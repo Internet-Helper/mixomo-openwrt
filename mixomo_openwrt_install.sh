@@ -171,7 +171,7 @@ install_mihomo() {
         log_error "Не удалось определить версию. Проверьте интернет."
         return 1
     fi
-    echo "--> Последния версия: $RELEASE_TAG"
+    echo "--> Последняя версия: $RELEASE_TAG"
 
     FILENAME="mihomo-linux-${MIHOMO_ARCH}-${RELEASE_TAG}.gz"
     DOWNLOAD_URL="https://github.com/MetaCubeX/mihomo/releases/download/${RELEASE_TAG}/${FILENAME}"
@@ -1261,7 +1261,6 @@ install_magitrickle() {
     local BACKUP_PATH="/tmp/magitrickle_config_backup.yaml"
     
     if [ -f "$CONFIG_PATH" ]; then
-        log_info "Создание бэкапа конфига..."
         cp "$CONFIG_PATH" "$BACKUP_PATH"
     fi
     
@@ -1442,8 +1441,7 @@ main() {
 	echo "Теперь:"
 	echo "1. Выйдите из LuCI (страница роутера) и войдите снова."
 	echo "2. Во вкладке «Services\Службы» - «Mihomo» настройте конфигурацию."
-	echo "[Совет] Для этого можете использовать этот генератор конфигураций:"
-	echo "https://spatiumstas.github.io/web4core/"
+	echo "[Совет] https://spatiumstas.github.io/web4core/"
 	echo "3. Во вкладке «Services\Службы» - «MagiTrickle» создайте список нужных адресов."
 	echo "4. Наслаждайтесь интернетом :)"
 	echo ""

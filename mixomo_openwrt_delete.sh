@@ -18,7 +18,7 @@ is_pkg_installed() {
 }
 
 remove_mihomo() {
-    log_info "Проверка Mihomo..."
+    log_info "Проверка наличия Mihomo..."
     local CLEANED=0
 
     if [ -f "/etc/init.d/mihomo" ]; then
@@ -49,7 +49,7 @@ remove_mihomo() {
 }
 
 remove_hev_tunnel() {
-    log_info "Проверка Hev-Socks5-Tunnel..."
+    log_info "Проверка наличия Hev-Socks5-Tunnel..."
     local ACTION_TAKEN=0
 
     if [ -f "/etc/init.d/hev-socks5-tunnel" ]; then
@@ -88,7 +88,7 @@ remove_hev_tunnel() {
 }
 
 remove_magitrickle() {
-    log_info "Проверка MagiTrickle..."
+    log_info "Проверка наличия MagiTrickle..."
     local PKG_REMOVED=0
 
     if [ -f "/etc/init.d/magitrickle" ]; then
