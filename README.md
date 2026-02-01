@@ -1,8 +1,11 @@
-# Mixomo OpenWRT
-# Описание
+<img width="969" height="236" alt="mixomo" src="https://github.com/user-attachments/assets/290fcf0f-a1b8-439e-8b61-fb74fda313ca" />
+
+## Описание
 Автоматический установщик Mihomo, hev-socks5-tunnel и MagiTrickle для OpenWRT.  
 После установки необходимо лишь настроить конфигурацию Mihomo (рекомендации — здесь) и добавить списки сайтов в MagiTrickle.  
 Управление осуществляется через службы в LuCI.
+
+<img width="988" height="908" alt="1" src="https://github.com/user-attachments/assets/621d1a57-9e5f-4427-b5b2-a128abf0f616" />
 
 # Установка
 Загрузите необходимые пакеты:
