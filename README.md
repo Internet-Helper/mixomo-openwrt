@@ -2,11 +2,13 @@
 
 ## Описание
 Автоматический установщик Mihomo, hev-socks5-tunnel и MagiTrickle для OpenWRT.  
-После установки необходимо лишь настроить конфигурацию Mihomo (рекомендации — [здесь](https://github.com/Internet-Helper/mixomo-openwrt/blob/main/advise/%D0%A1%D0%BE%D0%B2%D0%B5%D1%82%D1%8B.md)) и добавить списки сайтов в MagiTrickle.  
-Управление осуществляется через службы Mihomo (прокси-клиент) и MagiTrickle (направление доменов и/или подсетей) в LuCI.  
-Главное преимущество — в Mihomo можно направлять трафик по доменам и/или подсетям через MagiTrickle, не затрагивая остальной трафик.
+Управление осуществляется через службы MagiTrickle (направление доменов и/или подсетей) и Mihomo (сам прокси) в LuCI.  
+Главное преимущество — можно направлять только выбранный трафик, не затрагивая остальной.  
+После установки необходимо лишь настроить конфигурацию Mihomo (рекомендации — [здесь](https://github.com/Internet-Helper/mixomo-openwrt/blob/main/advise/%D0%A1%D0%BE%D0%B2%D0%B5%D1%82%D1%8B.md)) и добавить списки в MagiTrickle.  
 
 <img width="988" height="908" alt="1" src="https://github.com/user-attachments/assets/621d1a57-9e5f-4427-b5b2-a128abf0f616" />
+
+<img width="993" height="527" alt="image" src="https://github.com/user-attachments/assets/1ae832a5-9bdd-45e8-b229-61fbae029203" />
 
 # Установка
 Загрузите необходимые пакеты:
