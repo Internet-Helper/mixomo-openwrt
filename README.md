@@ -15,7 +15,7 @@
 ## Описание
 Автоматическая установка трёх компонентов для **умной** маршрутизации трафика на роутерах OpenWRT:  
 - [Mihomo](https://github.com/MetaCubeX/mihomo) - мощный и современный прокси-движок.  
-- [hev-socks5-tunnel](https://github.com/heiher/hev-socks5-tunnel) - лёгкий и быстрый tun <-> socks5 мост. Нужен чтобы MagiTrickle увидел интерфейс Mihomo.  
+- [hev-socks5-tunnel](https://github.com/heiher/hev-socks5-tunnel) - быстрый tun <-> socks5 мост. Нужен чтобы MagiTrickle увидел интерфейс Mihomo.  
 - [MagiTrickle](https://github.com/MagiTrickle/MagiTrickle) | [MagiTrickle_Mod](https://github.com/LarinIvan/MagiTrickle_Mod) - направляет в прокси только выбранные домены и подсети (IP/CIDR).
 
 **Главное преимущество перед SSClash, OpenClash, Nikki, fchomo и других:**  
