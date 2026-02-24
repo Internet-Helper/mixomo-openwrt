@@ -1,0 +1,469 @@
+mode: rule
+ipv6: false
+mixed-port: 7890
+log-level: error
+allow-lan: false
+unified-delay: true
+tcp-concurrent: false
+find-process-mode: off
+external-controller: 0.0.0.0:9090
+external-ui: ./UI
+external-ui-url: "https://github.com/Zephyruso/zashboard/releases/latest/download/dist-cdn-fonts.zip"
+routing-mark: 2
+profile:
+  store-selected: true
+  store-fake-ip: true
+  tracing: true
+sniffer:
+  enable: true
+  force-dns-mapping: true
+  parse-pure-ip: true
+  sniff:
+    HTTP:
+      ports: [80]
+      override-destination: true
+    TLS:
+      ports: [443, 8443]
+    QUIC:
+      ports: [443, 8443]
+  skip-domain:
+    - Mijia Cloud
+    - +.lan
+    - +.local
+    - +.msftconnecttest.com
+    - +.msftncsi.com
+    - +.3gppnetwork.org
+    - +.openwrt.org
+    - +.vsean.net
+    - cudy.net
+
+hosts:
+  ntc.party: 130.255.77.28
+
+dns:
+  enable: true
+  listen: 0.0.0.0:7880
+  ipv6: false
+  nameserver:
+    - https://dns.google/dns-query
+    - https://dns.quad9.net/dns-query
+    - https://dns.cloudflare.com/dns-query
+    - https://common.dot.dns.yandex.net/dns-query
+    - https://unfiltered.adguard-dns.com/dns-query
+
+proxies:
+
+  - name: "Домашний интернет"
+    type: direct
+
+  - name: "🇷🇺 RU WARP"
+    type: wireguard
+    private-key: WARP-PRIVATE-KEY # ЗДЕCЬ УКАЖИТЕ PrivateKey
+    server: 162.159.192.1
+    port: 4500
+    ip: 172.16.0.2
+    public-key: bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=
+    allowed-ips: ['0.0.0.0/0']
+    udp: true
+    mtu: 1280
+    amnezia-wg-option:
+      jc: 4
+      jmin: 40
+      jmax: 70
+      s1: 0
+      s2: 0
+      h1: 1
+      h2: 2
+      h3: 3
+      h4: 4
+      i1: <b 0x494e56495445207369703a626f624062696c6f78692e636f6d205349502f322e300d0a5669613a205349502f322e302f55445020706333332e61746c616e74612e636f6d3b6272616e63683d7a39684734624b3737366173646864730d0a4d61782d466f7277617264733a2037300d0a546f3a20426f62203c7369703a626f624062696c6f78692e636f6d3e0d0a46726f6d3a20416c696365203c7369703a616c6963654061746c616e74612e636f6d3e3b7461673d313932383330313737340d0a43616c6c2d49443a20613834623463373665363637313040706333332e61746c616e74612e636f6d0d0a435365713a2033313431353920494e564954450d0a436f6e746163743a203c7369703a616c69636540706333332e61746c616e74612e636f6d3e0d0a436f6e74656e742d547970653a206170706c69636174696f6e2f7364700d0a436f6e74656e742d4c656e6774683a20300d0a0d0a>
+
+  - name: "🇷🇺 RU WARP [GeoHide DNS]"
+    type: wireguard
+    private-key: WARP-PRIVATE-KEY # ЗДЕCЬ УКАЖИТЕ PrivateKey
+    server: 162.159.192.1
+    port: 4500
+    ip: 172.16.0.2
+    public-key: bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=
+    allowed-ips: ['0.0.0.0/0']
+    udp: true
+    remote-dns-resolve: true
+    dns: [ 45.155.204.190, 95.182.120.241 ]
+    mtu: 1280
+    amnezia-wg-option:
+      jc: 4
+      jmin: 40
+      jmax: 70
+      s1: 0
+      s2: 0
+      h1: 1
+      h2: 2
+      h3: 3
+      h4: 4
+      i1: <b 0x494e56495445207369703a626f624062696c6f78692e636f6d205349502f322e300d0a5669613a205349502f322e302f55445020706333332e61746c616e74612e636f6d3b6272616e63683d7a39684734624b3737366173646864730d0a4d61782d466f7277617264733a2037300d0a546f3a20426f62203c7369703a626f624062696c6f78692e636f6d3e0d0a46726f6d3a20416c696365203c7369703a616c6963654061746c616e74612e636f6d3e3b7461673d313932383330313737340d0a43616c6c2d49443a20613834623463373665363637313040706333332e61746c616e74612e636f6d0d0a435365713a2033313431353920494e564954450d0a436f6e746163743a203c7369703a616c69636540706333332e61746c616e74612e636f6d3e0d0a436f6e74656e742d547970653a206170706c69636174696f6e2f7364700d0a436f6e74656e742d4c656e6774683a20300d0a0d0a>
+
+  - name: "🇷🇺 RU WARP [Malw DNS]"
+    type: wireguard
+    private-key: WARP-PRIVATE-KEY # ЗДЕCЬ УКАЖИТЕ PrivateKey
+    server: 162.159.192.1
+    port: 4500
+    ip: 172.16.0.2
+    public-key: bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=
+    allowed-ips: ['0.0.0.0/0']
+    udp: true
+    remote-dns-resolve: true
+    dns: [ 84.21.189.133, 193.23.209.189 ]
+    mtu: 1280
+    amnezia-wg-option:
+      jc: 4
+      jmin: 40
+      jmax: 70
+      s1: 0
+      s2: 0
+      h1: 1
+      h2: 2
+      h3: 3
+      h4: 4
+      i1: <b 0x494e56495445207369703a626f624062696c6f78692e636f6d205349502f322e300d0a5669613a205349502f322e302f55445020706333332e61746c616e74612e636f6d3b6272616e63683d7a39684734624b3737366173646864730d0a4d61782d466f7277617264733a2037300d0a546f3a20426f62203c7369703a626f624062696c6f78692e636f6d3e0d0a46726f6d3a20416c696365203c7369703a616c6963654061746c616e74612e636f6d3e3b7461673d313932383330313737340d0a43616c6c2d49443a20613834623463373665363637313040706333332e61746c616e74612e636f6d0d0a435365713a2033313431353920494e564954450d0a436f6e746163743a203c7369703a616c69636540706333332e61746c616e74612e636f6d3e0d0a436f6e74656e742d547970653a206170706c69636174696f6e2f7364700d0a436f6e74656e742d4c656e6774683a20300d0a0d0a>
+
+  - name: "🇷🇺 RU WARP [Mafioznik DNS]"
+    type: wireguard
+    private-key: WARP-PRIVATE-KEY # ЗДЕCЬ УКАЖИТЕ PrivateKey
+    server: 162.159.192.1
+    port: 4500
+    ip: 172.16.0.2
+    public-key: bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=
+    allowed-ips: ['0.0.0.0/0']
+    udp: true
+    remote-dns-resolve: true
+    dns: [ 103.27.157.38, 103.27.157.100 ]
+    mtu: 1280
+    amnezia-wg-option:
+      jc: 4
+      jmin: 40
+      jmax: 70
+      s1: 0
+      s2: 0
+      h1: 1
+      h2: 2
+      h3: 3
+      h4: 4
+      i1: <b 0x494e56495445207369703a626f624062696c6f78692e636f6d205349502f322e300d0a5669613a205349502f322e302f55445020706333332e61746c616e74612e636f6d3b6272616e63683d7a39684734624b3737366173646864730d0a4d61782d466f7277617264733a2037300d0a546f3a20426f62203c7369703a626f624062696c6f78692e636f6d3e0d0a46726f6d3a20416c696365203c7369703a616c6963654061746c616e74612e636f6d3e3b7461673d313932383330313737340d0a43616c6c2d49443a20613834623463373665363637313040706333332e61746c616e74612e636f6d0d0a435365713a2033313431353920494e564954450d0a436f6e746163743a203c7369703a616c69636540706333332e61746c616e74612e636f6d3e0d0a436f6e74656e742d547970653a206170706c69636174696f6e2f7364700d0a436f6e74656e742d4c656e6774683a20300d0a0d0a>
+
+  - name: "🇷🇺 RU WARP [Astracat DNS]"
+    type: wireguard
+    private-key: WARP-PRIVATE-KEY # ЗДЕCЬ УКАЖИТЕ PrivateKey
+    server: 162.159.192.1
+    port: 4500
+    ip: 172.16.0.2
+    public-key: bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=
+    allowed-ips: ['0.0.0.0/0']
+    udp: true
+    remote-dns-resolve: true
+    dns: [ 108.165.164.224, 108.165.164.201 ]
+    mtu: 1280
+    amnezia-wg-option:
+      jc: 4
+      jmin: 40
+      jmax: 70
+      s1: 0
+      s2: 0
+      h1: 1
+      h2: 2
+      h3: 3
+      h4: 4
+      i1: <b 0x494e56495445207369703a626f624062696c6f78692e636f6d205349502f322e300d0a5669613a205349502f322e302f55445020706333332e61746c616e74612e636f6d3b6272616e63683d7a39684734624b3737366173646864730d0a4d61782d466f7277617264733a2037300d0a546f3a20426f62203c7369703a626f624062696c6f78692e636f6d3e0d0a46726f6d3a20416c696365203c7369703a616c6963654061746c616e74612e636f6d3e3b7461673d313932383330313737340d0a43616c6c2d49443a20613834623463373665363637313040706333332e61746c616e74612e636f6d0d0a435365713a2033313431353920494e564954450d0a436f6e746163743a203c7369703a616c69636540706333332e61746c616e74612e636f6d3e0d0a436f6e74656e742d547970653a206170706c69636174696f6e2f7364700d0a436f6e74656e742d4c656e6774683a20300d0a0d0a>
+
+  - name: "🇷🇺 RU WARP [Xbox DNS]"
+    type: wireguard
+    private-key: WARP-PRIVATE-KEY # ЗДЕCЬ УКАЖИТЕ PrivateKey
+    server: 162.159.192.1
+    port: 4500
+    ip: 172.16.0.2
+    public-key: bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=
+    allowed-ips: ['0.0.0.0/0']
+    udp: true
+    remote-dns-resolve: true
+    dns: [ 176.99.11.77, 80.78.247.254 ]
+    mtu: 1280
+    amnezia-wg-option:
+      jc: 4
+      jmin: 40
+      jmax: 70
+      s1: 0
+      s2: 0
+      h1: 1
+      h2: 2
+      h3: 3
+      h4: 4
+      i1: <b 0x494e56495445207369703a626f624062696c6f78692e636f6d205349502f322e300d0a5669613a205349502f322e302f55445020706333332e61746c616e74612e636f6d3b6272616e63683d7a39684734624b3737366173646864730d0a4d61782d466f7277617264733a2037300d0a546f3a20426f62203c7369703a626f624062696c6f78692e636f6d3e0d0a46726f6d3a20416c696365203c7369703a616c6963654061746c616e74612e636f6d3e3b7461673d313932383330313737340d0a43616c6c2d49443a20613834623463373665363637313040706333332e61746c616e74612e636f6d0d0a435365713a2033313431353920494e564954450d0a436f6e746163743a203c7369703a616c69636540706333332e61746c616e74612e636f6d3e0d0a436f6e74656e742d547970653a206170706c69636174696f6e2f7364700d0a436f6e74656e742d4c656e6774683a20300d0a0d0a>
+
+  - name: "🇷🇺 RU WARP [Comss DNS]"
+    type: wireguard
+    private-key: WARP-PRIVATE-KEY # ЗДЕCЬ УКАЖИТЕ PrivateKey
+    server: 162.159.192.1
+    port: 4500
+    ip: 172.16.0.2
+    public-key: bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=
+    allowed-ips: ['0.0.0.0/0']
+    udp: true
+    remote-dns-resolve: true
+    dns: [ 83.220.169.155, 212.109.195.93 ]
+    mtu: 1280
+    amnezia-wg-option:
+      jc: 4
+      jmin: 40
+      jmax: 70
+      s1: 0
+      s2: 0
+      h1: 1
+      h2: 2
+      h3: 3
+      h4: 4
+      i1: <b 0x494e56495445207369703a626f624062696c6f78692e636f6d205349502f322e300d0a5669613a205349502f322e302f55445020706333332e61746c616e74612e636f6d3b6272616e63683d7a39684734624b3737366173646864730d0a4d61782d466f7277617264733a2037300d0a546f3a20426f62203c7369703a626f624062696c6f78692e636f6d3e0d0a46726f6d3a20416c696365203c7369703a616c6963654061746c616e74612e636f6d3e3b7461673d313932383330313737340d0a43616c6c2d49443a20613834623463373665363637313040706333332e61746c616e74612e636f6d0d0a435365713a2033313431353920494e564954450d0a436f6e746163743a203c7369703a616c69636540706333332e61746c616e74612e636f6d3e0d0a436f6e74656e742d547970653a206170706c69636174696f6e2f7364700d0a436f6e74656e742d4c656e6774683a20300d0a0d0a>
+
+  - name: "🇫🇮 FI WARP"
+    type: wireguard
+    private-key: WARP-PRIVATE-KEY # ЗДЕCЬ УКАЖИТЕ PrivateKey
+    server: fi.tribukvy.ltd
+    port: 4500
+    ip: 172.16.0.2
+    public-key: bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=
+    allowed-ips: ['0.0.0.0/0']
+    udp: true
+    mtu: 1280
+    amnezia-wg-option:
+      jc: 4
+      jmin: 40
+      jmax: 70
+      s1: 0
+      s2: 0
+      h1: 1
+      h2: 2
+      h3: 3
+      h4: 4
+      i1: <b 0x494e56495445207369703a626f624062696c6f78692e636f6d205349502f322e300d0a5669613a205349502f322e302f55445020706333332e61746c616e74612e636f6d3b6272616e63683d7a39684734624b3737366173646864730d0a4d61782d466f7277617264733a2037300d0a546f3a20426f62203c7369703a626f624062696c6f78692e636f6d3e0d0a46726f6d3a20416c696365203c7369703a616c6963654061746c616e74612e636f6d3e3b7461673d313932383330313737340d0a43616c6c2d49443a20613834623463373665363637313040706333332e61746c616e74612e636f6d0d0a435365713a2033313431353920494e564954450d0a436f6e746163743a203c7369703a616c69636540706333332e61746c616e74612e636f6d3e0d0a436f6e74656e742d547970653a206170706c69636174696f6e2f7364700d0a436f6e74656e742d4c656e6774683a20300d0a0d0a>
+
+  - name: "🇩🇪 DE WARP"
+    type: wireguard
+    private-key: WARP-PRIVATE-KEY # ЗДЕCЬ УКАЖИТЕ PrivateKey
+    server: de.tribukvy.ltd
+    port: 4500
+    ip: 172.16.0.2
+    public-key: bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=
+    allowed-ips: ['0.0.0.0/0']
+    udp: true
+    mtu: 1280
+    amnezia-wg-option:
+      jc: 4
+      jmin: 40
+      jmax: 70
+      s1: 0
+      s2: 0
+      h1: 1
+      h2: 2
+      h3: 3
+      h4: 4
+      i1: <b 0x494e56495445207369703a626f624062696c6f78692e636f6d205349502f322e300d0a5669613a205349502f322e302f55445020706333332e61746c616e74612e636f6d3b6272616e63683d7a39684734624b3737366173646864730d0a4d61782d466f7277617264733a2037300d0a546f3a20426f62203c7369703a626f624062696c6f78692e636f6d3e0d0a46726f6d3a20416c696365203c7369703a616c6963654061746c616e74612e636f6d3e3b7461673d313932383330313737340d0a43616c6c2d49443a20613834623463373665363637313040706333332e61746c616e74612e636f6d0d0a435365713a2033313431353920494e564954450d0a436f6e746163743a203c7369703a616c69636540706333332e61746c616e74612e636f6d3e0d0a436f6e74656e742d547970653a206170706c69636174696f6e2f7364700d0a436f6e74656e742d4c656e6774683a20300d0a0d0a>
+
+  - name: "🇩🇪 DE WARP [2]"
+    type: wireguard
+    private-key: WARP-PRIVATE-KEY # ЗДЕCЬ УКАЖИТЕ PrivateKey
+    server: se.tribukvy.ltd
+    port: 4500
+    ip: 172.16.0.2
+    public-key: bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=
+    allowed-ips: ['0.0.0.0/0']
+    udp: true
+    mtu: 1280
+    amnezia-wg-option:
+      jc: 4
+      jmin: 40
+      jmax: 70
+      s1: 0
+      s2: 0
+      h1: 1
+      h2: 2
+      h3: 3
+      h4: 4
+      i1: <b 0x494e56495445207369703a626f624062696c6f78692e636f6d205349502f322e300d0a5669613a205349502f322e302f55445020706333332e61746c616e74612e636f6d3b6272616e63683d7a39684734624b3737366173646864730d0a4d61782d466f7277617264733a2037300d0a546f3a20426f62203c7369703a626f624062696c6f78692e636f6d3e0d0a46726f6d3a20416c696365203c7369703a616c6963654061746c616e74612e636f6d3e3b7461673d313932383330313737340d0a43616c6c2d49443a20613834623463373665363637313040706333332e61746c616e74612e636f6d0d0a435365713a2033313431353920494e564954450d0a436f6e746163743a203c7369703a616c69636540706333332e61746c616e74612e636f6d3e0d0a436f6e74656e742d547970653a206170706c69636174696f6e2f7364700d0a436f6e74656e742d4c656e6774683a20300d0a0d0a>
+
+  - name: "🇱🇹 LT WARP"
+    type: wireguard
+    private-key: WARP-PRIVATE-KEY # ЗДЕCЬ УКАЖИТЕ PrivateKey
+    server: nl2.tribukvy.ltd
+    port: 4500
+    ip: 172.16.0.2
+    public-key: bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=
+    allowed-ips: ['0.0.0.0/0']
+    udp: true
+    mtu: 1280
+    amnezia-wg-option:
+      jc: 4
+      jmin: 40
+      jmax: 70
+      s1: 0
+      s2: 0
+      h1: 1
+      h2: 2
+      h3: 3
+      h4: 4
+      i1: <b 0x494e56495445207369703a626f624062696c6f78692e636f6d205349502f322e300d0a5669613a205349502f322e302f55445020706333332e61746c616e74612e636f6d3b6272616e63683d7a39684734624b3737366173646864730d0a4d61782d466f7277617264733a2037300d0a546f3a20426f62203c7369703a626f624062696c6f78692e636f6d3e0d0a46726f6d3a20416c696365203c7369703a616c6963654061746c616e74612e636f6d3e3b7461673d313932383330313737340d0a43616c6c2d49443a20613834623463373665363637313040706333332e61746c616e74612e636f6d0d0a435365713a2033313431353920494e564954450d0a436f6e746163743a203c7369703a616c69636540706333332e61746c616e74612e636f6d3e0d0a436f6e74656e742d547970653a206170706c69636174696f6e2f7364700d0a436f6e74656e742d4c656e6774683a20300d0a0d0a>
+
+  - name: "🇳🇱 NL WARP"
+    type: wireguard
+    private-key: WARP-PRIVATE-KEY # ЗДЕCЬ УКАЖИТЕ PrivateKey
+    server: nl.tribukvy.ltd
+    port: 4500
+    ip: 172.16.0.2
+    public-key: bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=
+    allowed-ips: ['0.0.0.0/0']
+    udp: true
+    mtu: 1280
+    amnezia-wg-option:
+      jc: 4
+      jmin: 40
+      jmax: 70
+      s1: 0
+      s2: 0
+      h1: 1
+      h2: 2
+      h3: 3
+      h4: 4
+      i1: <b 0x494e56495445207369703a626f624062696c6f78692e636f6d205349502f322e300d0a5669613a205349502f322e302f55445020706333332e61746c616e74612e636f6d3b6272616e63683d7a39684734624b3737366173646864730d0a4d61782d466f7277617264733a2037300d0a546f3a20426f62203c7369703a626f624062696c6f78692e636f6d3e0d0a46726f6d3a20416c696365203c7369703a616c6963654061746c616e74612e636f6d3e3b7461673d313932383330313737340d0a43616c6c2d49443a20613834623463373665363637313040706333332e61746c616e74612e636f6d0d0a435365713a2033313431353920494e564954450d0a436f6e746163743a203c7369703a616c69636540706333332e61746c616e74612e636f6d3e0d0a436f6e74656e742d547970653a206170706c69636174696f6e2f7364700d0a436f6e74656e742d4c656e6774683a20300d0a0d0a>
+
+  - name: "🇳🇱 NL WARP [2]"
+    type: wireguard
+    private-key: WARP-PRIVATE-KEY # ЗДЕCЬ УКАЖИТЕ PrivateKey
+    server: nl3.tribukvy.ltd
+    port: 4500
+    ip: 172.16.0.2
+    public-key: bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=
+    allowed-ips: ['0.0.0.0/0']
+    udp: true
+    mtu: 1280
+    amnezia-wg-option:
+      jc: 4
+      jmin: 40
+      jmax: 70
+      s1: 0
+      s2: 0
+      h1: 1
+      h2: 2
+      h3: 3
+      h4: 4
+      i1: <b 0x494e56495445207369703a626f624062696c6f78692e636f6d205349502f322e300d0a5669613a205349502f322e302f55445020706333332e61746c616e74612e636f6d3b6272616e63683d7a39684734624b3737366173646864730d0a4d61782d466f7277617264733a2037300d0a546f3a20426f62203c7369703a626f624062696c6f78692e636f6d3e0d0a46726f6d3a20416c696365203c7369703a616c6963654061746c616e74612e636f6d3e3b7461673d313932383330313737340d0a43616c6c2d49443a20613834623463373665363637313040706333332e61746c616e74612e636f6d0d0a435365713a2033313431353920494e564954450d0a436f6e746163743a203c7369703a616c69636540706333332e61746c616e74612e636f6d3e0d0a436f6e74656e742d547970653a206170706c69636174696f6e2f7364700d0a436f6e74656e742d4c656e6774683a20300d0a0d0a>
+
+proxy-providers:
+
+  Подписка:
+    type: http
+    url: "https://..." # ЗДЕСЬ УКАЖИТЕ ССЫЛКУ НА ВАШУ ПОДПИСКУ
+    path: ./proxy-providers/sub.yaml
+    interval: 86400
+    health-check:
+      enable: true
+      url: http://www.gstatic.com/generate_204
+      interval: 300
+      timeout: 5000
+      lazy: true
+    override:
+      dialer-proxy: 🇷🇺 RU WARP
+
+proxy-groups:
+
+  - name: "Сервер для YouTube"
+    type: fallback
+    url: http://gstatic.com/generate_204
+    expected-status: 204
+    interval: 300
+    lazy: true
+    icon: https://www.clashverge.dev/assets/icons/youtube.svg
+    proxies:
+      - "🇷🇺 RU WARP"
+      - "Домашний интернет"
+    use:
+      - "Подписка"
+
+  - name: "Сервер для обхода геоблока"
+    type: fallback
+    url: http://gstatic.com/generate_204
+    expected-status: 204
+    interval: 300
+    lazy: true
+    icon: https://www.clashverge.dev/assets/icons/chatgpt.svg
+    proxies:
+      - "🇩🇪 DE WARP"
+      - "🇩🇪 DE WARP [2]"
+      - "🇳🇱 NL WARP"
+      - "🇳🇱 NL WARP [2]"
+      - "🇱🇹 LT WARP"
+      - "🇫🇮 FI WARP"
+      - "🇷🇺 RU WARP [GeoHide DNS]"
+      - "🇷🇺 RU WARP [Malw DNS]"
+      - "🇷🇺 RU WARP [Mafioznik DNS]"
+      - "🇷🇺 RU WARP [Astracat DNS]"
+      - "🇷🇺 RU WARP [Xbox DNS]"
+      - "🇷🇺 RU WARP [Comss DNS]"
+    use:
+      - "Подписка"
+
+  - name: "Сервер для остального трафика"
+    type: fallback
+    url: http://gstatic.com/generate_204
+    expected-status: 204
+    interval: 300
+    lazy: true
+    icon: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.3/assets/svg/1f310.svg
+    proxies:
+      - "🇩🇪 DE WARP"
+      - "🇩🇪 DE WARP [2]"
+      - "🇳🇱 NL WARP"
+      - "🇳🇱 NL WARP [2]"
+      - "🇱🇹 LT WARP"
+      - "🇫🇮 FI WARP"
+      - "🇷🇺 RU WARP"
+      - "🇷🇺 RU WARP [GeoHide DNS]"
+      - "🇷🇺 RU WARP [Malw DNS]"
+      - "🇷🇺 RU WARP [Mafioznik DNS]"
+      - "🇷🇺 RU WARP [Astracat DNS]"
+      - "🇷🇺 RU WARP [Xbox DNS]"
+      - "🇷🇺 RU WARP [Comss DNS]"
+    use:
+      - "Подписка"
+
+rule-providers:
+
+  youtube:
+    type: http
+    format: yaml
+    behavior: classical
+    url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/YouTube/YouTube.yaml"
+    path: ./rule-providers/youtube-list.yaml
+    interval: 86400
+
+  geoblock-geohide:
+    type: http
+    format: yaml
+    behavior: classical
+    url: "https://raw.githubusercontent.com/Internet-Helper/GeoHideDNS/refs/heads/main/lists/Clash/domains.yaml"
+    path: ./rule-providers/geoblock-geohide-list.yaml
+    interval: 86400
+
+  geoblock-dartraiden:
+    type: http
+    format: yaml
+    behavior: classical
+    url: "https://raw.githubusercontent.com/dartraiden/no-russia-hosts/refs/heads/master/mihomo-wildcard.txt"
+    path: ./rule-providers/geoblock-dartraiden-list.txt
+    interval: 86400
+
+rules:
+
+  # Правила для списков из rule-providers
+  - RULE-SET,youtube,Сервер для YouTube
+  - RULE-SET,geoblock-geohide,Сервер для обхода геоблока
+  - RULE-SET,geoblock-dartraiden,Сервер для обхода геоблока
+  
+  # Правило для остального трафика
+  - MATCH,Сервер для остального трафика
