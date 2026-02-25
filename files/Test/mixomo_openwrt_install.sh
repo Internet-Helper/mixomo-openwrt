@@ -17,6 +17,7 @@ step_fail() { echo -e "${RED}[FAIL]${NC}"; exit 1; }
 
 MIHOMO_INSTALL_DIR="/etc/mihomo"
 MIHOMO_BIN="/usr/bin/mihomo"
+SCRIPT_VERSION="v0.1.0-alpha"
 
 detect_mihomo_arch() {
     local arch=$(uname -m)
@@ -48,8 +49,15 @@ detect_mihomo_arch() {
 }
 
 install_mihomo() {
-	if ! . /etc/openwrt_release 2>/dev/null || [ "${DISTRIB_RELEASE%%.*}" -lt 22 ]; then
-		log_error "Требуется OpenWrt 22.03 или новее"
+	if ! . /etc/openwrt_release 2>/dev/null; then
+		log_error "Не удалось определить версию OpenWrt"
+		return 1
+	fi
+	
+	local major="${DISTRIB_RELEASE%%.*}"
+	
+	if [ "$major" -lt 22 ] || [ "$major" -ge 25 ]; then
+		log_error "Поддерживаются только OpenWrt 22.03 - 24.x"
 		return 1
 	fi
 
@@ -218,9 +226,10 @@ mode: rule
 ipv6: false
 mixed-port: 7890
 log-level: error
-allow-lan: true
+allow-lan: false
 unified-delay: true
-tcp-concurrent: true
+tcp-concurrent: false
+find-process-mode: off
 external-controller: 0.0.0.0:9090
 external-ui: ./UI
 external-ui-url: "https://github.com/Zephyruso/zashboard/releases/latest/download/dist-cdn-fonts.zip"
@@ -256,19 +265,12 @@ dns:
   enable: true
   listen: 0.0.0.0:7880
   ipv6: false
-  prefer-h3: true
-  default-nameserver:
-    - tls://77.88.8.8
-    - tls://8.8.8.8
-  proxy-server-nameserver:
-    - tls://77.88.8.8
-    - tls://8.8.8.8
-  direct-nameserver:
-    - tls://77.88.8.8
-    - tls://8.8.8.8
   nameserver:
-    - https://common.dot.dns.yandex.net/dns-query
     - https://dns.google/dns-query
+    - https://dns.quad9.net/dns-query
+    - https://dns.cloudflare.com/dns-query
+    - https://common.dot.dns.yandex.net/dns-query
+    - https://unfiltered.adguard-dns.com/dns-query
 
 proxies:
   - name: Домашний интернет
@@ -1412,7 +1414,7 @@ finalize_install() {
 
 main() {
 	clear
-    log_done "Скрипт установки Mixomo OpenWRT от Internet Helper"
+    log_done "Скрипт установки Mixomo OpenWRT $SCRIPT_VERSION от Internet Helper"
 	echo ""
 	
     log_step "[1/3] Установка Mihomo"
@@ -1430,13 +1432,14 @@ main() {
 	
 	log_step "Установка прошла успешно!"
 	echo ""
-	echo "Теперь:"
 	echo "1. Выйдите из LuCI (страница роутера) и войдите снова."
-	echo "2. Во вкладке «Services\Службы» - «Mihomo» настройте конфигурацию."
-	echo "[Совет] https://spatiumstas.github.io/web4core/"
-	echo "3. Во вкладке «Services\Службы» - «MagiTrickle» создайте список нужных адресов."
-	echo "4. Наслаждайтесь интернетом :)"
 	echo ""
+	echo "2. Нажмите на Службы \ Services -> Mihomo -> Настройте конфигурацию"
+	echo "[Совет] https://spatiumstas.github.io/web4core/"
+	echo ""
+	echo "3. Нажмите на Службы \ Services -> MagiTrickle -> Создайте списки доменов \ подсетей"
+	echo ""
+	echo "4. И наслаждайтесь интернетом :)"
 }
 
 main
