@@ -44,7 +44,8 @@
 
 # Что делать после установки  
 - Зайти в LuCI -> Службы или Services -> Mihomo -> Вставить свою конфигурацию.<br>
-  Чтобы её составить можно использовать [оригинальную документацию](https://mihomo-docs.netlify.app/ru/config/) или [онлайн генератор web4core](https://spatiumstas.github.io/web4core).
+  Чтобы её составить можно использовать [оригинальную документацию](https://mihomo-docs.netlify.app/ru/config/) или [онлайн генератор web4core](https://spatiumstas.github.io/web4core).  
+  Конфигурация **обязана** содержать строку *mixed-port: 7890* для работы через *hev-socks5-tunnel*.
 - Зайти в LuCI -> Службы или Services -> MagiTrickle -> Создать списки доменов или подсетей.<br>  
 - (*Опционально*) Изменить DNS-серверы на публичные -> [ссылка на инструкцию](https://forum.routerich.ru/t/kak-izmenit-dns/71).
 
