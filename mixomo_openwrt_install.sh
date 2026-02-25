@@ -17,53 +17,52 @@ step_fail() { echo -e "${RED}[FAIL]${NC}"; exit 1; }
 
 MIHOMO_INSTALL_DIR="/etc/mihomo"
 MIHOMO_BIN="/usr/bin/mihomo"
+SCRIPT_VERSION="v0.1.0-alpha"
 
 detect_mihomo_arch() {
     local arch=$(uname -m)
-    
+    local endian_byte=$(hexdump -s 5 -n 1 -e '1/1 "%d"' /bin/busybox 2>/dev/null)
+
     case "$arch" in
-        x86_64)
-            echo "amd64" 
+        x86_64)  echo "amd64" ;;
+        i?86)    echo "386" ;;
+        aarch64|arm64) echo "arm64" ;;
+        armv7*)  echo "armv7" ;;
+        armv5*|armv4*) echo "armv5" ;;
+        mips*)
+            local fpu=$(grep -c "FPU" /proc/cpuinfo 2>/dev/null || echo 0)
+            local floattype="softfloat"
+            [ "$fpu" -gt 0 ] && floattype="hardfloat"
+
+            if [ "$endian_byte" = "1" ]; then
+                echo "mipsle-${floattype}"
+            else
+                echo "mips-${floattype}"
+            fi
             ;;
-        i?86)
-            echo "386"
-            ;;
-        aarch64|arm64)
-            echo "arm64"
-            ;;
-        armv7*)
-            echo "armv7"
-            ;;
-        armv5*|armv4*)
-            echo "armv5"
-            ;;
-        mips)
-            echo "mips-softfloat"
-            ;;
-        mipsle)
-            echo "mipsle-softfloat"
-            ;;
-        mips64)
-            echo "mips64"
-            ;;
-        riscv64)
-            echo "riscv64"
-            ;;
+        riscv64) echo "riscv64" ;;
         *)
-            log_error "Архитектура $arch не распознана автоматически."
+            log_error "Архитектура $arch не распознана"
             exit 1
             ;;
     esac
 }
 
 install_mihomo() {
-	if ! . /etc/openwrt_release 2>/dev/null || [ "${DISTRIB_RELEASE%%.*}" -lt 22 ]; then
-		log_error "Требуется OpenWrt 22.03 или новее"
+	if ! . /etc/openwrt_release 2>/dev/null; then
+		log_error "Не удалось определить версию OpenWrt"
+		return 1
+	fi
+	
+	local major="${DISTRIB_RELEASE%%.*}"
+	
+	if [ "$major" -lt 22 ] || [ "$major" -ge 25 ]; then
+		log_error "Поддерживаются только OpenWrt 22.03 - 24.x"
 		return 1
 	fi
 
 	local REQ_TMP_KB=16000
-	local REQ_ROOT_KB=36000
+	local REQ_ROOT_KB=32000
 	local AVAIL_TMP_KB
 	AVAIL_TMP_KB=$(df -k /tmp | awk 'NR==2 {print $4}')
 
@@ -164,6 +163,8 @@ install_mihomo() {
              /etc/mihomo/rule-files \
              /etc/mihomo/UI
 
+    echo "$MIHOMO_ARCH" > /etc/mihomo/.arch
+
     echo "--> Получение номера последней версии..."
     RELEASE_TAG=$(curl -Ls -o /dev/null -w '%{url_effective}' https://github.com/MetaCubeX/mihomo/releases/latest | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
     
@@ -225,9 +226,10 @@ mode: rule
 ipv6: false
 mixed-port: 7890
 log-level: error
-allow-lan: true
+allow-lan: false
 unified-delay: true
-tcp-concurrent: true
+tcp-concurrent: false
+find-process-mode: off
 external-controller: 0.0.0.0:9090
 external-ui: ./UI
 external-ui-url: "https://github.com/Zephyruso/zashboard/releases/latest/download/dist-cdn-fonts.zip"
@@ -263,19 +265,12 @@ dns:
   enable: true
   listen: 0.0.0.0:7880
   ipv6: false
-  prefer-h3: true
-  default-nameserver:
-    - tls://77.88.8.8
-    - tls://8.8.8.8
-  proxy-server-nameserver:
-    - tls://77.88.8.8
-    - tls://8.8.8.8
-  direct-nameserver:
-    - tls://77.88.8.8
-    - tls://8.8.8.8
   nameserver:
-    - https://common.dot.dns.yandex.net/dns-query
     - https://dns.google/dns-query
+    - https://dns.quad9.net/dns-query
+    - https://dns.cloudflare.com/dns-query
+    - https://common.dot.dns.yandex.net/dns-query
+    - https://unfiltered.adguard-dns.com/dns-query
 
 proxies:
   - name: Домашний интернет
@@ -1419,7 +1414,7 @@ finalize_install() {
 
 main() {
 	clear
-    log_done "Скрипт установки Mixomo OpenWRT от Internet Helper"
+    log_done "Скрипт установки Mixomo OpenWRT $SCRIPT_VERSION от Internet Helper"
 	echo ""
 	
     log_step "[1/3] Установка Mihomo"
@@ -1435,14 +1430,16 @@ main() {
     finalize_install || step_fail
 	echo ""
 	
-	log_step "Установка прошла успешно!"
+	log_step "Установка Mixomo OpenWRT $SCRIPT_VERSION прошла успешно!"
 	echo ""
-	echo "Теперь:"
-	echo "1. Выйдите из LuCI (страница роутера) и войдите снова."
-	echo "2. Во вкладке «Services\Службы» - «Mihomo» настройте конфигурацию."
-	echo "[Совет] https://spatiumstas.github.io/web4core/"
-	echo "3. Во вкладке «Services\Службы» - «MagiTrickle» создайте список нужных адресов."
-	echo "4. Наслаждайтесь интернетом :)"
+	log_done "1. Выйдите из LuCI (страница роутера) и войдите снова"
+	echo ""
+	log_done "2. Нажмите на Службы или Services -> Mihomo -> Настройте конфигурацию"
+	log_done "Вам может помочь онлайн генератор -> https://spatiumstas.github.io/web4core/"
+	echo ""
+	log_done "3. Нажмите на Службы или Services -> MagiTrickle -> Создайте списки доменов и подсетей"
+	echo ""
+	log_done "4. Наслаждайтесь интернетом :)"
 	echo ""
 }
 
