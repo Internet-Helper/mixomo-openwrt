@@ -62,7 +62,7 @@ install_mihomo() {
 	fi
 
 	local REQ_TMP_KB=16000
-	local REQ_ROOT_KB=32000
+	local REQ_ROOT_KB=24000
 	local AVAIL_TMP_KB
 	AVAIL_TMP_KB=$(df -k /tmp | awk 'NR==2 {print $4}')
 
