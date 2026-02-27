@@ -50,7 +50,11 @@
 - (*Опционально*) Изменить DNS-серверы на публичные -> [ссылка на инструкцию](https://forum.routerich.ru/t/kak-izmenit-dns/71).
 
 # Установка и обновление
-Если у вас форк OpenWRT (Routerich и т.п.), лучше выбрать **оригинальный** MagiTrickle после начала установки.  
+- Если у вас форк OpenWRT (Routerich и т.п.), лучше выбрать **оригинальный** MagiTrickle после начала установки.  
+- Повторный запуск обновит Mihomo, hev-socks5-tunnel и мод MagiTrickle (оригинал пока зафиксирован).  
+- Ваши настройки Mihomo и списки сайтов MagiTrickle останутся нетронутыми.  
+- Если появится новая техническая версия конфигурации MagiTrickle, предыдущая будет сохранена рядом в виде бэкапа. 
+- **Если не хватает места для обновления**, сохраните конфигурации Mihomo и MagiTrickle, затем запустите скрипт удаления и после - скрипт установки.
 
 Загрузите необходимые пакеты:
 ```
@@ -63,11 +67,7 @@ opkg update && opkg install curl wget-ssl
 Альтернативная команда (если не сработала выше):
 ```
 wget -qO /tmp/mixomo_openwrt_install.sh --no-check-certificate https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/refs/heads/main/mixomo_openwrt_install.sh && chmod +x /tmp/mixomo_openwrt_install.sh && /tmp/mixomo_openwrt_install.sh && rm /tmp/mixomo_openwrt_install.sh
-```  
-  
-Повторный запуск обновит Mihomo, hev-socks5-tunnel и мод MagiTrickle (оригинал пока зафиксирован).  
-Ваши настройки Mihomo и списки сайтов MagiTrickle останутся нетронутыми.  
-Если появится новая техническая версия конфигурации MagiTrickle, предыдущая будет сохранена рядом в виде бэкапа.
+```
 
 # Удаление
 Пакеты `curl` и `wget-ssl` удалены не будут.  
