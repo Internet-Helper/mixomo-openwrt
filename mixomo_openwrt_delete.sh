@@ -1,6 +1,6 @@
 #!/bin/sh
 
-set -u
+SCRIPT_VERSION="v0.1.2-alpha"
 
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -13,8 +13,25 @@ log_error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 log_step()  { echo -e "${GREEN}=== $* ===${NC}"; }
 log_done()  { echo -e "${GREEN}$*${NC}"; }
 
+USE_APK=0
+if command -v apk > /dev/null 2>&1; then
+    USE_APK=1
+fi
+
 is_pkg_installed() {
-    opkg list-installed | grep -q "^$1 "
+    if [ "$USE_APK" -eq 1 ]; then
+        apk info "$1" > /dev/null 2>&1
+    else
+        opkg list-installed 2>/dev/null | grep -q "^$1 "
+    fi
+}
+
+remove_pkg() {
+    if [ "$USE_APK" -eq 1 ]; then
+        apk del "$1" > /dev/null 2>&1 || true
+    else
+        opkg remove "$1" > /dev/null 2>&1 || true
+    fi
 }
 
 remove_mihomo() {
@@ -22,8 +39,8 @@ remove_mihomo() {
     local CLEANED=0
 
     if [ -f "/etc/init.d/mihomo" ]; then
-        /etc/init.d/mihomo stop 2>/dev/null
-        /etc/init.d/mihomo disable 2>/dev/null
+        /etc/init.d/mihomo stop 2>/dev/null || true
+        /etc/init.d/mihomo disable 2>/dev/null || true
         rm -f /etc/init.d/mihomo
         CLEANED=1
     fi
@@ -40,9 +57,9 @@ remove_mihomo() {
         rm -rf /www/luci-static/resources/view/mihomo
         CLEANED=1
     fi
-    
+
     if [ "$CLEANED" -eq 1 ]; then
-        log_done "Mihomo и его файлы были успешно удалены."
+        log_done "Mihomo и его файлы успешно удалены."
     else
         log_done "Mihomo не найден (уже удалён)."
     fi
@@ -53,32 +70,44 @@ remove_hev_tunnel() {
     local ACTION_TAKEN=0
 
     if [ -f "/etc/init.d/hev-socks5-tunnel" ]; then
-        /etc/init.d/hev-socks5-tunnel stop 2>/dev/null
+        /etc/init.d/hev-socks5-tunnel stop 2>/dev/null || true
     fi
 
     if is_pkg_installed hev-socks5-tunnel; then
-        opkg remove hev-socks5-tunnel >/dev/null 2>&1
+        remove_pkg hev-socks5-tunnel
         ACTION_TAKEN=1
     fi
 
     if [ -d "/etc/hev-socks5-tunnel" ] || [ -f "/etc/config/hev-socks5-tunnel" ]; then
         rm -rf /etc/hev-socks5-tunnel
-        rm -rf /etc/hev-socks5-tunnel/main.yml
         rm -f /etc/config/hev-socks5-tunnel
         ACTION_TAKEN=1
     fi
 
-    uci delete hev-socks5-tunnel 2>/dev/null
-    uci delete network.Mihomo 2>/dev/null
-    uci delete firewall.Mihomo 2>/dev/null
-    uci delete firewall.lan_to_Mihomo 2>/dev/null
-    
+    echo "--> Очистка UCI..."
+    uci delete network.Mihomo 2>/dev/null || true
+
+    local fw_section
+    for fw_section in $(uci show firewall 2>/dev/null \
+            | grep -E "\.name='Mihomo'" \
+            | sed "s/\.name.*//"); do
+        uci delete "$fw_section" 2>/dev/null || true
+    done
+
+    for fw_section in $(uci show firewall 2>/dev/null \
+            | grep -E "\.(src|dest)='Mihomo'" \
+            | sed -E "s/\.(src|dest).*//"); do
+        uci delete "$fw_section" 2>/dev/null || true
+    done
+
+    uci delete firewall.Mihomo 2>/dev/null || true
+    uci delete firewall.lan_to_Mihomo 2>/dev/null || true
+
     uci commit network
     uci commit firewall
-    uci commit hev-socks5-tunnel 2>/dev/null
 
-    /etc/init.d/network reload 2>/dev/null
-    /etc/init.d/firewall reload 2>/dev/null
+    /etc/init.d/network reload 2>/dev/null || true
+    /etc/init.d/firewall restart 2>/dev/null || true
 
     if [ "$ACTION_TAKEN" -eq 1 ]; then
         log_done "Hev-Socks5-Tunnel и настройки удалены."
@@ -92,29 +121,33 @@ remove_magitrickle() {
     local PKG_REMOVED=0
 
     if [ -f "/etc/init.d/magitrickle" ]; then
-        /etc/init.d/magitrickle stop 2>/dev/null
-        /etc/init.d/magitrickle disable 2>/dev/null
+        /etc/init.d/magitrickle stop 2>/dev/null || true
+        /etc/init.d/magitrickle disable 2>/dev/null || true
     fi
 
     if is_pkg_installed magitrickle_mod; then
         log_info "Найден MagiTrickle Mod. Удаление..."
-        opkg remove magitrickle_mod > /dev/null 2>&1
+        remove_pkg magitrickle_mod
         PKG_REMOVED=1
     fi
 
     if is_pkg_installed magitrickle; then
-        log_info "Найден оригинальный MagiTrickle. Удаление..."
-        opkg remove magitrickle > /dev/null 2>&1
+        log_info "Найден MagiTrickle. Удаление..."
+        remove_pkg magitrickle
         PKG_REMOVED=1
     fi
 
     local FILES_REMOVED=0
-    if [ -d "/www/luci-static/resources/view/magitrickle" ]; then
+    if [ -d "/www/luci-static/resources/view/magitrickle" ] || \
+       [ -f "/usr/share/luci/menu.d/luci-app-magitrickle.json" ]; then
         rm -rf /www/luci-static/resources/view/magitrickle
-        rm -f /www/luci-static/resources/view/magitrickle.js
         rm -f /usr/share/luci/menu.d/luci-app-magitrickle.json
-		rm -f /etc/magitrickle/state/config.yaml
-		rm -f /etc/magitrickle/state/config.yaml-opkg
+        FILES_REMOVED=1
+    fi
+
+    if [ -f "/etc/magitrickle/state/config.yaml" ]; then
+        rm -f /etc/magitrickle/state/config.yaml
+        rm -f /etc/magitrickle/state/config.yaml.backup
         FILES_REMOVED=1
     fi
 
@@ -125,43 +158,34 @@ remove_magitrickle() {
     fi
 }
 
-remove_dependencies() {
-    log_info "Очистка зависимостей..."
-    if is_pkg_installed kmod-nft-tproxy; then
-        opkg remove kmod-nft-tproxy > /dev/null 2>&1
-        echo "--> kmod-nft-tproxy удален."
-    fi
-}
-
 cleanup_system() {
     log_info "Очистка кэша и перезапуск служб..."
     rm -rf /tmp/luci-indexcache /tmp/luci-modulecache/
-    /etc/init.d/rpcd restart > /dev/null 2>&1
-    /etc/init.d/uhttpd restart > /dev/null 2>&1
+    /etc/init.d/rpcd restart > /dev/null 2>&1 || true
+    /etc/init.d/uhttpd restart > /dev/null 2>&1 || true
 }
 
 main() {
-	clear
-    log_done "Скрипт удаления Mixomo OpenWRT от Internet Helper"
+    clear
+    log_done "Скрипт удаления Mixomo OpenWrt $SCRIPT_VERSION от Internet Helper"
     echo ""
-    
+
     log_step "[1/4] Удаление Mihomo"
     remove_mihomo
     echo ""
-    
+
     log_step "[2/4] Удаление Hev-Tunnel"
     remove_hev_tunnel
     echo ""
-    
+
     log_step "[3/4] Удаление MagiTrickle"
     remove_magitrickle
     echo ""
 
-    log_step "[4/4] Очистка системы"
-    remove_dependencies
+    log_step "[4/4] Завершение"
     cleanup_system
     echo ""
-    
+
     log_done "Удаление успешно завершено!"
 }
 
