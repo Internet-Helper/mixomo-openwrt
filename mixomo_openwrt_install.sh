@@ -5,10 +5,10 @@ SCRIPT_VERSION="v0.1.3-alpha"
 MT_JOB_ID="13378493545"
 
 MT_APK_VERSION="0.5.3"
-MT_APK_PRE="pre20260305232358"
+MT_APK_PART="pre20260305232358"
 
-MT_IPK_VERSION="0.5.2"
-MT_IPK_GIT_HASH="git20260305232358.d47bd8b3-1"
+MT_IPK_VERSION="0.5.3"
+MT_IPK_PART="git20260305232358.d47bd8b3-1"
 
 MIHOMO_INSTALL_DIR="/etc/mihomo"
 MIHOMO_BIN="/usr/bin/mihomo"
@@ -243,7 +243,7 @@ mode: rule
 ipv6: false
 mixed-port: 7890
 log-level: error
-allow-lan: false
+allow-lan: true
 unified-delay: true
 tcp-concurrent: false
 find-process-mode: off
@@ -284,7 +284,6 @@ dns:
   ipv6: false
   nameserver:
     - https://dns.google/dns-query
-    - https://dns.cloudflare.com/dns-query
     - https://common.dot.dns.yandex.net/dns-query
     - https://unfiltered.adguard-dns.com/dns-query
 
@@ -1290,26 +1289,28 @@ _magitrickle_apk() {
     ARCH=$(grep "^OPENWRT_ARCH=" /etc/os-release | cut -d'"' -f2)
     [ -n "$ARCH" ] || { log_error "Не удалось определить архитектуру"; return 1; }
     
-    local PKG_NAME="magitrickle_${MT_APK_VERSION}_${MT_APK_PRE}-r1_openwrt_${ARCH}.apk"
-    local DOWNLOAD_URL="https://gitlab.com/magitrickle/magitrickle/-/jobs/${MT_JOB_ID}/artifacts/raw/.build/${PKG_NAME}?inline=false"
-    local TMP_FILE="/tmp/${PKG_NAME}"
+    local PKG_NAME="magitrickle_${MT_APK_VERSION}_${MT_APK_PART}-r1_openwrt_${ARCH}.apk"
+    local URL="https://gitlab.com/magitrickle/magitrickle/-/jobs/${MT_JOB_ID}/artifacts/raw/.build/${PKG_NAME}?inline=false"
+    local TMP="/tmp/${PKG_NAME}"
 
     echo "--> Скачивание APK: $PKG_NAME"
-    if ! curl -Lf --retry 3 --retry-delay 2 -o "$TMP_FILE" "$DOWNLOAD_URL" >/dev/null 2>&1; then
-        log_error "Ошибка скачивания: $DOWNLOAD_URL"
+    curl -Lf --retry 3 --retry-delay 2 -o "$TMP" "$URL" || { log_error "Ошибка скачивания"; return 1; }
+
+    echo "--> Установка $PKG_NAME..."
+    if apk add --allow-untrusted "$TMP" >/dev/null 2>&1; then
+        echo "--> Установка $PKG_NAME завершена..."
+    else
+        log_error "Ошибка установки $PKG_NAME"
+        rm -f "$TMP"
         return 1
     fi
 
-    echo "--> Установка APK..."
-    apk add --allow-untrusted "$TMP_FILE" >/dev/null 2>&1 || { log_error "Ошибка установки"; rm -f "$TMP_FILE"; return 1; }
-    
-    rm -f "$TMP_FILE"
     /etc/init.d/magitrickle enable 2>/dev/null && /etc/init.d/magitrickle start 2>/dev/null
 }
 
 _magitrickle_opkg() {
     echo "Выберите версию MagiTrickle для установки:"
-    echo "1) Оригинал v${MT_VERSION_OPKG} (https://magitrickle.dev/docs/welcome/)"
+    echo "1) Оригинал v${MT_IPK_VERSION} (https://magitrickle.dev/docs/welcome/)"
     echo "2) Мод от LarinIvan (https://github.com/LarinIvan/MagiTrickle_Mod/)"
     printf "-> "
     local CHOICE
@@ -1317,35 +1318,39 @@ _magitrickle_opkg() {
 
     case "$CHOICE" in
         1)
-            if ! wget --version > /dev/null 2>&1; then
-                log_warn "wget не работает, переустановка..."
-                opkg remove wget-ssl > /dev/null 2>&1
-                opkg install wget --force-reinstall > /dev/null 2>&1 || {
-                    log_error "Критическая ошибка: не удалось переустановить wget"
-                    return 1
-                }
-                log_info "wget успешно переустановлен..."
+            local ARCH
+            ARCH=$(grep "^OPENWRT_ARCH=" /etc/os-release | cut -d'"' -f2)
+            [ -n "$ARCH" ] || { log_error "Не удалось определить архитектуру"; return 1; }
+            echo "--> Архитектура OpenWrt: $ARCH"
+
+            local PKG_NAME="magitrickle_${MT_IPK_VERSION}~${MT_IPK_PART}_openwrt_${ARCH}.ipk"
+            local URL="https://gitlab.com/magitrickle/magitrickle/-/jobs/${MT_JOB_ID}/artifacts/raw/.build/${PKG_NAME}?inline=false"
+            local TMP="/tmp/${PKG_NAME}"
+
+            echo "--> Скачивание оригинала: $PKG_NAME"
+            if ! curl -Lf --retry 3 --retry-delay 2 -o "$TMP" "$URL"; then
+                log_error "Ошибка скачивания: $URL"
+                return 1
             fi
 
-            local ARCH_SYS
-            ARCH_SYS=$(grep "^OPENWRT_ARCH=" /etc/os-release | cut -d'"' -f2)
-            [ -n "$ARCH_SYS" ] || { log_error "Не удалось определить архитектуру OpenWrt"; return 1; }
-            echo "--> Архитектура: $ARCH_SYS"
+            echo "--> Установка оригинала..."
+            if opkg install "$TMP" >/dev/null 2>&1; then
+                echo "--> Установка $PKG_NAME завершена..."
+            else
+                log_error "Ошибка установки оригинала"
+                rm -f "$TMP"
+                return 1
+            fi
 
-            local IPK="magitrickle_${MT_VERSION_OPKG}-2_openwrt_${ARCH_SYS}.ipk"
-            local URL="https://gitlab.com/api/v4/projects/69165954/packages/generic/magitrickle/${MT_VERSION_OPKG}/$IPK"
-
-            wget -O "/tmp/$IPK" "$URL" || { log_error "Ошибка скачивания оригинального MagiTrickle"; return 1; }
-            opkg install "/tmp/$IPK" || return 1
-            rm -f "/tmp/$IPK"
-
-            /etc/init.d/magitrickle enable > /dev/null 2>&1
-            /etc/init.d/magitrickle start > /dev/null 2>&1
+            /etc/init.d/magitrickle enable 2>/dev/null && /etc/init.d/magitrickle start 2>/dev/null
             ;;
         2)
-            log_info "Установка MagiTrickle_Mod..."
-            wget -O- https://raw.githubusercontent.com/LarinIvan/MagiTrickle_Mod/develop/add_repo.sh | sh || return 1
-            ;;
+            log_info "Запуск установки MagiTrickle_Mod..."
+            curl -sSL https://raw.githubusercontent.com/LarinIvan/MagiTrickle_Mod/develop/add_repo.sh | sh >/dev/null 2>&1 || {
+                log_error "Ошибка установки MagiTrickle_Mod"
+                return 1
+            }
+            echo "--> Установка MagiTrickle_Mod завершена..." ;;
         *)
             log_error "Неверный выбор"
             return 1
@@ -1483,8 +1488,11 @@ main() {
     echo ""
 
     log_step "[4/5] Установка MagiTrickle"
-    install_magitrickle || step_fail
-    echo ""
+    if [ "$USE_APK" -eq 1 ]; then
+        _magitrickle_apk || step_fail
+    else
+        install_magitrickle
+    fi
 
     log_step "[5/5] Завершение"
     finalize_install || step_fail
