@@ -1,14 +1,6 @@
 #!/bin/sh
 
-SCRIPT_VERSION="v0.1.4-alpha"
-
-MT_JOB_ID="13378493545"
-
-MT_APK_VERSION="0.5.3"
-MT_APK_PART="pre20260305232358"
-
-MT_IPK_VERSION="0.5.3"
-MT_IPK_PART="git20260305232358.d47bd8b3-1"
+SCRIPT_VERSION="v0.1.6-alpha"
 
 MIHOMO_INSTALL_DIR="/etc/mihomo"
 MIHOMO_BIN="/usr/bin/mihomo"
@@ -81,12 +73,11 @@ detect_mihomo_arch() {
 }
 
 install_deps() {
-    log_info "Установка зависимостей..."
+    log_info "Установка зависимостей"
 
     local PKG_LOG="/tmp/install_deps.log"
 
     if [ "$USE_APK" -eq 1 ]; then
-        log_info "Обновление индексов пакетов..."
         apk update > "$PKG_LOG" 2>&1 || true
         local AVAIL_PKG
         AVAIL_PKG=$(grep -o '[0-9]* distinct packages available' "$PKG_LOG" | grep -o '^[0-9]*')
@@ -126,7 +117,7 @@ install_deps() {
     fi
 
     rm -f "$PKG_LOG"
-    log_info "Зависимости установлены."
+    log_info "Зависимости установлены"
 }
 
 install_mihomo() {
@@ -249,7 +240,10 @@ tcp-concurrent: false
 find-process-mode: off
 external-controller: 0.0.0.0:9090
 external-ui: ./UI
-external-ui-url: "https://github.com/Zephyruso/zashboard/releases/latest/download/dist-cdn-fonts.zip"
+# Zashboard
+#external-ui-url: "https://github.com/Zephyruso/zashboard/releases/latest/download/dist-cdn-fonts.zip"
+# MetaCubeX
+#external-ui-url: "https://github.com/MetaCubeX/metacubexd/releases/latest/download/compressed-dist.tgz"
 routing-mark: 2
 profile:
   store-selected: true
@@ -401,27 +395,28 @@ EOF
         echo "--> Актуальная версия ACE: $LATEST_ACE_VER"
     fi
 
-    log_info "Скачивание файлов ACE Editor $LATEST_ACE_VER..."
+    log_info "Скачивание файлов ACE Editor $LATEST_ACE_VER"
+    local CDNJS_ACE_VER="1.43.6"
     for file in ace.js theme-merbivore_soft.js theme-tomorrow.js mode-yaml.js worker-yaml.js; do
         local dest="${ACE_PATH}/${file}"
         local success=0
-        local URL_CDNJS="https://cdnjs.cloudflare.com/ajax/libs/ace/${LATEST_ACE_VER}/${file}"
-        local URL_JSDELIVR="https://cdn.jsdelivr.net/npm/ace-builds@${LATEST_ACE_VER}/src-min-noconflict/${file}"
-        local URL_GITHUB="https://raw.githubusercontent.com/ajaxorg/ace-builds/master/src-min-noconflict/${file}"
-
-        for download_url in "$URL_CDNJS" "$URL_JSDELIVR" "$URL_GITHUB"; do
-            if curl -Lf -s -o "$dest" "$download_url" || wget -q -O "$dest" "$download_url"; then
+        
+        for url in "https://cdn.jsdelivr.net/npm/ace-builds@${LATEST_ACE_VER}/src-min-noconflict/${file}" \
+                   "https://raw.githubusercontent.com/ajaxorg/ace-builds/master/src-min-noconflict/${file}" \
+                   "https://cdnjs.cloudflare.com/ajax/libs/ace/${CDNJS_ACE_VER}/${file}"; do
+            
+            echo -n "  -> Скачивание $file ... "
+            if curl -Lf -s --connect-timeout 5 --max-time 30 -o "$dest" "$url" || wget -q -T 5 -O "$dest" "$url"; then
                 if [ -s "$dest" ]; then
+                    echo "OK"
                     success=1
                     break
                 fi
             fi
-            [ -f "$dest" ] && rm -f "$dest"
+            echo "FAIL"
         done
 
-        if [ "$success" -eq 1 ]; then
-            echo "--> Скачан файл $file"
-        else
+        if [ "$success" -eq 0 ]; then
             log_error "Не удалось скачать $file ни из одного источника."
             return 1
         fi
@@ -1204,7 +1199,7 @@ EOF
 }
 
 install_hev_tunnel() {
-    log_info "Установка hev-socks5-tunnel..."
+    log_info "Установка hev-socks5-tunnel"
 
     if [ "$USE_APK" -eq 1 ]; then
         apk cache clean
@@ -1284,33 +1279,95 @@ EOF
     /etc/init.d/firewall restart
 }
 
-_magitrickle_apk() {
-    local ARCH
-    ARCH=$(grep "^OPENWRT_ARCH=" /etc/os-release | cut -d'"' -f2)
-    [ -n "$ARCH" ] || { log_error "Не удалось определить архитектуру"; return 1; }
-    
-    local PKG_NAME="magitrickle_${MT_APK_VERSION}_${MT_APK_PART}-r1_openwrt_${ARCH}.apk"
-    local URL="https://gitlab.com/magitrickle/magitrickle/-/jobs/${MT_JOB_ID}/artifacts/raw/.build/${PKG_NAME}?inline=false"
-    local TMP="/tmp/${PKG_NAME}"
+_get_magitrickle_release() {
+    local RELEASE_TAG
+    RELEASE_TAG=$(curl -Ls -o /dev/null -w '%{url_effective}' \
+        https://github.com/MagiTrickle/MagiTrickle/releases/latest \
+        | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+    if [ -z "$RELEASE_TAG" ]; then
+        log_error "Не удалось определить версию MagiTrickle. Проверьте интернет-соединение."
+        return 1
+    fi
+    echo "$RELEASE_TAG"
+}
 
-    echo "--> Скачивание APK: $PKG_NAME"
-    curl -Lf --retry 3 --retry-delay 2 -o "$TMP" "$URL" || { log_error "Ошибка скачивания"; return 1; }
+_get_magitrickle_arch() {
+    local OPENWRT_ARCH
+    OPENWRT_ARCH=$(grep "^OPENWRT_ARCH=" /etc/os-release | cut -d'"' -f2)
+    if [ -z "$OPENWRT_ARCH" ]; then
+        log_error "Не удалось определить архитектуру из /etc/os-release"
+        return 1
+    fi
+    echo "$OPENWRT_ARCH"
+}
 
-    echo "--> Установка APK..."
-    if apk add --allow-untrusted "$TMP" >/dev/null 2>&1; then
-        log_done "Установка APK завершена."
-    else
-        log_error "Ошибка установки APK"
+_magitrickle_download() {
+    local PKG_NAME="$1"
+    local URL="$2"
+    local TMP="$3"
+
+    log_info "Скачивание $PKG_NAME"
+    if ! curl -Lf --retry 3 --retry-delay 2 -o "$TMP" "$URL" 2>/dev/null; then
+        log_error "Ошибка скачивания: $URL"
         rm -f "$TMP"
         return 1
+    fi
+
+    if [ ! -s "$TMP" ]; then
+        log_error "Пакет для архитектуры '${ARCH}' не найден в релизе v${VERSION}."
+        log_error "Проверьте список доступных архитектур: https://github.com/MagiTrickle/MagiTrickle/releases"
+        rm -f "$TMP"
+        return 1
+    fi
+
+    return 0
+}
+
+_magitrickle_install_pkg() {
+    local TMP="$1"
+    local USE_APK="$2"
+
+    if [ "$USE_APK" -eq 1 ]; then
+        if apk add --allow-untrusted "$TMP" >/dev/null 2>&1; then
+            echo "--> $(basename "$TMP") установлен..."
+            rm -f "$TMP"
+        else
+            log_error "Ошибка установки $(basename "$TMP")"
+            rm -f "$TMP"
+            return 1
+        fi
+    else
+        if opkg install "$TMP" >/dev/null 2>&1; then
+            echo "--> $(basename "$TMP") установлен..."
+            rm -f "$TMP"
+        else
+            log_error "Ошибка установки $(basename "$TMP")"
+            rm -f "$TMP"
+            return 1
+        fi
     fi
 
     /etc/init.d/magitrickle enable 2>/dev/null && /etc/init.d/magitrickle start 2>/dev/null
 }
 
+_magitrickle_apk() {
+    local VERSION ARCH PKG_NAME TMP
+    VERSION=$(_get_magitrickle_release) || return 1
+    ARCH=$(_get_magitrickle_arch) || return 1
+
+    PKG_NAME="magitrickle_${VERSION}-r1_openwrt_${ARCH}.apk"
+    TMP="/tmp/${PKG_NAME}"
+
+    _magitrickle_download "$PKG_NAME" \
+        "https://github.com/MagiTrickle/MagiTrickle/releases/download/${VERSION}/${PKG_NAME}" \
+        "$TMP" || return 1
+
+    _magitrickle_install_pkg "$TMP" 1
+}
+
 _magitrickle_opkg() {
     echo "Выберите версию MagiTrickle для установки:"
-    echo "1) Оригинал v${MT_IPK_VERSION} (https://magitrickle.dev/docs/welcome/)"
+    echo "1) Оригинал (https://magitrickle.dev/docs/welcome/)"
     echo "2) Мод от LarinIvan (https://github.com/LarinIvan/MagiTrickle_Mod/)"
     printf "-> "
     local CHOICE
@@ -1318,39 +1375,27 @@ _magitrickle_opkg() {
 
     case "$CHOICE" in
         1)
-            local ARCH
-            ARCH=$(grep "^OPENWRT_ARCH=" /etc/os-release | cut -d'"' -f2)
-            [ -n "$ARCH" ] || { log_error "Не удалось определить архитектуру"; return 1; }
-            echo "--> Архитектура OpenWrt: $ARCH"
+            local VERSION ARCH PKG_NAME TMP
+            VERSION=$(_get_magitrickle_release) || return 1
+            ARCH=$(_get_magitrickle_arch) || return 1
 
-            local PKG_NAME="magitrickle_${MT_IPK_VERSION}~${MT_IPK_PART}_openwrt_${ARCH}.ipk"
-            local URL="https://gitlab.com/magitrickle/magitrickle/-/jobs/${MT_JOB_ID}/artifacts/raw/.build/${PKG_NAME}?inline=false"
-            local TMP="/tmp/${PKG_NAME}"
+            PKG_NAME="magitrickle_${VERSION}-1_openwrt_${ARCH}.ipk"
+            TMP="/tmp/${PKG_NAME}"
 
-            echo "--> Скачивание оригинала: $PKG_NAME"
-            if ! curl -Lf --retry 3 --retry-delay 2 -o "$TMP" "$URL"; then
-                log_error "Ошибка скачивания: $URL"
-                return 1
-            fi
+            _magitrickle_download "$PKG_NAME" \
+                "https://github.com/MagiTrickle/MagiTrickle/releases/download/${VERSION}/${PKG_NAME}" \
+                "$TMP" || return 1
 
-            echo "--> Установка оригинала..."
-            if opkg install "$TMP" >/dev/null 2>&1; then
-                log_done "Установка оригинала завершена."
-            else
-                log_error "Ошибка установки оригинала"
-                rm -f "$TMP"
-                return 1
-            fi
-
-            /etc/init.d/magitrickle enable 2>/dev/null && /etc/init.d/magitrickle start 2>/dev/null
+            _magitrickle_install_pkg "$TMP" 0
             ;;
         2)
-            log_info "Запуск установки MagiTrickle_Mod..."
+            log_info "Установка MagiTrickle_Mod..."
             curl -sSL https://raw.githubusercontent.com/LarinIvan/MagiTrickle_Mod/develop/add_repo.sh | sh >/dev/null 2>&1 || {
-                log_error "Ошибка установки Mod версии"
+                log_error "Ошибка установки MagiTrickle_Mod"
                 return 1
             }
-            log_done "Установка Mod завершена." ;;
+            echo "--> MagiTrickle_Mod установлен..."
+            ;;
         *)
             log_error "Неверный выбор"
             return 1
@@ -1427,13 +1472,30 @@ install_magitrickle() {
     cat > /www/luci-static/resources/view/magitrickle/magitrickle.js <<'EOF'
 'use strict';
 'require view';
+
 return view.extend({
-    handleSaveApply: null,
     handleSave: null,
+    handleSaveApply: null,
     handleReset: null,
+
     render: function() {
-        var ip = window.location.hostname;
-        var url = 'http://' + ip + ':8080';
+        var hostname = window.location.hostname;
+        var port = '8080';
+        var url = 'http://' + hostname + ':' + port;
+
+        if (window.location.protocol === 'https:') {
+            return E('div', { style: 'padding: 20px; text-align: center;' }, [
+                E('p', _('HTTPS соединение блокирует встроенный интерфейс MagiTrickle через LuCI.')),
+                E('p', { style: 'margin-bottom: 20px;' }, _('Пожалуйста, откройте MagiTrickle в новой вкладке для полноценного управления.')),
+                E('a', {
+                    'class': 'btn cbi-button-action',
+                    'href': url,
+                    'target': '_blank',
+                    'style': 'padding: 10px 20px; font-size: 1.1em;'
+                }, _('Открыть MagiTrickle'))
+            ]);
+        }
+
         return E('div', {
             style: 'width:100%; height:92vh; margin: -20px -20px 0 -20px; overflow: hidden;'
         }, E('iframe', {
@@ -1456,6 +1518,8 @@ EOF
     }
 }
 EOF
+
+    rm -rf /tmp/luci-indexcache /tmp/luci-modulecache/
 }
 
 finalize_install() {
@@ -1468,6 +1532,7 @@ finalize_install() {
     rm -rf /tmp/luci-indexcache /tmp/luci-modulecache/
     /etc/init.d/rpcd restart > /dev/null 2>&1
     /etc/init.d/uhttpd restart > /dev/null 2>&1
+    /etc/init.d/mihomo restart > /dev/null 2>&1
 }
 
 main() {
@@ -1488,12 +1553,9 @@ main() {
     echo ""
 
     log_step "[4/5] Установка MagiTrickle"
-    if [ "$USE_APK" -eq 1 ]; then
-        _magitrickle_apk || step_fail
-    else
-        install_magitrickle
-    fi
-
+    install_magitrickle || step_fail
+    echo ""
+    
     log_step "[5/5] Завершение"
     finalize_install || step_fail
     echo ""
