@@ -396,7 +396,7 @@ EOF
     fi
 
     log_info "Скачивание файлов ACE Editor $LATEST_ACE_VER"
-    local CDNJS_ACE_VER="1.43.6"
+    local CDNJS_ACE_VER="1.43.3"
     for file in ace.js theme-merbivore_soft.js theme-tomorrow.js mode-yaml.js worker-yaml.js; do
         local dest="${ACE_PATH}/${file}"
         local success=0
