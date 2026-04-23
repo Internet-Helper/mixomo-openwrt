@@ -1,6 +1,6 @@
 #!/bin/sh
 
-SCRIPT_VERSION="v0.1.5-alpha"
+SCRIPT_VERSION="v0.1.6-alpha"
 
 MIHOMO_INSTALL_DIR="/etc/mihomo"
 MIHOMO_BIN="/usr/bin/mihomo"
@@ -396,26 +396,27 @@ EOF
     fi
 
     log_info "Скачивание файлов ACE Editor $LATEST_ACE_VER"
+    local CDNJS_ACE_VER="1.43.6"
     for file in ace.js theme-merbivore_soft.js theme-tomorrow.js mode-yaml.js worker-yaml.js; do
         local dest="${ACE_PATH}/${file}"
         local success=0
-        local URL_CDNJS="https://cdnjs.cloudflare.com/ajax/libs/ace/${LATEST_ACE_VER}/${file}"
-        local URL_JSDELIVR="https://cdn.jsdelivr.net/npm/ace-builds@${LATEST_ACE_VER}/src-min-noconflict/${file}"
-        local URL_GITHUB="https://raw.githubusercontent.com/ajaxorg/ace-builds/master/src-min-noconflict/${file}"
-
-        for download_url in "$URL_CDNJS" "$URL_JSDELIVR" "$URL_GITHUB"; do
-            if curl -Lf -s -o "$dest" "$download_url" || wget -q -O "$dest" "$download_url"; then
+        
+        for url in "https://cdn.jsdelivr.net/npm/ace-builds@${LATEST_ACE_VER}/src-min-noconflict/${file}" \
+                   "https://raw.githubusercontent.com/ajaxorg/ace-builds/master/src-min-noconflict/${file}" \
+                   "https://cdnjs.cloudflare.com/ajax/libs/ace/${CDNJS_ACE_VER}/${file}"; do
+            
+            echo -n "  -> Скачивание $file ... "
+            if curl -Lf -s --connect-timeout 5 --max-time 30 -o "$dest" "$url" || wget -q -T 5 -O "$dest" "$url"; then
                 if [ -s "$dest" ]; then
+                    echo "OK"
                     success=1
                     break
                 fi
             fi
-            [ -f "$dest" ] && rm -f "$dest"
+            echo "FAIL"
         done
 
-        if [ "$success" -eq 1 ]; then
-            echo "--> Скачан файл $file"
-        else
+        if [ "$success" -eq 0 ]; then
             log_error "Не удалось скачать $file ни из одного источника."
             return 1
         fi
