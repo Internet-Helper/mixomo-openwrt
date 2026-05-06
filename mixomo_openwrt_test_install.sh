@@ -1,6 +1,6 @@
 #!/bin/sh
 
-SCRIPT_VERSION="v0.1.6-alpha"
+SCRIPT_VERSION="v0.1.7-alpha"
 
 MIHOMO_INSTALL_DIR="/etc/mihomo"
 MIHOMO_BIN="/usr/bin/mihomo"
@@ -175,7 +175,8 @@ install_mihomo() {
              /etc/mihomo/proxy-providers \
              /etc/mihomo/rule-providers \
              /etc/mihomo/rule-files \
-             /etc/mihomo/UI
+             /etc/mihomo/UI/zashboard \
+			 /etc/mihomo/UI/metacubex
 
     echo "$MIHOMO_ARCH" > /etc/mihomo/.arch
 
@@ -239,10 +240,11 @@ unified-delay: true
 tcp-concurrent: false
 find-process-mode: off
 external-controller: 0.0.0.0:9090
-external-ui: ./UI
 # Zashboard
+#external-ui: ./UI/zashboard
 #external-ui-url: "https://github.com/Zephyruso/zashboard/releases/latest/download/dist-cdn-fonts.zip"
 # MetaCubeX
+#external-ui: ./UI/metacubex
 #external-ui-url: "https://github.com/MetaCubeX/metacubexd/releases/latest/download/compressed-dist.tgz"
 routing-mark: 2
 profile:
