@@ -1,6 +1,6 @@
 #!/bin/sh
 
-SCRIPT_VERSION="v0.1.7-alpha"
+SCRIPT_VERSION="v0.1.8-alpha"
 
 MIHOMO_INSTALL_DIR="/etc/mihomo"
 MIHOMO_BIN="/usr/bin/mihomo"
@@ -180,7 +180,7 @@ install_mihomo() {
 
     echo "$MIHOMO_ARCH" > /etc/mihomo/.arch
 
-    echo "--> Получение номера последней версии..."
+    echo "--> Получение номера последней версии"
     local RELEASE_TAG
     RELEASE_TAG=$(curl -Ls -o /dev/null -w '%{url_effective}' https://github.com/MetaCubeX/mihomo/releases/latest | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
     if [ -z "$RELEASE_TAG" ]; then
@@ -200,7 +200,7 @@ install_mihomo() {
         return 1
     fi
 
-    echo "--> Распаковка архива..."
+    echo "--> Распаковка архива"
     if ! gunzip -c "$TMP_FILE" > "$MIHOMO_BIN" 2>/dev/null; then
         log_error "Ошибка распаковки архива"
         rm -f "$TMP_FILE"
@@ -209,7 +209,7 @@ install_mihomo() {
     chmod +x "$MIHOMO_BIN"
     rm -f "$TMP_FILE"
 
-    echo "--> Проверка работы ядра Mihomo..."
+    echo "--> Проверка работы ядра Mihomo"
     if ! "$MIHOMO_BIN" -v >/dev/null 2>&1; then
         log_error "Ядро не запускается! Возможно, выбрана неверная архитектура."
         return 1
@@ -296,7 +296,7 @@ rules:
 EOF
     fi
 
-    echo "--> Создание службы /etc/init.d/mihomo..."
+    echo "--> Создание службы /etc/init.d/mihomo"
     cat > /etc/init.d/mihomo <<'EOF'
 #!/bin/sh /etc/rc.common
 START=99
@@ -325,7 +325,7 @@ EOF
     chmod +x /etc/init.d/mihomo
     /etc/init.d/mihomo enable || log_warn "Не удалось включить автозапуск"
 
-    echo "--> Настройка страницы LuCI для управления Mihomo..."
+    echo "--> Настройка страницы LuCI для управления Mihomo"
     mkdir -p /usr/share/luci/menu.d
     cat > /usr/share/luci/menu.d/luci-app-mihomo.json <<'EOF'
 {
@@ -383,21 +383,21 @@ EOF
     local ACE_PATH="$VIEW_PATH/ace"
     mkdir -p "$ACE_PATH"
 
-    echo "--> Определение последней версии ACE Editor..."
+    echo "--> Определение актуальной версии ACE Editor"
     local LATEST_ACE_VER
     LATEST_ACE_VER=$(curl -s "https://api.cdnjs.com/libraries/ace" | grep -o '"version":"[^"]*"' | cut -d'"' -f4 | head -1)
     if [ -z "$LATEST_ACE_VER" ]; then
-        log_warn "cdnjs API недоступен, пробуем GitHub API..."
+        log_warn "cdnjs API недоступен, пробуем GitHub API"
         LATEST_ACE_VER=$(curl -s "https://api.github.com/repos/ajaxorg/ace/releases/latest" | grep -o '"tag_name": *"[^"]*"' | cut -d'"' -f4 | sed 's/^v//' | head -1)
     fi
     if [ -z "$LATEST_ACE_VER" ]; then
         log_warn "Используем фиксированную версию ACE Editor"
         LATEST_ACE_VER="1.43.3"
     else
-        echo "--> Актуальная версия ACE: $LATEST_ACE_VER"
+        echo "--> Актуальная версия ACE Editor: $LATEST_ACE_VER"
     fi
 
-    log_info "Скачивание файлов ACE Editor $LATEST_ACE_VER"
+    log_info "Скачивание файлов для ACE Editor $LATEST_ACE_VER:"
     local CDNJS_ACE_VER="1.43.6"
     for file in ace.js theme-merbivore_soft.js theme-tomorrow.js mode-yaml.js worker-yaml.js; do
         local dest="${ACE_PATH}/${file}"
@@ -407,10 +407,10 @@ EOF
                    "https://raw.githubusercontent.com/ajaxorg/ace-builds/master/src-min-noconflict/${file}" \
                    "https://cdnjs.cloudflare.com/ajax/libs/ace/${CDNJS_ACE_VER}/${file}"; do
             
-            echo -n "  -> Скачивание $file ... "
+            echo -n "--> Скачивание $file"
             if curl -Lf -s --connect-timeout 5 --max-time 30 -o "$dest" "$url" || wget -q -T 5 -O "$dest" "$url"; then
                 if [ -s "$dest" ]; then
-                    echo "OK"
+                    echo ""
                     success=1
                     break
                 fi
@@ -424,7 +424,7 @@ EOF
         fi
     done
 
-    echo "--> Создание config.js..."
+    echo "--> Создание config.js"
     cat > "$VIEW_PATH/config.js" <<'EOF'
 'use strict';
 'require view';
@@ -1225,7 +1225,7 @@ socks5:
 EOF
     chmod 600 /etc/hev-socks5-tunnel/main.yml
 
-    echo "--> Очистка старых настроек UCI..."
+    echo "--> Очистка старых настроек UCI"
     uci delete network.Mihomo 2>/dev/null || true
 
     local fw_section
@@ -1247,21 +1247,21 @@ EOF
     /etc/init.d/firewall restart 2>/dev/null || true
     sleep 1
 
-    echo "--> Настройка UCI-сервиса hev-socks5-tunnel..."
+    echo "--> Настройка UCI-сервиса hev-socks5-tunnel"
     uci set hev-socks5-tunnel.config.enabled='1'
     uci set hev-socks5-tunnel.config.configfile='/etc/hev-socks5-tunnel/main.yml'
     uci commit hev-socks5-tunnel
     /etc/init.d/hev-socks5-tunnel restart
     sleep 2
 
-    echo "--> Настройка сетевого интерфейса..."
+    echo "--> Настройка сетевого интерфейса"
     uci set network.Mihomo=interface
     uci set network.Mihomo.proto='none'
     uci set network.Mihomo.device='Mihomo'
     uci commit network
     /etc/init.d/network reload
 
-    echo "--> Настройка firewall..."
+    echo "--> Настройка firewall"
     local FW_ZONE
     FW_ZONE=$(uci add firewall zone)
     uci set "firewall.${FW_ZONE}.name=Mihomo"
@@ -1331,7 +1331,7 @@ _magitrickle_install_pkg() {
 
     if [ "$USE_APK" -eq 1 ]; then
         if apk add --allow-untrusted "$TMP" >/dev/null 2>&1; then
-            echo "--> $(basename "$TMP") установлен..."
+            echo "--> Установлен $(basename "$TMP")"
             rm -f "$TMP"
         else
             log_error "Ошибка установки $(basename "$TMP")"
@@ -1340,7 +1340,7 @@ _magitrickle_install_pkg() {
         fi
     else
         if opkg install "$TMP" >/dev/null 2>&1; then
-            echo "--> $(basename "$TMP") установлен..."
+            echo "--> Установлен $(basename "$TMP")"
             rm -f "$TMP"
         else
             log_error "Ошибка установки $(basename "$TMP")"
@@ -1369,7 +1369,7 @@ _magitrickle_apk() {
 
 _magitrickle_opkg() {
     echo "Выберите версию MagiTrickle для установки:"
-    echo "1) Оригинал (https://magitrickle.dev/docs/welcome/)"
+    echo "1) Оригинал (https://github.com/MagiTrickle/MagiTrickle)"
     echo "2) Мод от LarinIvan (https://github.com/LarinIvan/MagiTrickle_Mod/)"
     printf "-> "
     local CHOICE
@@ -1468,7 +1468,7 @@ install_magitrickle() {
 
     _magitrickle_restore_config "$BACKUP_PATH"
 
-    echo "--> Создание страницы MagiTrickle в LuCI..."
+    echo "--> Создание страницы MagiTrickle в LuCI"
     mkdir -p /www/luci-static/resources/view/magitrickle
 
     cat > /www/luci-static/resources/view/magitrickle/magitrickle.js <<'EOF'
@@ -1525,12 +1525,12 @@ EOF
 }
 
 finalize_install() {
-    echo "--> Выставление прав доступа..."
+    echo "--> Выставление прав доступа"
     chmod -R 755 /www/luci-static/resources/view/mihomo 2>/dev/null || true
     find /www/luci-static/resources/view/mihomo -type f -exec chmod 644 {} \; 2>/dev/null || true
     chmod 644 /www/luci-static/resources/view/magitrickle/magitrickle.js 2>/dev/null || true
 
-    echo "--> Очистка кэша LuCI и перезапуск сервисов..."
+    echo "--> Очистка кэша LuCI и перезапуск сервисов"
     rm -rf /tmp/luci-indexcache /tmp/luci-modulecache/
     /etc/init.d/rpcd restart > /dev/null 2>&1
     /etc/init.d/uhttpd restart > /dev/null 2>&1
