@@ -1,6 +1,6 @@
 #!/bin/sh
 
-SCRIPT_VERSION="v0.1.8-alpha"
+SCRIPT_VERSION="v0.1.9-alpha"
 
 MIHOMO_INSTALL_DIR="/etc/mihomo"
 MIHOMO_BIN="/usr/bin/mihomo"
@@ -93,19 +93,19 @@ install_deps() {
                 return 1
             fi
         fi
-        apk add wget-ssl ca-certificates kmod-tun kmod-nft-tproxy kmod-nft-nat curl >> "$PKG_LOG" 2>&1 || {
+        
+        apk add ca-certificates kmod-tun kmod-nft-tproxy kmod-nft-nat curl >> "$PKG_LOG" 2>&1 || {
             log_error "Ошибка установки зависимостей:"; cat "$PKG_LOG"; rm -f "$PKG_LOG"; return 1;
         }
     else
         if ! opkg update > "$PKG_LOG" 2>&1; then
-            log_warn "opkg update не удался, переустановка wget..."
-            opkg remove wget-ssl >> "$PKG_LOG" 2>&1
-            opkg install wget --force-reinstall >> "$PKG_LOG" 2>&1
-            if ! opkg update >> "$PKG_LOG" 2>&1; then
-                log_error "Ошибка обновления списков пакетов:"; cat "$PKG_LOG"; rm -f "$PKG_LOG"; return 1
-            fi
+            log_error "Ошибка обновления списков пакетов (opkg update):"
+            cat "$PKG_LOG"
+            rm -f "$PKG_LOG"
+            return 1
         fi
-        opkg install wget-ssl ca-certificates kmod-tun kmod-nft-tproxy kmod-nft-nat curl libcurl4 ca-bundle >> "$PKG_LOG" 2>&1 || {
+        
+        opkg install ca-certificates kmod-tun kmod-nft-tproxy kmod-nft-nat curl libcurl4 ca-bundle >> "$PKG_LOG" 2>&1 || {
             log_error "Ошибка установки зависимостей:"
             if grep -iq "No space left on device" "$PKG_LOG" || grep -iq "write error" "$PKG_LOG"; then
                 log_error "Недостаточно места на диске!"
@@ -241,10 +241,10 @@ tcp-concurrent: false
 find-process-mode: off
 external-controller: 0.0.0.0:9090
 # Zashboard
-#external-ui: ./UI/zashboard
+#external-ui: ./UI/zashboard/
 #external-ui-url: "https://github.com/Zephyruso/zashboard/releases/latest/download/dist-cdn-fonts.zip"
 # MetaCubeX
-#external-ui: ./UI/metacubex
+#external-ui: ./UI/metacubex/
 #external-ui-url: "https://github.com/MetaCubeX/metacubexd/releases/latest/download/compressed-dist.tgz"
 routing-mark: 2
 profile:
@@ -279,9 +279,16 @@ dns:
   listen: 0.0.0.0:7880
   ipv6: false
   nameserver:
-    - https://dns.google/dns-query
-    - https://common.dot.dns.yandex.net/dns-query
-    - https://unfiltered.adguard-dns.com/dns-query
+    - https://8.8.8.8/dns-query
+    - https://8.8.4.4/dns-query
+    - https://1.1.1.1/dns-query
+    - https://1.0.0.1/dns-query
+    - https://9.9.9.9/dns-query
+    - https://149.112.112.112/dns-query
+    - https://94.140.14.140/dns-query
+    - https://94.140.14.141/dns-query
+    - https://77.88.8.8/dns-query
+    - https://77.88.8.1/dns-query
 
 proxies:
   - name: Домашний интернет
@@ -1410,37 +1417,35 @@ _magitrickle_restore_config() {
     local BACKUP_PATH="$1"
 
     [ -f "$BACKUP_PATH" ] || return 0
-    [ -f "$CONFIG_PATH" ] || { mkdir -p "$(dirname "$CONFIG_PATH")"; cp "$BACKUP_PATH" "$CONFIG_PATH"; rm -f "$BACKUP_PATH"; return 0; }
+
+    if [ ! -f "$CONFIG_PATH" ]; then
+        log_info "Новая конфигурация отсутствует. Восстановление из бэкапа..."
+        mkdir -p "$(dirname "$CONFIG_PATH")"
+        cp "$BACKUP_PATH" "$CONFIG_PATH"
+        rm -f "$BACKUP_PATH"
+        return 0
+    fi
 
     local OLD_VERSION NEW_VERSION
-    OLD_VERSION=$(grep "^configVersion:" "$BACKUP_PATH" | awk '{print $2}' | tr -d ' ')
-    NEW_VERSION=$(grep "^configVersion:" "$CONFIG_PATH" | awk '{print $2}' | tr -d ' ')
+    OLD_VERSION=$(grep -E "^[[:space:]]*configVersion:" "$BACKUP_PATH" | awk '{print $2}' | tr -d ' "\r\n')
+    NEW_VERSION=$(grep -E "^[[:space:]]*configVersion:" "$CONFIG_PATH" | awk '{print $2}' | tr -d ' "\r\n')
 
     if [ -z "$OLD_VERSION" ] || [ -z "$NEW_VERSION" ]; then
-        log_warn "Не удалось определить версию конфигурации. Бэкап сохранен как ${CONFIG_PATH}.backup"
+        log_warn "Не удалось определить версию конфигурации."
+        log_info "Бэкап сохранен как ${CONFIG_PATH}.backup"
         cp "$BACKUP_PATH" "${CONFIG_PATH}.backup"
         rm -f "$BACKUP_PATH"
         return 0
     fi
 
-    local o1 o2 o3 n1 n2 n3
-    o1=$(echo "$OLD_VERSION" | cut -d'.' -f1)
-    o2=$(echo "$OLD_VERSION" | cut -d'.' -f2)
-    o3=$(echo "$OLD_VERSION" | cut -d'.' -f3)
-    n1=$(echo "$NEW_VERSION" | cut -d'.' -f1)
-    n2=$(echo "$NEW_VERSION" | cut -d'.' -f2)
-    n3=$(echo "$NEW_VERSION" | cut -d'.' -f3)
-    o1=${o1:-0}; o2=${o2:-0}; o3=${o3:-0}
-    n1=${n1:-0}; n2=${n2:-0}; n3=${n3:-0}
-
-    if [ "$o1" -eq "$n1" ] && [ "$o2" -eq "$n2" ] && [ "$o3" -eq "$n3" ]; then
+    if [ "$OLD_VERSION" = "$NEW_VERSION" ]; then
         echo "--> Версии конфигурации совпадают ($OLD_VERSION). Восстановление..."
         cp "$BACKUP_PATH" "$CONFIG_PATH"
-    elif [ "$o1" -gt "$n1" ] || { [ "$o1" -eq "$n1" ] && [ "$o2" -gt "$n2" ]; } || { [ "$o1" -eq "$n1" ] && [ "$o2" -eq "$n2" ] && [ "$o3" -gt "$n3" ]; }; then
-        log_warn "Старая конфигурация ($OLD_VERSION) новее новой ($NEW_VERSION). Бэкап: ${CONFIG_PATH}.backup"
-        cp "$BACKUP_PATH" "${CONFIG_PATH}.backup"
     else
-        log_info "Новая версия конфигурации ($NEW_VERSION) выше старой ($OLD_VERSION). Бэкап: ${CONFIG_PATH}.backup"
+        log_warn "Версии конфигураций отличаются!"
+        log_info "Скачанная версия: $NEW_VERSION"
+        log_info "Прошлая версия: $OLD_VERSION"
+        log_info "Прошлая версия сохранена по пути как ${CONFIG_PATH}.backup"
         cp "$BACKUP_PATH" "${CONFIG_PATH}.backup"
     fi
 
@@ -1451,7 +1456,10 @@ install_magitrickle() {
     local CONFIG_PATH="/etc/magitrickle/state/config.yaml"
     local BACKUP_PATH="/tmp/magitrickle_config_backup.yaml"
 
-    [ -f "$CONFIG_PATH" ] && cp "$CONFIG_PATH" "$BACKUP_PATH"
+    if [ -f "$CONFIG_PATH" ]; then
+        cp "$CONFIG_PATH" "$BACKUP_PATH"
+        rm -f "$CONFIG_PATH"
+    fi
 
     if [ "$USE_APK" -eq 1 ]; then
         apk del magitrickle >/dev/null 2>&1 || true
