@@ -27,11 +27,7 @@
 - Через прокси проходит только тот трафик, который Вы в него направили
 - Всё остальное идёт через Вашего домашнего провайдера на его полной скорости, минуя прокси‑ядро
 
-Управление происходит через удобный веб-интерфейс LuCI в разделах Mihomo и MagiTrickle:
-
-<img width="988" height="908" alt="1" src="https://github.com/user-attachments/assets/621d1a57-9e5f-4427-b5b2-a128abf0f616" />
-
-<img width="993" height="527" alt="image" src="https://github.com/user-attachments/assets/1ae832a5-9bdd-45e8-b229-61fbae029203" />
+<img width="1222" height="1544" alt="Windows" src="https://github.com/user-attachments/assets/ce48a2f0-0a7f-4dd9-a2bc-bc4cf4ce0297" />
 
 # Требования
 - OpenWRT 24.10+ и 25.12+ включительно
