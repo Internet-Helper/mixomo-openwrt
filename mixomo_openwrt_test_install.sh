@@ -72,6 +72,36 @@ detect_mihomo_arch() {
     esac
 }
 
+verify_required_deps() {
+    log_info "Проверка наличия критических зависимостей..."
+    local missing=0
+
+    if ! command -v curl >/dev/null 2>&1; then
+        log_error "Пакет 'curl' не найден!"
+        missing=1
+    fi
+
+    if [ ! -f /etc/ssl/certs/ca-certificates.crt ] && [ ! -f /etc/ssl/certs/ca-bundle.crt ]; then
+        log_error "Пакет ca-certificates не найден!"
+        missing=1
+    fi
+
+    if [ ! -c /dev/net/tun ]; then
+        modprobe tun >/dev/null 2>&1 || true
+        if [ ! -c /dev/net/tun ]; then
+            log_error "В ядре нет поддержки TUN (/dev/net/tun)!"
+            missing=1
+        fi
+    fi
+
+    if [ "$missing" -eq 1 ]; then
+        return 1
+    fi
+
+    log_info "Проверка пройдена успешно: все ключевые пакеты установлены."
+    return 0
+}
+
 install_deps() {
     log_info "Установка зависимостей"
 
@@ -94,9 +124,7 @@ install_deps() {
             fi
         fi
         
-        apk add ca-certificates kmod-tun kmod-nft-tproxy kmod-nft-nat curl >> "$PKG_LOG" 2>&1 || {
-            log_error "Ошибка установки зависимостей:"; cat "$PKG_LOG"; rm -f "$PKG_LOG"; return 1;
-        }
+        apk add ca-certificates kmod-tun kmod-nft-tproxy kmod-nft-nat curl >> "$PKG_LOG" 2>&1 || true
     else
         if ! opkg update > "$PKG_LOG" 2>&1; then
             log_error "Ошибка обновления списков пакетов (opkg update):"
@@ -105,19 +133,17 @@ install_deps() {
             return 1
         fi
         
-        opkg install ca-certificates kmod-tun kmod-nft-tproxy kmod-nft-nat curl libcurl4 ca-bundle >> "$PKG_LOG" 2>&1 || {
-            log_error "Ошибка установки зависимостей:"
-            if grep -iq "No space left on device" "$PKG_LOG" || grep -iq "write error" "$PKG_LOG"; then
-                log_error "Недостаточно места на диске!"
-            else
-                cat "$PKG_LOG"
-            fi
-            rm -f "$PKG_LOG"; return 1
-        }
+        opkg install ca-certificates kmod-tun kmod-nft-tproxy kmod-nft-nat curl libcurl4 ca-bundle >> "$PKG_LOG" 2>&1 || true
     fi
 
     rm -f "$PKG_LOG"
-    log_info "Зависимости установлены"
+
+    if ! verify_required_deps; then
+        log_error "Не удалось подтвердить наличие обязательных компонентов."
+        return 1
+    fi
+
+    log_info "Зависимости успешно проверены и настроены"
 }
 
 install_mihomo() {
