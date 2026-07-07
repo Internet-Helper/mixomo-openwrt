@@ -1,6 +1,6 @@
 #!/bin/sh
 
-SCRIPT_VERSION="v0.1.9-alpha"
+SCRIPT_VERSION="v0.2.0-alpha"
 
 MIHOMO_INSTALL_DIR="/etc/mihomo"
 MIHOMO_BIN="/usr/bin/mihomo"
@@ -47,7 +47,13 @@ detect_mihomo_arch() {
     endian_byte=$(hexdump -s 5 -n 1 -e '1/1 "%d"' /bin/busybox 2>/dev/null || echo "0")
 
     case "$arch" in
-        x86_64)        echo "amd64" ;;
+        x86_64)
+            if grep -q "avx2" /proc/cpuinfo; then
+                echo "amd64"
+            else
+                echo "amd64-compatible"
+            fi
+            ;;
         i?86)          echo "386" ;;
         aarch64|arm64) echo "arm64" ;;
         armv7*)        echo "armv7" ;;
@@ -1480,7 +1486,7 @@ main() {
     log_done "│ 2. Службы или Services → Mihomo → Настройте конфигурацию прокси       │"
     log_done "│    ${CYAN}[Онлайн генератор конфигурации]                                    ${GREEN}│"
     log_done "│    ${CYAN}https://spatiumstas.github.io/web4core/                            ${GREEN}│"
-    log_done "│    ${CYAN}[Готовые оффлайн конфигурации]                                     ${GREEN}│"
+    log_done "│    ${CYAN}[Готовые конфигурации]                                             ${GREEN}│"
     log_done "│    ${CYAN}https://secret-harbor.notion.site/31345fc37b6f80fa82d3da96e9ae12cc ${GREEN}│"
     log_done "├───────────────────────────────────────────────────────────────────────┤"
     log_done "│ 3. Службы или Services → MagiTrickle → Укажите сайты для прокси       │"
