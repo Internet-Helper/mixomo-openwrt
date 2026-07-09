@@ -37,11 +37,11 @@
 # Установка или обновление  
 #### Команда для установки или обновления:
 ```
-wget -qO- --no-check-certificate https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/refs/heads/main/mixomo_openwrt_install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/main/install.sh | sh
 ```
 #### Альтернативная команда для установки или обновления:
 ```
-curl -fsSL https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/refs/heads/main/mixomo_openwrt_install.sh | sh
+wget -qO- --no-check-certificate https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/main/install.sh | sh
 ```
 
 **Некоторые пояснения:**  
@@ -61,9 +61,9 @@ curl -fsSL https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/refs
 # Удаление  
 #### Команда для удаления:
 ```
-wget -qO- --no-check-certificate https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/refs/heads/main/mixomo_openwrt_delete.sh | sh
+curl -fsSL https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/main/delete.sh | sh
 ```
 #### Альтернативная команда для удаления:
 ```
-curl -fsSL https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/refs/heads/main/mixomo_openwrt_delete.sh | sh
+wget -qO- --no-check-certificate https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/main/delete.sh | sh
 ```
