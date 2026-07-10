@@ -4,7 +4,7 @@
 cat >> /etc/dnsmasq.conf << 'EOF'
 strict-order
 no-resolv
-server=127.0.0.1#3053
+server=127.0.0.1#7880
 server=8.8.8.8
 server=8.8.4.4
 server=1.1.1.1
@@ -45,7 +45,7 @@ service dnsmasq restart
 cat >> /etc/dnsmasq.conf << 'EOF'   # Запись в конец файла службы dnsmasq (отвечает за работу с DNS)
 strict-order                        # Служба dnsmasq будет опрашивать DNS‑серверы строго сверху вниз
 no-resolv                           # Запрещает использовать другие DNS (из /etc/resolv.conf)
-server=127.0.0.1#3053               # 1 DNS - секция DNS в Mihomo (порт 3053 можно менять на другой)
+server=127.0.0.1#7880               # 1 DNS - секция DNS в Mihomo (порт 7880 можно менять на другой)
 server=8.8.8.8                      # 2 DNS - Google
 server=8.8.4.4                      # 3 DNS - Google
 server=1.1.1.1                      # 4 DNS - Cloudflare
@@ -67,7 +67,7 @@ service dnsmasq restart             # Перезапуск службы dnsmasq
 
 dns:
   enable: true
-  listen: 0.0.0.0:3053 # Порт 3053 можно менять на любой свободный
+  listen: 0.0.0.0:7880 # Порт 7880 можно менять на любой свободный
   ipv6: false
   nameserver:
     - https://8.8.8.8/dns-query
