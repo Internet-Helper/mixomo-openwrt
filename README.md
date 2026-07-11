@@ -49,7 +49,7 @@ wget -qO- --no-check-certificate https://raw.githubusercontent.com/Internet-Help
 - Зайти в LuCI -> Службы или Services -> Mihomo -> Создать свою конфигурацию<br>
   Для этого можно использовать [оригинальную документацию](https://mihomo-docs.netlify.app/ru/config/) или [онлайн генератор web4core](https://spatiumstas.github.io/web4core)  
   Конфигурация **обязана** содержать строку `mixed-port: 7890` для работы через hev-socks5-tunnel
-- Зайти в LuCI -> Службы или Services -> MagiTrickle -> Указать сайты или ссылки в разделе «Подписки»<br> 
+- Зайти в LuCI -> Службы или Services -> MagiTrickle -> Указать сайты в «Группы» или ссылки в «Подписки»<br> 
 
 **Некоторые пояснения:**  
 - Повторный запуск команды установки переустановит Mihomo, hev-socks5-tunnel и MagiTrickle на актаульные версии  
