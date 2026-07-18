@@ -1,6 +1,6 @@
 #!/bin/sh
 
-SCRIPT_VERSION="v0.2.0-alpha"
+SCRIPT_VERSION="v0.2.1-alpha"
 
 MIHOMO_INSTALL_DIR="/etc/mihomo"
 MIHOMO_BIN="/usr/bin/mihomo"
@@ -189,8 +189,9 @@ install_mihomo() {
         fi
     fi
 
-    if [ -f "/etc/init.d/mihomo" ]; then
-        /etc/init.d/mihomo stop 2>/dev/null || true
+    local MIHOMO_WAS_RUNNING=0
+    if [ -x "/etc/init.d/mihomo" ] && /etc/init.d/mihomo running >/dev/null 2>&1; then
+        MIHOMO_WAS_RUNNING=1
     fi
 
     if [ -z "${MIHOMO_ARCH+x}" ]; then
@@ -219,6 +220,8 @@ install_mihomo() {
     local FILENAME="mihomo-linux-${MIHOMO_ARCH}-${RELEASE_TAG}.gz"
     local DOWNLOAD_URL="https://github.com/MetaCubeX/mihomo/releases/download/${RELEASE_TAG}/${FILENAME}"
     local TMP_FILE="/tmp/mihomo.gz"
+    local NEW_BIN="/tmp/mihomo.new"
+    local BACKUP_BIN="/tmp/mihomo.previous"
 
     log_online "Скачивание архива $FILENAME"
     log_online "$DOWNLOAD_URL"
@@ -227,20 +230,47 @@ install_mihomo() {
         return 1
     fi
 
-    echo "Распаковка архива"
-    if ! gunzip -c "$TMP_FILE" > "$MIHOMO_BIN" 2>/dev/null; then
+    echo "Распаковка архива во временный файл"
+    rm -f "$NEW_BIN"
+    if ! gunzip -c "$TMP_FILE" > "$NEW_BIN" 2>/dev/null || [ ! -s "$NEW_BIN" ]; then
         log_error "Ошибка распаковки архива"
-        rm -f "$TMP_FILE"
+        rm -f "$TMP_FILE" "$NEW_BIN"
         return 1
     fi
-    chmod +x "$MIHOMO_BIN"
+    chmod +x "$NEW_BIN"
     rm -f "$TMP_FILE"
 
-    echo "Проверка работы ядра Mihomo"
-    if ! "$MIHOMO_BIN" -v >/dev/null 2>&1; then
+    echo "Проверка нового ядра Mihomo"
+    if ! "$NEW_BIN" -v >/dev/null 2>&1; then
         log_error "Ядро не запускается! Возможно, выбрана неверная архитектура."
+        rm -f "$NEW_BIN"
         return 1
     fi
+
+    if [ "$MIHOMO_WAS_RUNNING" -eq 1 ]; then
+        echo "Остановка текущего Mihomo для замены ядра"
+        /etc/init.d/mihomo stop || {
+            log_error "Не удалось остановить текущий Mihomo"
+            rm -f "$NEW_BIN"
+            return 1
+        }
+    fi
+
+    rm -f "$BACKUP_BIN"
+    if [ -f "$MIHOMO_BIN" ] && ! cp "$MIHOMO_BIN" "$BACKUP_BIN"; then
+        log_error "Не удалось создать резервную копию текущего ядра"
+        [ "$MIHOMO_WAS_RUNNING" -eq 1 ] && /etc/init.d/mihomo start 2>/dev/null || true
+        rm -f "$NEW_BIN"
+        return 1
+    fi
+    if ! mv -f "$NEW_BIN" "$MIHOMO_BIN" || ! chmod +x "$MIHOMO_BIN"; then
+        log_error "Не удалось установить новое ядро"
+        [ -f "$BACKUP_BIN" ] && cp "$BACKUP_BIN" "$MIHOMO_BIN"
+        [ "$MIHOMO_WAS_RUNNING" -eq 1 ] && /etc/init.d/mihomo start 2>/dev/null || true
+        rm -f "$NEW_BIN" "$BACKUP_BIN"
+        return 1
+    fi
+    rm -f "$BACKUP_BIN"
 
     local CONFIG_FILE="/etc/mihomo/config.yaml"
     local WRITE_NEW_CONFIG=1
@@ -358,6 +388,10 @@ service_triggers() {
 EOF
     chmod +x /etc/init.d/mihomo
     /etc/init.d/mihomo enable || log_warn "Не удалось включить автозапуск"
+    if [ "$MIHOMO_WAS_RUNNING" -eq 1 ]; then
+        echo "Запуск Mihomo с новым ядром"
+        /etc/init.d/mihomo start || log_warn "Не удалось запустить Mihomo; повторная попытка будет в конце установки"
+    fi
 
     echo "Настройка страницы LuCI для управления Mihomo"
     mkdir -p /usr/share/luci/menu.d
@@ -385,7 +419,8 @@ EOF
             },
             "ubus": {
                 "file": ["read", "list"],
-                "service": ["list"]
+                "service": ["list"],
+                "mihomo-routing": ["status", "clients"]
             }
         },
         "write": {
@@ -406,12 +441,325 @@ EOF
             },
             "ubus": {
                 "file": ["write"],
-                "service": ["list"]
+                "service": ["list"],
+                "mihomo-routing": ["add", "update", "delete", "set_enabled", "set_router"]
             }
         }
     }
 }
 EOF
+
+    mkdir -p /usr/libexec/rpcd
+    cat > /usr/libexec/rpcd/mihomo-routing <<'EOF'
+#!/bin/sh
+. /usr/share/libubox/jshn.sh
+
+PREFIX="mihomo_route_"
+TABLE_SECTION="mihomo_routing_table"
+ROUTER_MARK="0x233"
+ROUTER_NFT="/etc/mihomo/mihomo-router-routing.nft"
+ROUTER_FW_SECTION="mihomo_router_routing"
+
+fail() { json_init; json_add_boolean ok 0; json_add_string error "$1"; json_dump; exit 0; }
+
+valid_ipv4_cidr() {
+    value="$1"
+    ip="${value%/*}"
+    mask="${value#*/}"
+    [ "$ip" != "$value" ] || mask=32
+    case "$mask" in ''|*[!0-9]*) return 1;; esac
+    [ "$mask" -ge 1 ] 2>/dev/null && [ "$mask" -le 32 ] 2>/dev/null || return 1
+    oldifs="$IFS"; IFS=.; set -- $ip; IFS="$oldifs"
+    [ "$#" -eq 4 ] || return 1
+    for octet in "$@"; do
+        case "$octet" in ''|*[!0-9]*) return 1;; esac
+        [ "$octet" -le 255 ] 2>/dev/null || return 1
+    done
+    return 0
+}
+
+normalize_ipv4_cidr() {
+    value="$1"
+    case "$value" in */*) printf '%s\n' "$value"; return;; esac
+    oldifs="$IFS"; IFS=.; set -- $value; IFS="$oldifs"
+    [ "$#" -eq 4 ] || return 1
+    if [ "$4" = 0 ] && [ "$3" = 0 ] && [ "$2" = 0 ]; then mask=8
+    elif [ "$4" = 0 ] && [ "$3" = 0 ]; then mask=16
+    elif [ "$4" = 0 ]; then mask=24
+    else mask=32
+    fi
+    printf '%s/%s\n' "$value" "$mask"
+}
+
+find_table() {
+    existing="$(uci -q get network.$TABLE_SECTION.table)"
+    # Once chosen, Mixomo never changes its table merely because netifd has
+    # not installed the route yet. This keeps all rules on one stable table.
+    if [ -n "$existing" ] && [ "$existing" -ge 1 ] 2>/dev/null; then
+        echo "$existing"; return
+    fi
+    table=100
+    while [ "$table" -lt 1000 ]; do
+        # A table is ours only when its default route already uses Mihomo.
+        if ! ip route show table "$table" 2>/dev/null | grep -q . && \
+           ! ip rule list 2>/dev/null | grep -Eq "[[:space:]]lookup[[:space:]]+$table([[:space:]]|$)"; then
+            echo "$table"; return
+        fi
+        table=$((table + 1))
+    done
+    return 1
+}
+
+ensure_base() {
+    table="$(find_table)" || return 1
+    uci -q set "network.$TABLE_SECTION=route"
+    uci -q set "network.$TABLE_SECTION.interface=Mihomo"
+    uci -q set "network.$TABLE_SECTION.target=0.0.0.0/0"
+    uci -q set "network.$TABLE_SECTION.table=$table"
+
+    # Rebuild only Mixomo's own local-destination exclusions.
+    for section in $(uci show network 2>/dev/null | sed -n "s/^network\\.\\(${PREFIX}local_[^.=]*\\)=rule$/\\1/p"); do uci -q delete "network.$section"; done
+    number=0
+    ip -4 route show table main proto kernel scope link 2>/dev/null | while read -r subnet rest; do
+        case "$subnet" in */*) ;;
+            *) continue;; esac
+        case "$rest" in *"dev Mihomo"*) continue;; esac
+        uci -q set "network.${PREFIX}local_$number=rule"
+        uci -q set "network.${PREFIX}local_$number.name=Mixomo-local-$number"
+        uci -q set "network.${PREFIX}local_$number.priority=$((10000 + number))"
+        uci -q set "network.${PREFIX}local_$number.dest=$subnet"
+        uci -q set "network.${PREFIX}local_$number.lookup=main"
+        number=$((number + 1))
+    done
+    echo "$table"
+}
+
+apply_network() {
+    table="$1"
+    uci commit network
+    /etc/init.d/network reload
+    sleep 1
+    # Some proto-none TUN interfaces are not handled consistently by netifd.
+    # Keep the UCI route for persistence, then verify the live kernel route.
+    if ! ip route show table "$table" 2>/dev/null | grep -Eq '^default[[:space:]].*dev[[:space:]]Mihomo([[:space:]]|$)'; then
+        ip route replace default dev Mihomo table "$table" 2>/dev/null || return 1
+    fi
+    ip route show table "$table" 2>/dev/null | grep -Eq '^default[[:space:]].*dev[[:space:]]Mihomo([[:space:]]|$)'
+}
+
+ensure_router_policy() {
+    table="$1"
+    if ! ip rule list 2>/dev/null | grep -Eq "^[[:space:]]*19000:.*fwmark $ROUTER_MARK.*lookup $table([[:space:]]|$)"; then
+        ip rule add priority 19000 fwmark "$ROUTER_MARK" lookup "$table" 2>/dev/null || return 1
+    fi
+}
+
+list_client_sections() {
+    for type in rule mihomo_rule; do
+        uci show network 2>/dev/null | sed -n "s/^network\\.\\(${PREFIX}client_[^.=]*\\)=$type$/\\1/p"
+    done
+}
+
+local_ipv4_nft_set() {
+    # Never mark replies to LuCI/LAN clients or traffic to an upstream gateway.
+    # These connected prefixes are discovered at runtime, not hard-coded.
+    local_nets="127.0.0.0/8"
+    ip -4 route show table main proto kernel scope link 2>/dev/null > /tmp/mihomo-local-routes
+    while read -r subnet rest; do
+        case "$subnet" in */*) local_nets="$local_nets, $subnet";; esac
+    done < /tmp/mihomo-local-routes
+    printf '%s\n' "$local_nets"
+}
+
+enable_router_mark() {
+    local_nets="$(local_ipv4_nft_set)"
+    cat > "$ROUTER_NFT" <<NFT
+chain mihomo_router_routing {
+    type route hook output priority mangle; policy accept;
+    ip daddr { $local_nets } return
+    ip daddr 224.0.0.0/4 return
+    ip daddr 255.255.255.255 return
+    meta nfproto ipv4 meta mark 0 meta mark set $ROUTER_MARK
+}
+NFT
+    uci -q set "firewall.$ROUTER_FW_SECTION=include"
+    uci -q set "firewall.$ROUTER_FW_SECTION.type=nftables"
+    uci -q set "firewall.$ROUTER_FW_SECTION.path=$ROUTER_NFT"
+    uci -q set "firewall.$ROUTER_FW_SECTION.enabled=1"
+    uci commit firewall
+    /etc/init.d/firewall reload
+    if ! nft list chain inet fw4 mihomo_router_routing >/dev/null 2>&1; then
+        nft add chain inet fw4 mihomo_router_routing '{ type route hook output priority mangle; policy accept; }' 2>/dev/null || return 1
+        nft add rule inet fw4 mihomo_router_routing ip daddr "{ $local_nets }" return 2>/dev/null || return 1
+        nft add rule inet fw4 mihomo_router_routing ip daddr 224.0.0.0/4 return 2>/dev/null || return 1
+        nft add rule inet fw4 mihomo_router_routing ip daddr 255.255.255.255 return 2>/dev/null || return 1
+        nft add rule inet fw4 mihomo_router_routing meta nfproto ipv4 meta mark 0 meta mark set "$ROUTER_MARK" 2>/dev/null || return 1
+    fi
+}
+
+disable_router_mark() {
+    nft delete chain inet fw4 mihomo_router_routing 2>/dev/null || true
+    nft delete table inet mihomo_router_routing 2>/dev/null || true
+    uci -q delete "firewall.$ROUTER_FW_SECTION"
+    rm -f "$ROUTER_NFT"
+    uci commit firewall
+    /etc/init.d/firewall reload
+}
+
+cleanup_if_unused() {
+    [ -n "$(list_client_sections)" ] && return 0
+    uci -q get "network.${PREFIX}router" >/dev/null && return 0
+    table="$(uci -q get network.$TABLE_SECTION.table)"
+    for section in $(uci show network 2>/dev/null | sed -n "s/^network\\.\\(${PREFIX}local_[^.=]*\\)=rule$/\\1/p"); do uci -q delete "network.$section"; done
+    uci -q delete "network.$TABLE_SECTION"
+    uci commit network
+    /etc/init.d/network reload
+    [ -n "$table" ] && ip route flush table "$table" 2>/dev/null || true
+    disable_router_mark
+}
+
+emit_status() {
+    table="$(uci -q get network.$TABLE_SECTION.table)"
+    router=0
+    [ "$(uci -q get network.${PREFIX}router.mark)" = "$ROUTER_MARK" ] && router=1
+    json_init; json_add_boolean ok 1; json_add_int table "${table:-0}"; json_add_boolean router "$router"
+    json_add_array rules
+    for section in $(list_client_sections); do
+        json_add_object
+        json_add_string id "${section#${PREFIX}client_}"
+        json_add_string source "$(uci -q get network.$section.src)"
+        json_add_string label "$(uci -q get network.$section.name)"
+        json_add_boolean enabled "$( [ "$(uci -q get network.$section)" = rule ] && [ "$(uci -q get network.$section.disabled)" != 1 ] && echo 1 || echo 0 )"
+        json_close_object
+    done
+    json_close_array; json_dump
+}
+
+emit_clients() {
+    json_init; json_add_boolean ok 1; json_add_array clients
+    router_ips=" $(ip -4 addr show 2>/dev/null | awk '/inet / {sub(/\/.*/, "", $2); printf "%s ", $2}')"
+    gateway_ips=" $(ip -4 route show 2>/dev/null | awk '/ via / {for (i = 1; i <= NF; i++) if ($i == "via") printf "%s ", $(i + 1)}')"
+    seen_ips=" "
+    is_visible_client() {
+        case "$router_ips" in *" $1 "*) return 1;; esac
+        case "$gateway_ips" in *" $1 "*) return 1;; esac
+        case "$seen_ips" in *" $1 "*) return 1;; esac
+        seen_ips="$seen_ips$1 "
+        return 0
+    }
+    # DHCP names have priority; ARP neighbours only fill the remaining IPs.
+    if [ -r /tmp/dhcp.leases ]; then
+        while read -r expiry mac ip name clientid; do
+            valid_ipv4_cidr "$ip" || continue
+            is_visible_client "$ip" || continue
+            json_add_object; json_add_string ip "$ip"; json_add_string mac "$mac"; json_add_string name "${name:-}"; json_close_object
+        done < /tmp/dhcp.leases
+    fi
+    ip -4 neigh show 2>/dev/null > /tmp/mihomo-neigh
+    while read -r ip dev _ mac _ state; do
+        valid_ipv4_cidr "$ip" || continue
+        [ "$state" = FAILED ] && continue
+        is_visible_client "$ip" || continue
+        json_add_object; json_add_string ip "$ip"; json_add_string mac "${mac:-}"; json_add_string name ""; json_close_object
+    done < /tmp/mihomo-neigh
+    json_close_array; json_dump
+}
+
+case "$1" in
+list) echo '{"status":{},"clients":{},"add":{"source":"String","label":"String"},"update":{"id":"String","source":"String","label":"String"},"delete":{"id":"String"},"set_enabled":{"id":"String","enabled":true},"set_router":{"enabled":true}}' ;;
+call)
+    json_load "$(cat)"
+    case "$2" in
+    status) emit_status ;;
+    clients) emit_clients ;;
+    add)
+        json_get_var source source; json_get_var label label
+        valid_ipv4_cidr "$source" || fail "Введите корректный IPv4-адрес или CIDR"
+        source="$(normalize_ipv4_cidr "$source")" || fail "Не удалось определить маску подсети"
+        [ "${#label}" -le 64 ] || fail "Название не длиннее 64 символов"
+        printf '%s' "$label" | grep -q '[[:cntrl:]]' && fail "Недопустимое название"
+        id="$(date +%s)_$$"
+        table="$(ensure_base)" || fail "Не удалось подобрать свободную таблицу маршрутизации"
+        uci -q set "network.${PREFIX}client_$id=rule"
+        uci -q set "network.${PREFIX}client_$id.name=${label:-$source}"
+        uci -q set "network.${PREFIX}client_$id.priority=$((20000 + $(uci show network 2>/dev/null | grep -c "^network\\.${PREFIX}client_.*=rule")))"
+        uci -q set "network.${PREFIX}client_$id.src=$source"
+        uci -q set "network.${PREFIX}client_$id.lookup=$table"
+        uci -q delete "network.${PREFIX}client_$id.enabled"
+        apply_network "$table" || fail "Не удалось создать маршрут по умолчанию через интерфейс Mihomo"
+        emit_status ;;
+    update)
+        json_get_var id id; json_get_var source source; json_get_var label label
+        printf '%s' "$id" | grep -Eq '^[0-9_]+$' || fail "Некорректный идентификатор правила"
+        uci -q get "network.${PREFIX}client_$id" >/dev/null || fail "Правило не найдено"
+        valid_ipv4_cidr "$source" || fail "Введите корректный IPv4-адрес или CIDR"
+        source="$(normalize_ipv4_cidr "$source")" || fail "Не удалось определить маску подсети"
+        [ "${#label}" -le 64 ] || fail "Название не длиннее 64 символов"
+        printf '%s' "$label" | grep -q '[[:cntrl:]]' && fail "Недопустимое название"
+        table="$(ensure_base)" || fail "Не удалось подготовить таблицу маршрутизации"
+        uci -q set "network.${PREFIX}client_$id.src=$source"
+        uci -q set "network.${PREFIX}client_$id.name=${label:-$source}"
+        uci -q set "network.${PREFIX}client_$id.lookup=$table"
+        apply_network "$table" || fail "Не удалось применить сетевые настройки"
+        emit_status ;;
+    delete)
+        json_get_var id id
+        printf '%s' "$id" | grep -Eq '^[0-9_]+$' || fail "Некорректный идентификатор правила"
+        uci -q get "network.${PREFIX}client_$id" >/dev/null || fail "Правило не найдено"
+        table="$(uci -q get network.$TABLE_SECTION.table)"
+        uci -q delete "network.${PREFIX}client_$id"
+        cleanup_if_unused
+        [ -n "$(uci -q get network.$TABLE_SECTION.table)" ] && apply_network "$table" || true
+        emit_status ;;
+    set_enabled)
+        json_get_var id id; json_get_var enabled enabled
+        printf '%s' "$id" | grep -Eq '^[0-9_]+$' || fail "Некорректный идентификатор правила"
+        uci -q get "network.${PREFIX}client_$id" >/dev/null || fail "Правило не найдено"
+        case "$enabled" in 1|true) enabled=1;; *) enabled=0;; esac
+        if [ "$enabled" = 1 ]; then
+            uci -q set "network.${PREFIX}client_$id=rule"
+            uci -q delete "network.${PREFIX}client_$id.enabled"
+            uci -q delete "network.${PREFIX}client_$id.disabled"
+        else
+            priority="$(uci -q get network.${PREFIX}client_$id.priority)"
+            [ -n "$priority" ] && ip rule del priority "$priority" 2>/dev/null || true
+            uci -q set "network.${PREFIX}client_$id=rule"
+            uci -q set "network.${PREFIX}client_$id.disabled=1"
+        fi
+        table="$(uci -q get network.$TABLE_SECTION.table)"
+        apply_network "$table" || fail "Не удалось применить сетевые настройки"; emit_status ;;
+    set_router)
+        json_get_var enabled enabled
+        table="$(ensure_base)" || fail "Не удалось подобрать свободную таблицу маршрутизации"
+        case "$enabled" in 1|true) enabled=1;; *) enabled=0;; esac
+        if [ "$enabled" = 1 ]; then
+            uci -q set "network.${PREFIX}router=rule"; uci -q set "network.${PREFIX}router.name=Mixomo-router"
+            uci -q delete "network.${PREFIX}router.src"
+            uci -q set "network.${PREFIX}router.priority=19000"; uci -q set "network.${PREFIX}router.mark=$ROUTER_MARK"; uci -q set "network.${PREFIX}router.lookup=$table"
+            enable_router_mark || fail "Не удалось включить правило трафика роутера"
+            apply_network "$table" || fail "Не удалось создать маршрут по умолчанию через интерфейс Mihomo"
+            ensure_router_policy "$table" || fail "Не удалось создать policy rule для трафика роутера"
+        else
+            ip rule del priority 19000 fwmark "$ROUTER_MARK" 2>/dev/null || true
+            uci -q delete "network.${PREFIX}router"
+            cleanup_if_unused
+            [ -n "$(uci -q get network.$TABLE_SECTION.table)" ] && apply_network "$table" || true
+        fi
+        emit_status ;;
+    *) fail "Неизвестный метод";;
+    esac ;;
+esac
+EOF
+    chmod 755 /usr/libexec/rpcd/mihomo-routing
+    
+    if [ "$(uci -q get network.mihomo_route_router.mark)" = "0x233" ]; then
+        printf '%s\n' '{"enabled":true}' | /usr/libexec/rpcd/mihomo-routing call set_router >/dev/null 2>&1 || \
+            log_warn "Не удалось автоматически обновить особое правило маршрутизации роутера"
+    else
+        uci -q delete firewall.mihomo_router_routing
+        rm -f /etc/mihomo/mihomo-router-routing.nft
+        uci commit firewall
+    fi
 
     local VIEW_PATH="/www/luci-static/resources/view/mihomo"
     local ACE_PATH="$VIEW_PATH/ace"
@@ -482,6 +830,14 @@ var callServiceList = rpc.declare({
     method: 'list',
     params: ['name']
 });
+
+var callRoutingStatus = rpc.declare({ object: 'mihomo-routing', method: 'status', expect: { '': {} } });
+var callRoutingClients = rpc.declare({ object: 'mihomo-routing', method: 'clients', expect: { '': {} } });
+var callRoutingAdd = rpc.declare({ object: 'mihomo-routing', method: 'add', params: ['source', 'label'], expect: { '': {} } });
+var callRoutingUpdate = rpc.declare({ object: 'mihomo-routing', method: 'update', params: ['id', 'source', 'label'], expect: { '': {} } });
+var callRoutingDelete = rpc.declare({ object: 'mihomo-routing', method: 'delete', params: ['id'], expect: { '': {} } });
+var callRoutingEnabled = rpc.declare({ object: 'mihomo-routing', method: 'set_enabled', params: ['id', 'enabled'], expect: { '': {} } });
+var callRoutingRouter = rpc.declare({ object: 'mihomo-routing', method: 'set_router', params: ['enabled'], expect: { '': {} } });
 
 function escapeHtml(text) {
     if (typeof text !== 'string') return text;
@@ -569,6 +925,113 @@ return view.extend({
     latestVersion: null,
     updateButton: null,
     latestVersionEl: null,
+    routingPanel: null,
+
+    showRoutingError: function(result) {
+        if (!result || !result.ok) ui.addNotification(null, E('p', (result && result.error) || _('Не удалось применить правило')), 'error');
+        return result && result.ok;
+    },
+
+    confirmRouterRouting: function(enable) {
+        var self = this;
+        var text = enable
+            ? _('Вы уверены что хотите ВКЛЮЧИТЬ все исходящие соединения от роутера через Mihomo? Других клиентов это не затронет.')
+            : _('Вы уверены что хотите ВЫКЛЮЧИТЬ все исходящие соединения от роутера через Mihomo? Других клиентов это не затронет.');
+        ui.showModal(_('Дополнительное подтверждение...'), [
+            E('p', {}, text),
+            E('div', { class: 'right', style: 'margin-top:1rem;' }, [
+                E('button', { class: 'btn cbi-button-neutral', click: ui.hideModal }, _('Отменить')), ' ',
+                E('button', { class: 'btn cbi-button-positive btn-save-custom', click: function() {
+                    ui.hideModal();
+                    callRoutingRouter(enable).then(function(res) { if (self.showRoutingError(res)) self.refreshRouting(); });
+                }}, _('Продолжить'))
+            ])
+        ]);
+    },
+
+    editRoutingRule: function(rule) {
+        var self = this;
+        var source = E('input', { type: 'text', value: rule.source, style: 'width:100%;' });
+        var label = E('input', { type: 'text', value: rule.label || '', style: 'width:100%;' });
+        ui.showModal(_('Редактировать правило'), [
+            E('div', {}, [E('label', {}, _('Источник (IP или CIDR)')), source]),
+            E('div', { style: 'margin-top:.7rem;' }, [E('label', {}, _('Название')), label]),
+            E('div', { class: 'right', style: 'margin-top:1rem;' }, [
+                E('button', { class: 'btn cbi-button-neutral', click: ui.hideModal }, _('Отменить')), ' ',
+                E('button', { class: 'btn cbi-button-positive btn-save-custom', click: function() {
+                    callRoutingUpdate(rule.id, source.value.trim(), label.value.trim()).then(function(res) { if (self.showRoutingError(res)) { ui.hideModal(); self.refreshRouting(); } });
+                }}, _('Сохранить'))
+            ])
+        ]);
+    },
+
+    refreshRouting: function() {
+        var self = this;
+        return Promise.all([callRoutingStatus(), callRoutingClients()]).then(function(data) {
+            self.routingData = data[0] || {}; self.clientData = data[1] || {};
+            self.renderRoutingPanel();
+        }).catch(function(err) { ui.addNotification(null, E('p', _('Ошибка маршрутизации: ') + err.message), 'error'); });
+    },
+
+    toggleRoutingPanel: function() {
+        if (!this.routingPanel) return;
+        var open = this.routingPanel.style.display !== 'none';
+        this.routingPanel.style.display = open ? 'none' : 'block';
+        if (!open) { this.routingPanel.scrollIntoView({ behavior: 'smooth', block: 'start' }); this.refreshRouting(); }
+    },
+
+    renderRoutingPanel: function() {
+        var panel = this.routingPanel;
+        if (!panel) return;
+        var self = this, status = this.routingData || {}, clients = (this.clientData && this.clientData.clients) || [];
+        while (panel.firstChild) panel.removeChild(panel.firstChild);
+        var routerEnabled = (status.router === true || status.router === 1 || status.router === '1');
+        var routerToggle = E('input', { type: 'checkbox', click: function(ev) {
+            ev.preventDefault();
+            self.confirmRouterRouting(!routerEnabled);
+        }});
+        routerToggle.checked = routerEnabled;
+        panel.appendChild(E('h3', {}, _('ЭКСПЕРИМЕНТАЛЬНЫЙ РЕЖИМ | Политика маршрутизации')));
+        panel.appendChild(E('p', { style: 'opacity:.75; margin-top:0;' }, [
+        _('ВКЛЮЧАЙТЕ НА СВОЙ СТРАХ И РИСК!'),
+        E('br'),
+        _('При использовании этой политики абсолютно весь трафик направится в Mihomo.'),
+        E('br'),
+        _('Добавлять устройства и подсети можно только из локальных диапазонов.'),
+        E('br'),
+        _('Совет: закрепить локальный IP за конкретным устройством можно в '),
+        E('a', { href: L.url('admin/network/dhcp'), target: '_blank' }, _('Статических арендах DHCP'))]));
+
+        var deviceLabel = E('input', { type: 'text', placeholder: _('Название (необязательно)'), style: 'min-width:12rem;' });
+        var known = E('select', { style: 'min-width:15rem;' }, [E('option', { value: '' }, _('Выберите устройство...'))].concat(clients.map(function(c) {
+            return E('option', { value: c.ip }, (c.name ? c.name + ' — ' : '') + c.ip);
+        })));
+        panel.appendChild(E('div', { class: 'mihomo-route-add' }, [known, deviceLabel, E('button', { class: 'btn cbi-button-positive btn-save-custom', click: function() {
+            if (!known.value) { ui.addNotification(null, E('p', _('Сначала выберите устройство')), 'error'); return; }
+            var selected = clients.filter(function(c) { return c.ip === known.value; })[0];
+            var label = deviceLabel.value.trim() || (selected && selected.name) || '';
+            callRoutingAdd(known.value, label).then(function(res) { if (self.showRoutingError(res)) { known.value = ''; deviceLabel.value = ''; self.refreshRouting(); } });
+        }}, _('Добавить правило'))]));
+        var source = E('input', { type: 'text', placeholder: 'Напишите IP или CIDR...', style: 'min-width:15rem;' });
+        var manualLabel = E('input', { type: 'text', placeholder: _('Название (необязательно)'), style: 'min-width:12rem;' });
+        panel.appendChild(E('div', { style: 'opacity:.75; margin-top:.35rem; margin-bottom:.35rem;' }, _('Или')));
+        panel.appendChild(E('div', { class: 'mihomo-route-add' }, [source, manualLabel, E('button', { class: 'btn cbi-button-positive btn-save-custom', click: function() {
+            callRoutingAdd(source.value.trim(), manualLabel.value.trim()).then(function(res) { if (self.showRoutingError(res)) { source.value = ''; manualLabel.value = ''; self.refreshRouting(); } });
+        }}, _('Добавить правило'))]));
+
+        var rules = status.rules || [];
+        if (!rules.length) panel.appendChild(E('p', { style: 'opacity:.75; margin-top:.35rem; margin-bottom:1.35rem;' }, [
+            _('Правил пока нет.')
+        ]));
+        else {
+            var table = E('table', { class: 'table mihomo-routing-table', style: 'width:100%; margin-top:.8rem;' }, [E('thead', {}, E('tr', {}, [E('th', {}, _('Название')), E('th', {}, _('Источник')), E('th', {}, _('Статус')), E('th', {}, _('Действие'))]))]);
+            var body = E('tbody'); rules.forEach(function(rule) { body.appendChild(E('tr', {}, [E('td', {}, rule.label || '—'), E('td', {}, rule.source), E('td', {}, rule.enabled ? _('Включено') : _('Отключено')), E('td', {}, E('div', { class: 'mihomo-route-actions' }, [E('button', { class: 'btn cbi-button-neutral', click: function() { self.editRoutingRule(rule); } }, _('Редактировать')), E('button', { class: 'btn cbi-button-neutral', click: function() { callRoutingEnabled(rule.id, !rule.enabled).then(function(res) { if (self.showRoutingError(res)) self.refreshRouting(); }); } }, rule.enabled ? _('Отключить') : _('Включить')), E('button', { class: 'btn cbi-button-reset', click: function() { if (confirm(_('Удалить это правило?'))) callRoutingDelete(rule.id).then(function(res) { if (self.showRoutingError(res)) self.refreshRouting(); }); } }, _('Удалить'))])) ])); });
+            table.appendChild(body); panel.appendChild(table);
+        }
+        panel.appendChild(E('p', { style: 'opacity:.75; margin-top:.35rem; margin-bottom:.35rem;' }, _('Особое правило:')));
+        panel.appendChild(E('label', { style: 'display:block; margin:.4rem 0;' }, [routerToggle, ' ', _('Направлять трафик самого роутера через Mihomo')]));
+        panel.appendChild(E('p', { style: 'opacity:.75; margin-top:.35rem; margin-bottom:.35rem;' }, _('Применяется только к исходящим соединениям, которые инициирует сам роутер (обновления пакетов, wget, curl и другие системные запросы). Не затрагивает других клиентов.')));
+    },
 	
     getMihomoVersion: function() {
         return fs.stat('/usr/bin/mihomo')
@@ -593,7 +1056,6 @@ return view.extend({
         if (this.latestVersionEl) {
             this.latestVersionEl.textContent = _('(актуальное ядро %s)').format(latestVersion.replace('v', ''));
             this.latestVersionEl.style.display = 'inline';
-            // Используем стандартный зеленый через opacity/filter или оставляем для привлечения внимания
             this.latestVersionEl.style.color = (latestVersion !== currentVersion) ? '#5cb85c' : '';
             this.latestVersionEl.style.opacity = (latestVersion !== currentVersion) ? '1' : '0.6';
         }
@@ -719,6 +1181,7 @@ return view.extend({
         this.latestVersionEl = latestVersionEl;
         var updateButton = E('button', { 'id': 'mihomo-update-btn', 'class': 'btn cbi-button-neutral', 'style': 'margin-left: 10px; padding: 0 0.6em; font-size: 0.9em;', 'disabled': true }, _('Проверить обновление'));
         this.updateButton = updateButton;
+        var routingButton = E('button', { 'class': 'btn cbi-button-neutral', 'style': 'margin-left: 10px;', 'click': ui.createHandlerFn(this, 'toggleRoutingPanel') }, _('Маршрутизация'));
         
         var statusBadge = isRunning 
             ? E('span', { 
@@ -740,7 +1203,8 @@ return view.extend({
             serviceButton, 
             versionContainer, 
             latestVersionEl,
-            updateButton
+            updateButton,
+            routingButton
         ]);
 		
         var self = this;
@@ -822,6 +1286,11 @@ return view.extend({
             .btn-generate { border-color: #5cb85c !important; color: #5cb85c !important; margin: auto 0; display: block; background: var(--bg-input); }
             .btn-generate:hover { border-color: #5cb85c !important; }
             .snippet-container { margin-top: 0; border: 1px solid var(--border-color); background: var(--bg-toolbar); padding: 0.8rem; display: none; }
+            .mihomo-routing-panel { border: 1px solid var(--border-color); background: var(--bg-toolbar); padding: 1rem; margin: 0 0 1rem; }
+            .mihomo-route-add { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+            .mihomo-route-actions { display: flex; gap: 1rem; padding: 0.2rem 0; }
+            .mihomo-routing-panel input, .mihomo-routing-panel select { background: var(--bg-input); color: var(--text-main); border: 1px solid var(--border-color); padding: .4em; }
+            .mihomo-routing-table th, .mihomo-routing-table td { text-align: left !important; }
             .snippet-header { margin-bottom: 0.4rem; color: var(--text-main); font-size: 0.85em; }
             .snippet-text { width: 100%; height: 9.5em; background: var(--bg-tab-active); color: var(--text-main); border: 1px solid var(--border-color); font-family: monospace; font-size: 0.9em; padding: 0.8em; resize: none; }
             .output-box-close { background: transparent; border: none; color: var(--text-main); font-size: 1.5em; line-height: 1; cursor: pointer; margin-left: 1rem; padding: 0 0.4rem; }
@@ -860,6 +1329,9 @@ return view.extend({
             ]),
             E('pre', { 'id': 'output-text', 'style': 'margin: 0; padding: 1rem; background: var(--bg-output); color: var(--text-output); font-family: monospace; font-size: 1em; white-space: pre-wrap; word-wrap: break-word; max-height: 25rem; overflow-y: auto;' }, '')
         ]);
+
+        var routingPanel = E('div', { 'class': 'mihomo-routing-panel', 'style': 'display:none;' });
+        this.routingPanel = routingPanel;
         
         loadScript(ACE_DIR + 'ace.js').then(function() {
             ace.config.set('basePath', ACE_DIR);
@@ -884,7 +1356,7 @@ return view.extend({
         setTimeout(function() { this.updateVisibility(MAIN_CONFIG); }.bind(this), 100);
         
         return E('div', { 'class': 'cbi-map' }, [
-            header, style, tabBar, toolbarContainer, editorContainer,
+            header, routingPanel, style, tabBar, toolbarContainer, editorContainer,
             middleActions, snippetContainer, buttonContainer, outputBox
         ]);
     },
@@ -1449,6 +1921,7 @@ finalize_install() {
     rm -rf /tmp/luci-indexcache /tmp/luci-modulecache/
     /etc/init.d/rpcd restart > /dev/null 2>&1
     /etc/init.d/uhttpd restart > /dev/null 2>&1
+    /etc/init.d/hev-socks5-tunnel restart > /dev/null 2>&1
     /etc/init.d/mihomo restart > /dev/null 2>&1
 }
 
