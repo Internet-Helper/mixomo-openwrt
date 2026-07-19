@@ -9,7 +9,7 @@
 </div>
 <br>  
 
-<img width="1920" height="478" alt="Logo-2" src="https://github.com/user-attachments/assets/21e6da2b-2048-4baf-b067-b5c90f2120ff" />
+<img width="1920" height="478" alt="Logo-2" src="https://github.com/user-attachments/assets/d3ae54a4-5db1-4395-84c7-40600bf1718c" />
 
 ## Описание
 
