@@ -8,8 +8,8 @@
   <a href="https://pay.cloudtips.ru/p/8ec8a87c">CloudTips</a> или <a href="https://yoomoney.ru/to/41001945296522">Юмани</a>
 </div>
 <br>  
-  
-<img width="1920" height="478" alt="Logo" src="https://github.com/user-attachments/assets/c4a4aa90-c9d2-4c82-ac77-7487a4392cdb" />
+
+<img width="1920" height="478" alt="Logo-2" src="https://github.com/user-attachments/assets/21e6da2b-2048-4baf-b067-b5c90f2120ff" />
 
 ## Описание
 
