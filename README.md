@@ -67,3 +67,7 @@ curl -fsSL https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/main
 ```
 wget -qO- --no-check-certificate https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/main/delete.sh | sh
 ```
+
+# Лицензия
+
+Данный проект распространяется по лицензии [Apache 2.0](https://github.com/Internet-Helper/mixomo-openwrt/blob/main/LICENSE).
