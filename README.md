@@ -27,8 +27,8 @@
 - Через прокси проходит только тот трафик, который Вы в него направили
 - Всё остальное идёт через Вашего домашнего провайдера на его полной скорости, минуя прокси‑ядро
 - При необходимости можно использовать локальную маршрутизацию, чтобы отправлять весь трафик выбранных IP/CIDR в ядро Mihomo
-
-<img width="1222" height="1544" alt="Windows" src="https://github.com/user-attachments/assets/ce48a2f0-0a7f-4dd9-a2bc-bc4cf4ce0297" />
+- 
+<img width="1212" height="1414" alt="image" src="https://github.com/user-attachments/assets/0d82becc-37ac-41b8-8420-a3eeb26547a6" />
 
 # Требования
 - OpenWrt 24.10+ и 25.12+
