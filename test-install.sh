@@ -1,9 +1,12 @@
 #!/bin/sh
 
-SCRIPT_VERSION="v0.2.0-alpha"
+SCRIPT_VERSION="v0.2.2-alpha"
 
 MIHOMO_INSTALL_DIR="/etc/mihomo"
 MIHOMO_BIN="/usr/bin/mihomo"
+MIHOMO_VERSION_FILE="/etc/mihomo/.mihomo-version-now"
+HEV_VERSION_FILE="/etc/hev-socks5-tunnel/.hev-socks5-tunnel-version-now"
+MAGI_VERSION_FILE="/etc/magitrickle/.magitrickle-version-now"
 
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -16,6 +19,30 @@ log_warn()    { echo -e "${YELLOW}[WARN]${NC} $*"; }
 log_error()   { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 log_done()    { echo -e "${GREEN}$*${NC}"; }
 step_fail()   { echo -e "${RED}[FAIL]${NC}"; exit 1; }
+
+kill_stale_pkg() {
+    local name="$1"
+    for pid in $(ps 2>/dev/null | grep -v grep | grep -E "[ /]${name}([ /]|$)" | awk '{print $1}'); do
+        [ "$pid" = "$$" ] && continue
+        echo "Принудительно завершаю зависший процесс: $(ps -o args= -p "$pid" 2>/dev/null || echo pid=$pid)"
+        kill -9 "$pid" 2>/dev/null || true
+    done
+}
+
+ask_menu() {
+    local def="${1:-1}" ans
+    while :; do
+        read -r ans
+        ans=$(printf '%s' "$ans" | tr -d ' \r\n' | tr 'Q' 'q')
+        case "$ans" in
+            1) echo "1"; return ;;
+            2) echo "2"; return ;;
+            q) echo "q"; return ;;
+            '') echo "$def"; return ;;
+            *) log_warn "Некорректный ответ: \"$ans\". Введите 1, 2, q или Enter." ;;
+        esac
+    done
+}
 
 USE_APK=0
 if command -v apk > /dev/null 2>&1; then
@@ -38,6 +65,171 @@ manage_pkg() {
             remove)  opkg remove "$@" ;;
         esac
     fi
+}
+
+MAGI_VARIANT_MARKER="$MAGI_VERSION_FILE"
+MAGI_VARIANT="original"
+
+read_variant_now() { sed -n '1p' "$MAGI_VERSION_FILE" 2>/dev/null | tr -d ' \r\n'; }
+read_version_now() { sed -n '2p' "$MAGI_VERSION_FILE" 2>/dev/null | tr -d ' \r\n'; }
+
+detect_magitrickle_variant() {
+    local v
+    if [ -f "$MAGI_VERSION_FILE" ]; then
+        v=$(read_variant_now)
+        case "$v" in original|mod) echo "$v"; return ;; esac
+    fi
+    if [ -f /etc/magitrickle/state/config.yaml ]; then
+        if grep -q 'tproxyPort' /etc/magitrickle/state/config.yaml 2>/dev/null; then
+            echo "mod"; return
+        fi
+    fi
+    echo "original"
+}
+
+save_magitrickle_variant() {
+    local variant="$1" version="$2"
+    [ -z "$version" ] && version="$(read_version_now)"
+    mkdir -p "$(dirname "$MAGI_VERSION_FILE")" 2>/dev/null || true
+    printf '%s\n%s\n' "$variant" "$version" > "$MAGI_VERSION_FILE"
+}
+
+magitrickle_latest_version() {
+    local variant="$1"
+    if [ "$variant" = "mod" ]; then
+        curl -s https://api.github.com/repos/badigit/MagiTrickle_mod_badigit/releases/latest 2>/dev/null \
+            | grep -m1 '"tag_name"' | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/'
+    else
+        curl -sL "https://gitlab.com/api/v4/projects/magitrickle%2Fmagitrickle/releases/permalink/latest" 2>/dev/null \
+            | grep -o '"tag_name":"[^"]*"' | cut -d'"' -f4
+    fi
+}
+
+choose_magitrickle_variant() {
+    local installed choice
+    local inst_label="" opt1="" opt2=""
+    installed="$(detect_magitrickle_variant)"
+
+    if [ -d "/etc/magitrickle" ] || [ -f "/etc/init.d/magitrickle" ]; then
+        if [ "$installed" = "mod" ]; then
+            inst_label="MagiTrickle Mod от badigit"
+            opt1="Обновить Mod от badigit (можно нажать Enter)"
+            opt2="Установить оригинальную версию MagiTrickle"
+        else
+            inst_label="оригинальный MagiTrickle"
+            opt1="Обновить оригинальный MagiTrickle (можно нажать Enter)"
+            opt2="Установить MagiTrickle Mod от badigit"
+        fi
+    else
+        installed=""
+        inst_label="не установлен"
+        opt1="Установить оригинальный MagiTrickle (можно нажать Enter)"
+        opt2="Установить MagiTrickle Mod от badigit"
+    fi
+
+    while true; do
+        echo ""
+        log_done "Сейчас установлен $inst_label"
+        echo ""
+        echo "[1] $opt1"
+        echo "[2] $opt2"
+        echo "[q] Выход"
+        echo ""
+        printf "Ваш выбор: "
+        read choice
+
+        if [ -z "$choice" ]; then
+            choice="1"
+        fi
+
+        case "$choice" in
+            q)
+                echo ""
+                exit 0
+                ;;
+            1)
+                if [ -n "$installed" ]; then
+                    MAGI_VARIANT="$installed"
+                else
+                    MAGI_VARIANT="original"
+                fi
+                break
+                ;;
+            2)
+                case "$installed" in
+                    mod) MAGI_VARIANT="original";;
+                    *)   MAGI_VARIANT="mod";;
+                esac
+                break
+                ;;
+            *)
+                echo ""
+                clear
+                continue
+                ;;
+        esac
+    done
+
+    save_magitrickle_variant "$MAGI_VARIANT"
+}
+
+tcp_port_free() {
+    local port="$1"
+    if command -v ss >/dev/null 2>&1; then
+        ss -lnt 2>/dev/null | awk '{print $4}' | grep -q ":${port}\$" && return 1
+    elif command -v netstat >/dev/null 2>&1; then
+        netstat -lnt 2>/dev/null | awk '{print $4}' | grep -q ":${port}\$" && return 1
+    fi
+    return 0
+}
+
+ensure_mihomo_redir_port() {
+    local CONFIG_FILE="/etc/mihomo/config.yaml"
+    [ -f "$CONFIG_FILE" ] || return 1
+    local existing port
+    existing=$(grep -E '^[[:space:]]*redir-port:' "$CONFIG_FILE" | awk '{print $2}' | tr -d ' \r\n')
+    if [ -n "$existing" ] && [ "$existing" -ge 1 ] 2>/dev/null && [ "$existing" -le 65535 ]; then
+        echo "$existing"
+        return 0
+    fi
+    port=5001
+    while [ "$port" -le 65535 ]; do
+        if tcp_port_free "$port"; then break; fi
+        port=$((port + 1))
+    done
+    if [ "$port" -gt 65535 ]; then
+        log_error "Не удалось найти свободный redir-port для Mihomo"
+        return 1
+    fi
+    if grep -qE '^[[:space:]]*mixed-port:' "$CONFIG_FILE"; then
+        sed -i "/^[[:space:]]*mixed-port:/a redir-port: ${port}" "$CONFIG_FILE"
+    elif grep -qE '^[[:space:]]*mode:' "$CONFIG_FILE"; then
+        sed -i "/^[[:space:]]*mode:/a redir-port: ${port}" "$CONFIG_FILE"
+    else
+        sed -i "1i redir-port: ${port}" "$CONFIG_FILE"
+    fi
+    echo "$port"
+}
+
+sync_tproxy_port() {
+    local port="$1"
+    local CONFIG_PATH="/etc/magitrickle/state/config.yaml"
+    [ -n "$port" ] || return 0
+    [ -f "$CONFIG_PATH" ] || return 0
+    local TMP_T
+    TMP_T=$(mktemp) || return 1
+    awk -v port="$port" '
+        /^[[:space:]]*tproxyPort:[[:space:]]/ { next }
+        /^[[:space:]]*startMarkTableIndex:[[:space:]]*[0-9]+/ {
+            match($0, /^[[:space:]]*/)
+            indent = substr($0, RSTART, RLENGTH)
+            print
+            print indent "tproxyPort: " port
+            next
+        }
+        { print }
+    ' "$CONFIG_PATH" > "$TMP_T" && mv "$TMP_T" "$CONFIG_PATH"
+    return 0
 }
 
 detect_mihomo_arch() {
@@ -115,10 +307,18 @@ install_deps() {
         local AVAIL_PKG
         AVAIL_PKG=$(grep -o '[0-9]* distinct packages available' "$PKG_LOG" | grep -o '^[0-9]*')
         if [ -z "$AVAIL_PKG" ] || [ "$AVAIL_PKG" -eq 0 ]; then
-            log_warn "apk update не вернул доступных пакетов, повторная попытка..."
-            sleep 3
-            apk update > "$PKG_LOG" 2>&1 || true
-            AVAIL_PKG=$(grep -o '[0-9]* distinct packages available' "$PKG_LOG" | grep -o '^[0-9]*')
+            if grep -q "Resource temporarily unavailable" "$PKG_LOG"; then
+                log_warn "apk заблокирован. Автоматически завершаю зависший процесс apk и повторяю..."
+                kill_stale_pkg apk
+                sleep 2
+                apk update > "$PKG_LOG" 2>&1 || true
+                AVAIL_PKG=$(grep -o '[0-9]* distinct packages available' "$PKG_LOG" | grep -o '^[0-9]*')
+            else
+                log_warn "apk update не вернул доступных пакетов, повторная попытка..."
+                sleep 3
+                apk update > "$PKG_LOG" 2>&1 || true
+                AVAIL_PKG=$(grep -o '[0-9]* distinct packages available' "$PKG_LOG" | grep -o '^[0-9]*')
+            fi
             if [ -z "$AVAIL_PKG" ] || [ "$AVAIL_PKG" -eq 0 ]; then
                 log_error "apk update завершился без доступных пакетов:"
                 cat "$PKG_LOG"
@@ -128,15 +328,29 @@ install_deps() {
         fi
         
         apk add ca-certificates kmod-tun kmod-nft-tproxy kmod-nft-nat curl >> "$PKG_LOG" 2>&1 || true
+        apk add kmod-nft-socket iptables-mod-tproxy iptables-mod-socket >> "$PKG_LOG" 2>&1 || true
     else
         if ! opkg update > "$PKG_LOG" 2>&1; then
-            log_error "Ошибка обновления списков пакетов (opkg update):"
-            cat "$PKG_LOG"
-            rm -f "$PKG_LOG"
-            return 1
+            if grep -qiE "Resource temporarily unavailable|lock" "$PKG_LOG"; then
+                log_warn "opkg заблокирован. Автоматически завершаю зависший процесс opkg и повторяю..."
+                kill_stale_pkg opkg
+                sleep 2
+                if ! opkg update > "$PKG_LOG" 2>&1; then
+                    log_error "Ошибка обновления списков пакетов (opkg update):"
+                    cat "$PKG_LOG"
+                    rm -f "$PKG_LOG"
+                    return 1
+                fi
+            else
+                log_error "Ошибка обновления списков пакетов (opkg update):"
+                cat "$PKG_LOG"
+                rm -f "$PKG_LOG"
+                return 1
+            fi
         fi
         
         opkg install ca-certificates kmod-tun kmod-nft-tproxy kmod-nft-nat curl libcurl4 ca-bundle >> "$PKG_LOG" 2>&1 || true
+        opkg install kmod-nft-socket kmod-ipt-tproxy kmod-ipt-socket >> "$PKG_LOG" 2>&1 || true
     fi
 
     rm -f "$PKG_LOG"
@@ -189,8 +403,9 @@ install_mihomo() {
         fi
     fi
 
-    if [ -f "/etc/init.d/mihomo" ]; then
-        /etc/init.d/mihomo stop 2>/dev/null || true
+    local MIHOMO_WAS_RUNNING=0
+    if [ -x "/etc/init.d/mihomo" ] && /etc/init.d/mihomo running >/dev/null 2>&1; then
+        MIHOMO_WAS_RUNNING=1
     fi
 
     if [ -z "${MIHOMO_ARCH+x}" ]; then
@@ -211,14 +426,27 @@ install_mihomo() {
     local RELEASE_TAG
     RELEASE_TAG=$(curl -Ls -o /dev/null -w '%{url_effective}' https://github.com/MetaCubeX/mihomo/releases/latest | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
     if [ -z "$RELEASE_TAG" ]; then
-        log_error "Не удалось определить версию. Проверьте интернет."
+        log_error "Не удалось определить версию. Проверьте доступ к GitHub."
         return 1
     fi
     echo "Последняя версия: $RELEASE_TAG"
 
+    local NEED_UPDATE=1 NOW_VER=""
+    if [ -f "$MIHOMO_VERSION_FILE" ]; then
+        NOW_VER=$(tr -d ' \r\n' < "$MIHOMO_VERSION_FILE" 2>/dev/null)
+    fi
+    if [ -x "$MIHOMO_BIN" ] && [ -n "$NOW_VER" ] && [ "$NOW_VER" = "$RELEASE_TAG" ] && "$MIHOMO_BIN" -v >/dev/null 2>&1; then
+        NEED_UPDATE=0
+        log_online "Актуальный Mihomo $RELEASE_TAG уже установлен"
+        echo "$RELEASE_TAG" > "$MIHOMO_VERSION_FILE"
+    fi
+
+    if [ "$NEED_UPDATE" -eq 1 ]; then
     local FILENAME="mihomo-linux-${MIHOMO_ARCH}-${RELEASE_TAG}.gz"
     local DOWNLOAD_URL="https://github.com/MetaCubeX/mihomo/releases/download/${RELEASE_TAG}/${FILENAME}"
     local TMP_FILE="/tmp/mihomo.gz"
+    local NEW_BIN="/tmp/mihomo.new"
+    local BACKUP_BIN="/tmp/mihomo.previous"
 
     log_online "Скачивание архива $FILENAME"
     log_online "$DOWNLOAD_URL"
@@ -227,19 +455,48 @@ install_mihomo() {
         return 1
     fi
 
-    echo "Распаковка архива"
-    if ! gunzip -c "$TMP_FILE" > "$MIHOMO_BIN" 2>/dev/null; then
+    echo "Распаковка архива во временный файл"
+    rm -f "$NEW_BIN"
+    if ! gunzip -c "$TMP_FILE" > "$NEW_BIN" 2>/dev/null || [ ! -s "$NEW_BIN" ]; then
         log_error "Ошибка распаковки архива"
-        rm -f "$TMP_FILE"
+        rm -f "$TMP_FILE" "$NEW_BIN"
         return 1
     fi
-    chmod +x "$MIHOMO_BIN"
+    chmod +x "$NEW_BIN"
     rm -f "$TMP_FILE"
 
-    echo "Проверка работы ядра Mihomo"
-    if ! "$MIHOMO_BIN" -v >/dev/null 2>&1; then
+    echo "Проверка ядра Mihomo"
+    if ! "$NEW_BIN" -v >/dev/null 2>&1; then
         log_error "Ядро не запускается! Возможно, выбрана неверная архитектура."
+        rm -f "$NEW_BIN"
         return 1
+    fi
+
+    if [ "$MIHOMO_WAS_RUNNING" -eq 1 ]; then
+        echo "Остановка текущего Mihomo для замены ядра"
+        /etc/init.d/mihomo stop || {
+            log_error "Не удалось остановить текущий Mihomo"
+            rm -f "$NEW_BIN"
+            return 1
+        }
+    fi
+
+    rm -f "$BACKUP_BIN"
+    if [ -f "$MIHOMO_BIN" ] && ! cp "$MIHOMO_BIN" "$BACKUP_BIN"; then
+        log_error "Не удалось создать резервную копию текущего ядра"
+        [ "$MIHOMO_WAS_RUNNING" -eq 1 ] && /etc/init.d/mihomo start 2>/dev/null || true
+        rm -f "$NEW_BIN"
+        return 1
+    fi
+    if ! mv -f "$NEW_BIN" "$MIHOMO_BIN" || ! chmod +x "$MIHOMO_BIN"; then
+        log_error "Не удалось установить новое ядро"
+        [ -f "$BACKUP_BIN" ] && cp "$BACKUP_BIN" "$MIHOMO_BIN"
+        [ "$MIHOMO_WAS_RUNNING" -eq 1 ] && /etc/init.d/mihomo start 2>/dev/null || true
+        rm -f "$NEW_BIN" "$BACKUP_BIN"
+        return 1
+    fi
+    rm -f "$BACKUP_BIN"
+    echo "$RELEASE_TAG" > "$MIHOMO_VERSION_FILE"
     fi
 
     local CONFIG_FILE="/etc/mihomo/config.yaml"
@@ -250,13 +507,13 @@ install_mihomo() {
             echo "Использование существующей конфигурации"
             WRITE_NEW_CONFIG=0
         else
-            log_warn "Конфигурация найдена, но без 'mixed-port: 7890'. Создаём резервную копию"
+            log_warn "Конфигурация найдена, но без 'mixed-port: 7890'. Создание резервной копии"
             cp "$CONFIG_FILE" "${CONFIG_FILE}.bak"
         fi
     fi
 
     if [ "$WRITE_NEW_CONFIG" -eq 1 ]; then
-        echo "Создание новой конфигурации /etc/mihomo/config.yaml..."
+        echo "Создание конфигурации /etc/mihomo/config.yaml..."
         cat > "$CONFIG_FILE" <<'EOF'
 mode: rule
 ipv6: false
@@ -302,6 +559,7 @@ sniffer:
     - cudy.net
 
 dns:
+
   enable: true
   listen: 0.0.0.0:7880
   ipv6: false
@@ -318,6 +576,7 @@ dns:
     - https://77.88.8.1/dns-query
 
 proxies:
+
   - name: Домашний интернет
     type: direct
 
@@ -329,6 +588,8 @@ rules:
   - MATCH,Домашний интернет
 EOF
     fi
+
+    ensure_mihomo_redir_port >/dev/null || log_warn "Не удалось настроить redir-port Mihomo (необходим для redir-tproxy)"
 
     echo "Создание службы /etc/init.d/mihomo"
     cat > /etc/init.d/mihomo <<'EOF'
@@ -358,6 +619,10 @@ service_triggers() {
 EOF
     chmod +x /etc/init.d/mihomo
     /etc/init.d/mihomo enable || log_warn "Не удалось включить автозапуск"
+    if [ "$MIHOMO_WAS_RUNNING" -eq 1 ]; then
+        echo "Запуск Mihomo"
+        /etc/init.d/mihomo start || log_warn "Не удалось запустить Mihomo; повторная попытка будет в конце установки"
+    fi
 
     echo "Настройка страницы LuCI для управления Mihomo"
     mkdir -p /usr/share/luci/menu.d
@@ -385,7 +650,8 @@ EOF
             },
             "ubus": {
                 "file": ["read", "list"],
-                "service": ["list"]
+                "service": ["list"],
+                "mihomo-routing": ["status", "clients"]
             }
         },
         "write": {
@@ -406,12 +672,451 @@ EOF
             },
             "ubus": {
                 "file": ["write"],
-                "service": ["list"]
+                "service": ["list"],
+                "mihomo-routing": ["add", "update", "delete", "set_enabled", "set_router"]
             }
         }
     }
 }
 EOF
+
+    mkdir -p /usr/libexec/rpcd
+    cat > /usr/libexec/rpcd/mihomo-routing <<'EOF'
+#!/bin/sh
+. /usr/share/libubox/jshn.sh
+
+PREFIX="mihomo_route_"
+TABLE_SECTION="mihomo_routing_table"
+ROUTER_MARK="0x233"
+ROUTER_NFT="/etc/mihomo/mihomo-router-routing.nft"
+ROUTER_FW_SECTION="mihomo_router_routing"
+
+fail() { json_init; json_add_boolean ok 0; json_add_string error "$1"; json_dump; exit 0; }
+
+valid_ipv4_cidr() {
+    value="$1"
+    ip="${value%/*}"
+    mask="${value#*/}"
+    [ "$ip" != "$value" ] || mask=32
+    case "$mask" in ''|*[!0-9]*) return 1;; esac
+    [ "$mask" -ge 1 ] 2>/dev/null && [ "$mask" -le 32 ] 2>/dev/null || return 1
+    oldifs="$IFS"; IFS=.; set -- $ip; IFS="$oldifs"
+    [ "$#" -eq 4 ] || return 1
+    for octet in "$@"; do
+        case "$octet" in ''|*[!0-9]*) return 1;; esac
+        [ "$octet" -le 255 ] 2>/dev/null || return 1
+    done
+    return 0
+}
+
+normalize_ipv4_cidr() {
+    value="$1"
+    case "$value" in */*) printf '%s\n' "$value"; return;; esac
+    oldifs="$IFS"; IFS=.; set -- $value; IFS="$oldifs"
+    [ "$#" -eq 4 ] || return 1
+    if [ "$4" = 0 ] && [ "$3" = 0 ] && [ "$2" = 0 ]; then mask=8
+    elif [ "$4" = 0 ] && [ "$3" = 0 ]; then mask=16
+    elif [ "$4" = 0 ]; then mask=24
+    else mask=32
+    fi
+    printf '%s/%s\n' "$value" "$mask"
+}
+
+find_table() {
+    existing="$(uci -q get network.$TABLE_SECTION.table)"
+    # Once chosen, Mixomo never changes its table merely because netifd has
+    # not installed the route yet. This keeps all rules on one stable table.
+    if [ -n "$existing" ] && [ "$existing" -ge 1 ] 2>/dev/null; then
+        echo "$existing"; return
+    fi
+    table=100
+    while [ "$table" -lt 1000 ]; do
+        # A table is ours only when its default route already uses Mihomo.
+        if ! ip route show table "$table" 2>/dev/null | grep -q . && \
+           ! ip rule list 2>/dev/null | grep -Eq "[[:space:]]lookup[[:space:]]+$table([[:space:]]|$)"; then
+            echo "$table"; return
+        fi
+        table=$((table + 1))
+    done
+    return 1
+}
+
+ensure_base() {
+    table="$(find_table)" || return 1
+    uci -q set "network.$TABLE_SECTION=route"
+    uci -q set "network.$TABLE_SECTION.interface=Mihomo"
+    uci -q set "network.$TABLE_SECTION.target=0.0.0.0/0"
+    uci -q set "network.$TABLE_SECTION.table=$table"
+
+    # Rebuild only Mixomo's own local-destination exclusions.
+    for section in $(uci show network 2>/dev/null | sed -n "s/^network\\.\\(${PREFIX}local_[^.=]*\\)=rule$/\\1/p"); do uci -q delete "network.$section"; done
+    number=0
+    ip -4 route show table main proto kernel scope link 2>/dev/null | while read -r subnet rest; do
+        case "$subnet" in */*) ;;
+            *) continue;; esac
+        case "$rest" in *"dev Mihomo"*) continue;; esac
+        uci -q set "network.${PREFIX}local_$number=rule"
+        uci -q set "network.${PREFIX}local_$number.name=Mixomo-local-$number"
+        uci -q set "network.${PREFIX}local_$number.priority=$((10000 + number))"
+        uci -q set "network.${PREFIX}local_$number.dest=$subnet"
+        uci -q set "network.${PREFIX}local_$number.lookup=main"
+        number=$((number + 1))
+    done
+    echo "$table"
+}
+
+apply_network() {
+    table="$1"
+    uci commit network
+    /etc/init.d/network reload
+    sleep 1
+    # Some proto-none TUN interfaces are not handled consistently by netifd.
+    # Keep the UCI route for persistence, then verify the live kernel route.
+    if ! ip route show table "$table" 2>/dev/null | grep -Eq '^default[[:space:]].*dev[[:space:]]Mihomo([[:space:]]|$)'; then
+        ip route replace default dev Mihomo table "$table" 2>/dev/null || return 1
+    fi
+    ip route show table "$table" 2>/dev/null | grep -Eq '^default[[:space:]].*dev[[:space:]]Mihomo([[:space:]]|$)'
+}
+
+ensure_router_policy() {
+    table="$1"
+    if ! ip rule list 2>/dev/null | grep -Eq "^[[:space:]]*19000:.*fwmark $ROUTER_MARK.*lookup $table([[:space:]]|$)"; then
+        ip rule add priority 19000 fwmark "$ROUTER_MARK" lookup "$table" 2>/dev/null || return 1
+    fi
+}
+
+list_client_sections() {
+    for type in rule mihomo_rule; do
+        uci show network 2>/dev/null | sed -n "s/^network\\.\\(${PREFIX}client_[^.=]*\\)=$type$/\\1/p"
+    done
+}
+
+list_tun_sections() {
+    uci show network 2>/dev/null | sed -n "s/^network\\.\\(${PREFIX}client_[^.=]*\\)=rule$/\\1/p"
+}
+
+list_redir_sections() {
+    uci show network 2>/dev/null | sed -n "s/^network\\.\\(${PREFIX}client_[^.=]*\\)=mihomo_rule$/\\1/p"
+}
+
+get_backend_default() {
+    if grep -E '^[[:space:]]*redir-port:' /etc/mihomo/config.yaml >/dev/null 2>&1; then
+        echo "redir-tproxy"
+    else
+        echo "tun-socks5"
+    fi
+}
+
+prefix_len() {
+    case "$1" in */*) echo "${1#*/}";; *) echo 32;; esac
+}
+
+next_priority() {
+    cidr="$1"; skip="$2"
+    base=$((20000 + (32 - $(prefix_len "$cidr")) * 100))
+    seq=0
+    while :; do
+        p=$((base + seq))
+        used=""
+        for s in $(list_client_sections); do
+            key="${s#${PREFIX}client_}"
+            [ "$key" = "$skip" ] && continue
+            [ "$(uci -q get network.$s.priority)" = "$p" ] && { used=1; break; }
+        done
+        [ -z "$used" ] && { echo "$p"; return; }
+        seq=$((seq + 1))
+    done
+}
+
+src_exists() {
+    cidr="$1"; skip="$2"
+    for s in $(list_client_sections); do
+        key="${s#${PREFIX}client_}"
+        [ "$key" = "$skip" ] && continue
+        [ "$(uci -q get network.$s.src)" = "$cidr" ] && return 0
+    done
+    return 1
+}
+
+rebuild_mixomo_redir() {
+    [ -x /usr/libexec/mixomo-redir ] && /usr/libexec/mixomo-redir 2>/dev/null
+}
+
+network_sync() {
+    uci commit network
+    /etc/init.d/network reload
+    sleep 1
+    table="$(uci -q get network.$TABLE_SECTION.table)"
+    if [ -n "$table" ]; then
+        if ! ip route show table "$table" 2>/dev/null | grep -Eq '^default[[:space:]].*dev[[:space:]]Mihomo([[:space:]]|$)'; then
+            ip route replace default dev Mihomo table "$table" 2>/dev/null || true
+        fi
+    fi
+    rebuild_mixomo_redir
+}
+
+local_ipv4_nft_set() {
+    # Never mark replies to LuCI/LAN clients or traffic to an upstream gateway.
+    # These connected prefixes are discovered at runtime, not hard-coded.
+    local_nets="127.0.0.0/8"
+    ip -4 route show table main proto kernel scope link 2>/dev/null > /tmp/mihomo-local-routes
+    while read -r subnet rest; do
+        case "$subnet" in */*) local_nets="$local_nets, $subnet";; esac
+    done < /tmp/mihomo-local-routes
+    printf '%s\n' "$local_nets"
+}
+
+enable_router_mark() {
+    local_nets="$(local_ipv4_nft_set)"
+    cat > "$ROUTER_NFT" <<NFT
+chain mihomo_router_routing {
+    type route hook output priority mangle; policy accept;
+    ip daddr { $local_nets } return
+    ip daddr 224.0.0.0/4 return
+    ip daddr 255.255.255.255 return
+    meta nfproto ipv4 meta mark 0 meta mark set $ROUTER_MARK
+}
+NFT
+    uci -q set "firewall.$ROUTER_FW_SECTION=include"
+    uci -q set "firewall.$ROUTER_FW_SECTION.type=nftables"
+    uci -q set "firewall.$ROUTER_FW_SECTION.path=$ROUTER_NFT"
+    uci -q set "firewall.$ROUTER_FW_SECTION.enabled=1"
+    uci commit firewall
+    /etc/init.d/firewall reload
+    if ! nft list chain inet fw4 mihomo_router_routing >/dev/null 2>&1; then
+        nft add chain inet fw4 mihomo_router_routing '{ type route hook output priority mangle; policy accept; }' 2>/dev/null || return 1
+        nft add rule inet fw4 mihomo_router_routing ip daddr "{ $local_nets }" return 2>/dev/null || return 1
+        nft add rule inet fw4 mihomo_router_routing ip daddr 224.0.0.0/4 return 2>/dev/null || return 1
+        nft add rule inet fw4 mihomo_router_routing ip daddr 255.255.255.255 return 2>/dev/null || return 1
+        nft add rule inet fw4 mihomo_router_routing meta nfproto ipv4 meta mark 0 meta mark set "$ROUTER_MARK" 2>/dev/null || return 1
+    fi
+}
+
+disable_router_mark() {
+    nft delete chain inet fw4 mihomo_router_routing 2>/dev/null || true
+    nft delete table inet mihomo_router_routing 2>/dev/null || true
+    uci -q delete "firewall.$ROUTER_FW_SECTION"
+    rm -f "$ROUTER_NFT"
+    uci commit firewall
+    /etc/init.d/firewall reload
+}
+
+cleanup_if_unused() {
+    [ -n "$(list_client_sections)" ] && return 0
+    uci -q get "network.${PREFIX}router" >/dev/null && return 0
+    table="$(uci -q get network.$TABLE_SECTION.table)"
+    for section in $(uci show network 2>/dev/null | sed -n "s/^network\\.\\(${PREFIX}local_[^.=]*\\)=rule$/\\1/p"); do uci -q delete "network.$section"; done
+    uci -q delete "network.$TABLE_SECTION"
+    uci commit network
+    /etc/init.d/network reload
+    [ -n "$table" ] && ip route flush table "$table" 2>/dev/null || true
+    disable_router_mark
+}
+
+emit_status() {
+    table="$(uci -q get network.$TABLE_SECTION.table)"
+    router=0
+    [ "$(uci -q get network.${PREFIX}router.mark)" = "$ROUTER_MARK" ] && router=1
+    variant="$(get_backend_default)"
+    redir_available=0
+    [ "$variant" = "redir-tproxy" ] && redir_available=1
+    json_init; json_add_boolean ok 1; json_add_int table "${table:-0}"; json_add_boolean router "$router"
+    json_add_string variant "$variant"; json_add_boolean redirAvailable "$redir_available"
+    json_add_array rules
+    for section in $(list_client_sections); do
+        json_add_object
+        json_add_string id "${section#${PREFIX}client_}"
+        json_add_string source "$(uci -q get network.$section.src)"
+        json_add_string label "$(uci -q get network.$section.name)"
+        json_add_string backend "$(uci -q get network.$section.backend)"
+        json_add_boolean enabled "$( [ "$(uci -q get network.$section.disabled)" != 1 ] && echo 1 || echo 0 )"
+        json_close_object
+    done
+    json_close_array; json_dump
+}
+
+emit_clients() {
+    json_init; json_add_boolean ok 1; json_add_array clients
+    router_ips=" $(ip -4 addr show 2>/dev/null | awk '/inet / {sub(/\/.*/, "", $2); printf "%s ", $2}')"
+    gateway_ips=" $(ip -4 route show 2>/dev/null | awk '/ via / {for (i = 1; i <= NF; i++) if ($i == "via") printf "%s ", $(i + 1)}')"
+    seen_ips=" "
+    is_visible_client() {
+        case "$router_ips" in *" $1 "*) return 1;; esac
+        case "$gateway_ips" in *" $1 "*) return 1;; esac
+        case "$seen_ips" in *" $1 "*) return 1;; esac
+        seen_ips="$seen_ips$1 "
+        return 0
+    }
+    # DHCP names have priority; ARP neighbours only fill the remaining IPs.
+    if [ -r /tmp/dhcp.leases ]; then
+        while read -r expiry mac ip name clientid; do
+            valid_ipv4_cidr "$ip" || continue
+            is_visible_client "$ip" || continue
+            json_add_object; json_add_string ip "$ip"; json_add_string mac "$mac"; json_add_string name "${name:-}"; json_close_object
+        done < /tmp/dhcp.leases
+    fi
+    ip -4 neigh show 2>/dev/null > /tmp/mihomo-neigh
+    while read -r ip dev _ mac _ state; do
+        valid_ipv4_cidr "$ip" || continue
+        [ "$state" = FAILED ] && continue
+        is_visible_client "$ip" || continue
+        json_add_object; json_add_string ip "$ip"; json_add_string mac "${mac:-}"; json_add_string name ""; json_close_object
+    done < /tmp/mihomo-neigh
+    json_close_array; json_dump
+}
+
+case "$1" in
+list) echo '{"status":{},"clients":{},"add":{"source":"String","label":"String","backend":"String"},"update":{"id":"String","source":"String","label":"String","backend":"String"},"delete":{"id":"String"},"set_enabled":{"id":"String","enabled":true},"set_router":{"enabled":true}}' ;;
+call)
+    json_load "$(cat)"
+    case "$2" in
+    status) emit_status ;;
+    clients) emit_clients ;;
+    add)
+        json_get_var source source; json_get_var label label; json_get_var backend backend
+        valid_ipv4_cidr "$source" || fail "Введите корректный IPv4-адрес или CIDR"
+        source="$(normalize_ipv4_cidr "$source")" || fail "Не удалось определить маску подсети"
+        [ "${#label}" -le 64 ] || fail "Название не длиннее 64 символов"
+        printf '%s' "$label" | grep -q '[[:cntrl:]]' && fail "Недопустимое название"
+        [ -z "$backend" ] && backend="$(get_backend_default)"
+        case "$backend" in redir-tproxy|tun-socks5) :;; *) fail "Неизвестный backend" ;; esac
+        src_exists "$source" "" && fail "Такой источник уже добавлен"
+        id="$(date +%s)_$$"
+        prio="$(next_priority "$source" "")"
+        if [ "$backend" = "redir-tproxy" ]; then
+            uci -q set "network.${PREFIX}client_$id=mihomo_rule"
+            uci -q set "network.${PREFIX}client_$id.backend=redir-tproxy"
+            uci -q set "network.${PREFIX}client_$id.priority=$prio"
+            uci -q set "network.${PREFIX}client_$id.src=$source"
+            uci -q set "network.${PREFIX}client_$id.name=${label:-$source}"
+            uci -q delete "network.${PREFIX}client_$id.lookup"
+            uci -q delete "network.${PREFIX}client_$id.enabled"
+            uci -q delete "network.${PREFIX}client_$id.disabled"
+            network_sync
+        else
+            table="$(ensure_base)" || fail "Не удалось подобрать свободную таблицу маршрутизации"
+            uci -q set "network.${PREFIX}client_$id=rule"
+            uci -q set "network.${PREFIX}client_$id.backend=tun-socks5"
+            uci -q set "network.${PREFIX}client_$id.priority=$prio"
+            uci -q set "network.${PREFIX}client_$id.src=$source"
+            uci -q set "network.${PREFIX}client_$id.name=${label:-$source}"
+            uci -q set "network.${PREFIX}client_$id.lookup=$table"
+            uci -q delete "network.${PREFIX}client_$id.enabled"
+            uci -q delete "network.${PREFIX}client_$id.disabled"
+            apply_network "$table" || fail "Не удалось создать маршрут по умолчанию через интерфейс Mihomo"
+            rebuild_mixomo_redir
+        fi
+        emit_status ;;
+    update)
+        json_get_var id id; json_get_var source source; json_get_var label label; json_get_var backend backend
+        printf '%s' "$id" | grep -Eq '^[0-9_]+$' || fail "Некорректный идентификатор правила"
+        uci -q get "network.${PREFIX}client_$id" >/dev/null || fail "Правило не найдено"
+        valid_ipv4_cidr "$source" || fail "Введите корректный IPv4-адрес или CIDR"
+        source="$(normalize_ipv4_cidr "$source")" || fail "Не удалось определить маску подсети"
+        [ "${#label}" -le 64 ] || fail "Название не длиннее 64 символов"
+        printf '%s' "$label" | grep -q '[[:cntrl:]]' && fail "Недопустимое название"
+        [ -z "$backend" ] && backend="$(uci -q get network.${PREFIX}client_$id.backend)"
+        [ -z "$backend" ] && backend="$(get_backend_default)"
+        case "$backend" in redir-tproxy|tun-socks5) :;; *) fail "Неизвестный backend" ;; esac
+        src_exists "$source" "$id" && fail "Такой источник уже добавлен"
+        prio="$(next_priority "$source" "$id")"
+        uci -q set "network.${PREFIX}client_$id.src=$source"
+        uci -q set "network.${PREFIX}client_$id.name=${label:-$source}"
+        uci -q set "network.${PREFIX}client_$id.priority=$prio"
+        uci -q set "network.${PREFIX}client_$id.backend=$backend"
+        if [ "$backend" = "redir-tproxy" ]; then
+            uci -q set "network.${PREFIX}client_$id=mihomo_rule"
+            uci -q delete "network.${PREFIX}client_$id.lookup"
+            network_sync
+        else
+            table="$(ensure_base)" || fail "Не удалось подготовить таблицу маршрутизации"
+            uci -q set "network.${PREFIX}client_$id=rule"
+            uci -q set "network.${PREFIX}client_$id.lookup=$table"
+            apply_network "$table" || fail "Не удалось применить сетевые настройки"
+            rebuild_mixomo_redir
+        fi
+        emit_status ;;
+    delete)
+        json_get_var id id
+        printf '%s' "$id" | grep -Eq '^[0-9_]+$' || fail "Некорректный идентификатор правила"
+        uci -q get "network.${PREFIX}client_$id" >/dev/null || fail "Правило не найдено"
+        table="$(uci -q get network.$TABLE_SECTION.table)"
+        uci -q delete "network.${PREFIX}client_$id"
+        cleanup_if_unused
+        uci commit network
+        if [ -n "$(uci -q get network.$TABLE_SECTION.table)" ]; then
+            apply_network "$table" || true
+        else
+            /etc/init.d/network reload 2>/dev/null
+        fi
+        rebuild_mixomo_redir
+        emit_status ;;
+    set_enabled)
+        json_get_var id id; json_get_var enabled enabled
+        printf '%s' "$id" | grep -Eq '^[0-9_]+$' || fail "Некорректный идентификатор правила"
+        uci -q get "network.${PREFIX}client_$id" >/dev/null || fail "Правило не найдено"
+        case "$enabled" in 1|true) enabled=1;; *) enabled=0;; esac
+        backend="$(uci -q get network.${PREFIX}client_$id.backend)"
+        [ -z "$backend" ] && backend="$(get_backend_default)"
+        prio="$(uci -q get network.${PREFIX}client_$id.priority)"
+        if [ "$backend" = "redir-tproxy" ]; then
+            uci -q set "network.${PREFIX}client_$id=mihomo_rule"
+            if [ "$enabled" = 1 ]; then
+                uci -q delete "network.${PREFIX}client_$id.disabled"
+                uci -q delete "network.${PREFIX}client_$id.enabled"
+            else
+                uci -q set "network.${PREFIX}client_$id.disabled=1"
+            fi
+            network_sync
+        else
+            uci -q set "network.${PREFIX}client_$id=rule"
+            if [ "$enabled" = 1 ]; then
+                uci -q delete "network.${PREFIX}client_$id.disabled"
+                uci -q delete "network.${PREFIX}client_$id.enabled"
+            else
+                [ -n "$prio" ] && ip rule del priority "$prio" 2>/dev/null || true
+                uci -q set "network.${PREFIX}client_$id.disabled=1"
+            fi
+            table="$(uci -q get network.$TABLE_SECTION.table)"
+            if [ -n "$table" ]; then
+                apply_network "$table" || fail "Не удалось применить сетевые настройки"
+            else
+                network_sync
+            fi
+        fi
+        emit_status ;;
+    set_router)
+        json_get_var enabled enabled
+        table="$(ensure_base)" || fail "Не удалось подобрать свободную таблицу маршрутизации"
+        case "$enabled" in 1|true) enabled=1;; *) enabled=0;; esac
+        if [ "$enabled" = 1 ]; then
+            uci -q set "network.${PREFIX}router=rule"; uci -q set "network.${PREFIX}router.name=Mixomo-router"
+            uci -q delete "network.${PREFIX}router.src"
+            uci -q set "network.${PREFIX}router.priority=19000"; uci -q set "network.${PREFIX}router.mark=$ROUTER_MARK"; uci -q set "network.${PREFIX}router.lookup=$table"
+            enable_router_mark || fail "Не удалось включить правило трафика роутера"
+            apply_network "$table" || fail "Не удалось создать маршрут по умолчанию через интерфейс Mihomo"
+            ensure_router_policy "$table" || fail "Не удалось создать policy rule для трафика роутера"
+        else
+            ip rule del priority 19000 fwmark "$ROUTER_MARK" 2>/dev/null || true
+            uci -q delete "network.${PREFIX}router"
+            cleanup_if_unused
+            [ -n "$(uci -q get network.$TABLE_SECTION.table)" ] && apply_network "$table" || true
+        fi
+        emit_status ;;
+    *) fail "Неизвестный метод";;
+    esac ;;
+esac
+EOF
+    chmod 755 /usr/libexec/rpcd/mihomo-routing
+    
+    if [ "$(uci -q get network.mihomo_route_router.mark)" = "0x233" ]; then
+        printf '%s\n' '{"enabled":true}' | /usr/libexec/rpcd/mihomo-routing call set_router >/dev/null 2>&1 || \
+            log_warn "Не удалось автоматически обновить особое правило маршрутизации роутера"
+    else
+        uci -q delete firewall.mihomo_router_routing
+        rm -f /etc/mihomo/mihomo-router-routing.nft
+        uci commit firewall
+    fi
 
     local VIEW_PATH="/www/luci-static/resources/view/mihomo"
     local ACE_PATH="$VIEW_PATH/ace"
@@ -431,31 +1136,48 @@ EOF
         echo "Актуальная версия ACE Editor: $LATEST_ACE_VER"
     fi
 
-    log_online "Скачивание файлов для ACE Editor $LATEST_ACE_VER:"
-    local CDNJS_ACE_VER="1.43.6"
-    for file in ace.js theme-merbivore_soft.js theme-tomorrow.js mode-yaml.js worker-yaml.js; do
-        local dest="${ACE_PATH}/${file}"
-        local success=0
-        
-        for url in "https://cdn.jsdelivr.net/npm/ace-builds@${LATEST_ACE_VER}/src-min-noconflict/${file}" \
-                   "https://raw.githubusercontent.com/ajaxorg/ace-builds/master/src-min-noconflict/${file}" \
-                   "https://cdnjs.cloudflare.com/ajax/libs/ace/${CDNJS_ACE_VER}/${file}"; do
-            
-            log_online "Скачивание $file"
-            if curl -Lf -s --connect-timeout 5 --max-time 30 -o "$dest" "$url" || wget -q -T 5 -O "$dest" "$url"; then
-                if [ -s "$dest" ]; then
-                    success=1
-                    break
-                fi
-            fi
-            echo "FAIL"
+    local ACE_FILES="ace.js theme-merbivore_soft.js theme-tomorrow.js mode-yaml.js worker-yaml.js"
+    local ACE_VERSION_FILE="$ACE_PATH/.ace-version"
+    local ACE_UP_TO_DATE=1
+    local f fname
+    if [ -f "$ACE_VERSION_FILE" ] && [ "$(tr -d ' \r\n' < "$ACE_VERSION_FILE")" = "$LATEST_ACE_VER" ]; then
+        for fname in $ACE_FILES; do
+            [ -s "$ACE_PATH/$fname" ] || { ACE_UP_TO_DATE=0; break; }
         done
+    else
+        ACE_UP_TO_DATE=0
+    fi
 
-        if [ "$success" -eq 0 ]; then
-            log_error "Не удалось скачать $file ни из одного источника."
-            return 1
-        fi
-    done
+    if [ "$ACE_UP_TO_DATE" -eq 1 ]; then
+        log_online "Актуальный ACE Editor $LATEST_ACE_VER уже установлен"
+    else
+        log_online "Скачивание файлов для ACE Editor $LATEST_ACE_VER:"
+        local CDNJS_ACE_VER="1.43.6"
+        for file in $ACE_FILES; do
+            local dest="${ACE_PATH}/${file}"
+            local success=0
+            
+            for url in "https://cdn.jsdelivr.net/npm/ace-builds@${LATEST_ACE_VER}/src-min-noconflict/${file}" \
+                       "https://raw.githubusercontent.com/ajaxorg/ace-builds/master/src-min-noconflict/${file}" \
+                       "https://cdnjs.cloudflare.com/ajax/libs/ace/${CDNJS_ACE_VER}/${file}"; do
+                
+                log_online "Скачивание $file"
+                if curl -Lf -s --connect-timeout 5 --max-time 30 -o "$dest" "$url" || wget -q -T 5 -O "$dest" "$url"; then
+                    if [ -s "$dest" ]; then
+                        success=1
+                        break
+                    fi
+                fi
+                echo "FAIL"
+            done
+
+            if [ "$success" -eq 0 ]; then
+                log_error "Не удалось скачать $file ни из одного источника."
+                return 1
+            fi
+        done
+        echo "$LATEST_ACE_VER" > "$ACE_VERSION_FILE"
+    fi
 
     echo "Создание config.js"
     cat > "$VIEW_PATH/config.js" <<'EOF'
@@ -483,11 +1205,28 @@ var callServiceList = rpc.declare({
     params: ['name']
 });
 
+var callRoutingStatus = rpc.declare({ object: 'mihomo-routing', method: 'status', expect: { '': {} } });
+var callRoutingClients = rpc.declare({ object: 'mihomo-routing', method: 'clients', expect: { '': {} } });
+var callRoutingAdd = rpc.declare({ object: 'mihomo-routing', method: 'add', params: ['source', 'label', 'backend'], expect: { '': {} } });
+var callRoutingUpdate = rpc.declare({ object: 'mihomo-routing', method: 'update', params: ['id', 'source', 'label', 'backend'], expect: { '': {} } });
+var callRoutingDelete = rpc.declare({ object: 'mihomo-routing', method: 'delete', params: ['id'], expect: { '': {} } });
+var callRoutingEnabled = rpc.declare({ object: 'mihomo-routing', method: 'set_enabled', params: ['id', 'enabled'], expect: { '': {} } });
+var callRoutingRouter = rpc.declare({ object: 'mihomo-routing', method: 'set_router', params: ['enabled'], expect: { '': {} } });
+
 function escapeHtml(text) {
     if (typeof text !== 'string') return text;
     return text.replace(/[&<>"']/g, function(m) {
         return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
     });
+}
+
+function backendLabel(backend) {
+    return (backend === 'redir-tproxy') ? 'TProxy' : 'Socks5';
+}
+
+function displaySource(source) {
+    if (typeof source === 'string' && /\/32$/.test(source)) return source.slice(0, -3);
+    return source || '';
 }
 
 function validatePath(path, allowedBase) {
@@ -569,6 +1308,130 @@ return view.extend({
     latestVersion: null,
     updateButton: null,
     latestVersionEl: null,
+    routingPanel: null,
+
+    showRoutingError: function(result) {
+        if (!result || !result.ok) ui.addNotification(null, E('p', (result && result.error) || _('Не удалось применить правило')), 'error');
+        return result && result.ok;
+    },
+
+    confirmRouterRouting: function(enable) {
+        var self = this;
+        var text = enable
+            ? _('Вы уверены что хотите ВКЛЮЧИТЬ все исходящие соединения от роутера через Mihomo? Других клиентов это не затронет.')
+            : _('Вы уверены что хотите ВЫКЛЮЧИТЬ все исходящие соединения от роутера через Mihomo? Других клиентов это не затронет.');
+        ui.showModal(_('Дополнительное подтверждение...'), [
+            E('p', {}, text),
+            E('div', { class: 'right', style: 'margin-top:1rem;' }, [
+                E('button', { class: 'btn cbi-button-neutral', click: ui.hideModal }, _('Отменить')), ' ',
+                E('button', { class: 'btn cbi-button-positive btn-save-custom', click: function() {
+                    ui.hideModal();
+                    callRoutingRouter(enable).then(function(res) { if (self.showRoutingError(res)) self.refreshRouting(); });
+                }}, _('Продолжить'))
+            ])
+        ]);
+    },
+
+    editRoutingRule: function(rule) {
+        var self = this;
+        var redirAvail = !!(this.routingData && (this.routingData.redirAvailable === true || this.routingData.redirAvailable === 1 || this.routingData.redirAvailable === '1'));
+        var source = E('input', { type: 'text', value: displaySource(rule.source), style: 'width:100%;' });
+        var label = E('input', { type: 'text', value: rule.label || '', style: 'width:100%;' });
+        var opts = [];
+        if (redirAvail) opts.push(E('option', { value: 'redir-tproxy' }, 'TProxy'));
+        opts.push(E('option', { value: 'tun-socks5' }, 'Socks5'));
+        var backend = E('select', { style: 'width:100%;' }, opts);
+        backend.value = (rule.backend === 'redir-tproxy' && redirAvail) ? 'redir-tproxy' : 'tun-socks5';
+        ui.showModal(_('Редактировать правило'), [
+            E('div', {}, [E('label', {}, _('Источник (IP или CIDR)')), source]),
+            E('div', { style: 'margin-top:.7rem;' }, [E('label', {}, _('Название')), label]),
+            E('div', { style: 'margin-top:.7rem;' }, [E('label', {}, _('Тип подключения')), backend]),
+            E('div', { class: 'right', style: 'margin-top:1rem;' }, [
+                E('button', { class: 'btn cbi-button-neutral', click: ui.hideModal }, _('Отменить')), ' ',
+                E('button', { class: 'btn cbi-button-positive btn-save-custom', click: function() {
+                    callRoutingUpdate(rule.id, source.value.trim(), label.value.trim(), backend.value).then(function(res) { if (self.showRoutingError(res)) { ui.hideModal(); self.refreshRouting(); } });
+                }}, _('Сохранить'))
+            ])
+        ]);
+    },
+
+    refreshRouting: function() {
+        var self = this;
+        return Promise.all([callRoutingStatus(), callRoutingClients()]).then(function(data) {
+            self.routingData = data[0] || {}; self.clientData = data[1] || {};
+            self.renderRoutingPanel();
+        }).catch(function(err) { ui.addNotification(null, E('p', _('Ошибка маршрутизации: ') + err.message), 'error'); });
+    },
+
+    toggleRoutingPanel: function() {
+        if (!this.routingPanel) return;
+        var open = this.routingPanel.style.display !== 'none';
+        this.routingPanel.style.display = open ? 'none' : 'block';
+        if (!open) { this.routingPanel.scrollIntoView({ behavior: 'smooth', block: 'start' }); this.refreshRouting(); }
+    },
+
+    renderRoutingPanel: function() {
+        var panel = this.routingPanel;
+        if (!panel) return;
+        var self = this, status = this.routingData || {}, clients = (this.clientData && this.clientData.clients) || [];
+        while (panel.firstChild) panel.removeChild(panel.firstChild);
+        var routerEnabled = (status.router === true || status.router === 1 || status.router === '1');
+        var routerToggle = E('input', { type: 'checkbox', click: function(ev) {
+            ev.preventDefault();
+            self.confirmRouterRouting(!routerEnabled);
+        }});
+        routerToggle.checked = routerEnabled;
+        var redirAvail = !!(status.redirAvailable === true || status.redirAvailable === 1 || status.redirAvailable === '1');
+        var defaultBackend = (status.variant === 'redir-tproxy') ? 'redir-tproxy' : 'tun-socks5';
+        function mkBackend(def) {
+            var opts = [];
+            if (redirAvail) opts.push(E('option', { value: 'redir-tproxy' }, 'TProxy'));
+            opts.push(E('option', { value: 'tun-socks5' }, 'Socks5'));
+            var s = E('select', { style: 'min-width:8rem;' }, opts);
+            s.value = def;
+            return s;
+        }
+        var backendSel = mkBackend(defaultBackend);
+        var backendSel2 = mkBackend(defaultBackend);
+        panel.appendChild(E('h3', {}, _('Локальная маршрутизация')));
+        panel.appendChild(E('p', { style: 'opacity:.75; margin-top:0;' }, [
+        _('При использовании абсолютно весь трафик направляется в ядро Mihomo.'),
+        E('br'),
+        _('Добавлять устройства и подсети можно только из локальных диапазонов.'),
+        E('br'),
+        _('Закрепить локальные IP за конкретными устройствами можно в '),
+        E('a', { href: L.url('admin/network/dhcp'), target: '_blank' }, _('Статических арендах DHCP'))]));
+
+        var deviceLabel = E('input', { type: 'text', placeholder: _('Название (необязательно)'), style: 'min-width:12rem;' });
+        var known = E('select', { style: 'min-width:15rem;' }, [E('option', { value: '' }, _('Выберите устройство...'))].concat(clients.map(function(c) {
+            return E('option', { value: c.ip }, (c.name ? c.name + ' — ' : '') + c.ip);
+        })));
+        panel.appendChild(E('div', { class: 'mihomo-route-add' }, [known, deviceLabel, backendSel, E('button', { class: 'btn cbi-button-positive btn-save-custom', click: function() {
+            if (!known.value) { ui.addNotification(null, E('p', _('Сначала выберите устройство')), 'error'); return; }
+            var selected = clients.filter(function(c) { return c.ip === known.value; })[0];
+            var label = deviceLabel.value.trim() || (selected && selected.name) || '';
+            callRoutingAdd(known.value, label, backendSel.value).then(function(res) { if (self.showRoutingError(res)) { known.value = ''; deviceLabel.value = ''; self.refreshRouting(); } });
+        }}, _('Добавить правило'))]));
+        var source = E('input', { type: 'text', placeholder: 'Напишите IP или CIDR...', style: 'min-width:15rem;' });
+        var manualLabel = E('input', { type: 'text', placeholder: _('Название (необязательно)'), style: 'min-width:12rem;' });
+        panel.appendChild(E('div', { style: 'opacity:.75; margin-top:.35rem; margin-bottom:.35rem;' }, _('Или')));
+        panel.appendChild(E('div', { class: 'mihomo-route-add' }, [source, manualLabel, backendSel2, E('button', { class: 'btn cbi-button-positive btn-save-custom', click: function() {
+            callRoutingAdd(source.value.trim(), manualLabel.value.trim(), backendSel2.value).then(function(res) { if (self.showRoutingError(res)) { source.value = ''; manualLabel.value = ''; self.refreshRouting(); } });
+        }}, _('Добавить правило'))]));
+
+        var rules = status.rules || [];
+        if (!rules.length) panel.appendChild(E('p', { style: 'opacity:.75; margin-top:.35rem; margin-bottom:1.35rem;' }, [
+            _('Правил пока нет.')
+        ]));
+        else {
+            var table = E('table', { class: 'table mihomo-routing-table', style: 'width:100%; margin-top:.8rem;' }, [E('thead', {}, E('tr', {}, [E('th', {}, _('Название')), E('th', {}, _('Источник')), E('th', {}, _('Тип подключения')), E('th', {}, _('Статус')), E('th', {}, _('Действие'))]))]);
+            var body = E('tbody'); rules.forEach(function(rule) { body.appendChild(E('tr', {}, [E('td', {}, rule.label || '—'), E('td', {}, displaySource(rule.source)), E('td', {}, backendLabel(rule.backend || 'tun-socks5')), E('td', {}, rule.enabled ? _('Включено') : _('Отключено')), E('td', {}, E('div', { class: 'mihomo-route-actions' }, [E('button', { class: 'btn cbi-button-neutral', click: function() { self.editRoutingRule(rule); } }, _('Редактировать')), E('button', { class: 'btn cbi-button-neutral', click: function() { callRoutingEnabled(rule.id, !rule.enabled).then(function(res) { if (self.showRoutingError(res)) self.refreshRouting(); }); } }, rule.enabled ? _('Отключить') : _('Включить')), E('button', { class: 'btn cbi-button-reset', click: function() { if (confirm(_('Удалить это правило?'))) callRoutingDelete(rule.id).then(function(res) { if (self.showRoutingError(res)) self.refreshRouting(); }); } }, _('Удалить'))])) ])); });
+            table.appendChild(body); panel.appendChild(table);
+        }
+        panel.appendChild(E('p', { style: 'opacity:.75; margin-top:.35rem; margin-bottom:.35rem;' }, _('Особое правило:')));
+        panel.appendChild(E('label', { style: 'display:block; margin:.4rem 0;' }, [routerToggle, ' ', _('Направлять трафик самого роутера через Mihomo')]));
+        panel.appendChild(E('p', { style: 'opacity:.75; margin-top:.35rem; margin-bottom:.35rem;' }, _('Применяется только к исходящим соединениям, которые инициирует сам роутер (обновления пакетов, wget, curl и другие системные запросы). Не затрагивает других клиентов.')));
+    },
 	
     getMihomoVersion: function() {
         return fs.stat('/usr/bin/mihomo')
@@ -593,7 +1456,6 @@ return view.extend({
         if (this.latestVersionEl) {
             this.latestVersionEl.textContent = _('(актуальное ядро %s)').format(latestVersion.replace('v', ''));
             this.latestVersionEl.style.display = 'inline';
-            // Используем стандартный зеленый через opacity/filter или оставляем для привлечения внимания
             this.latestVersionEl.style.color = (latestVersion !== currentVersion) ? '#5cb85c' : '';
             this.latestVersionEl.style.opacity = (latestVersion !== currentVersion) ? '1' : '0.6';
         }
@@ -719,6 +1581,7 @@ return view.extend({
         this.latestVersionEl = latestVersionEl;
         var updateButton = E('button', { 'id': 'mihomo-update-btn', 'class': 'btn cbi-button-neutral', 'style': 'margin-left: 10px; padding: 0 0.6em; font-size: 0.9em;', 'disabled': true }, _('Проверить обновление'));
         this.updateButton = updateButton;
+        var routingButton = E('button', { 'class': 'btn cbi-button-neutral', 'style': 'margin-left: 10px;', 'click': ui.createHandlerFn(this, 'toggleRoutingPanel') }, _('Локальная маршрутизация'));
         
         var statusBadge = isRunning 
             ? E('span', { 
@@ -740,7 +1603,8 @@ return view.extend({
             serviceButton, 
             versionContainer, 
             latestVersionEl,
-            updateButton
+            updateButton,
+            routingButton
         ]);
 		
         var self = this;
@@ -822,6 +1686,11 @@ return view.extend({
             .btn-generate { border-color: #5cb85c !important; color: #5cb85c !important; margin: auto 0; display: block; background: var(--bg-input); }
             .btn-generate:hover { border-color: #5cb85c !important; }
             .snippet-container { margin-top: 0; border: 1px solid var(--border-color); background: var(--bg-toolbar); padding: 0.8rem; display: none; }
+            .mihomo-routing-panel { border: 1px solid var(--border-color); background: var(--bg-toolbar); padding: 1rem; margin: 0 0 1rem; }
+            .mihomo-route-add { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+            .mihomo-route-actions { display: flex; gap: 1rem; padding: 0.2rem 0; }
+            .mihomo-routing-panel input, .mihomo-routing-panel select { background: var(--bg-input); color: var(--text-main); border: 1px solid var(--border-color); padding: .4em; }
+            .mihomo-routing-table th, .mihomo-routing-table td { text-align: left !important; }
             .snippet-header { margin-bottom: 0.4rem; color: var(--text-main); font-size: 0.85em; }
             .snippet-text { width: 100%; height: 9.5em; background: var(--bg-tab-active); color: var(--text-main); border: 1px solid var(--border-color); font-family: monospace; font-size: 0.9em; padding: 0.8em; resize: none; }
             .output-box-close { background: transparent; border: none; color: var(--text-main); font-size: 1.5em; line-height: 1; cursor: pointer; margin-left: 1rem; padding: 0 0.4rem; }
@@ -860,6 +1729,9 @@ return view.extend({
             ]),
             E('pre', { 'id': 'output-text', 'style': 'margin: 0; padding: 1rem; background: var(--bg-output); color: var(--text-output); font-family: monospace; font-size: 1em; white-space: pre-wrap; word-wrap: break-word; max-height: 25rem; overflow-y: auto;' }, '')
         ]);
+
+        var routingPanel = E('div', { 'class': 'mihomo-routing-panel', 'style': 'display:none;' });
+        this.routingPanel = routingPanel;
         
         loadScript(ACE_DIR + 'ace.js').then(function() {
             ace.config.set('basePath', ACE_DIR);
@@ -884,7 +1756,7 @@ return view.extend({
         setTimeout(function() { this.updateVisibility(MAIN_CONFIG); }.bind(this), 100);
         
         return E('div', { 'class': 'cbi-map' }, [
-            header, style, tabBar, toolbarContainer, editorContainer,
+            header, routingPanel, style, tabBar, toolbarContainer, editorContainer,
             middleActions, snippetContainer, buttonContainer, outputBox
         ]);
     },
@@ -1234,13 +2106,28 @@ EOF
 }
 
 install_hev_tunnel() {
-    log_online "Установка hev-socks5-tunnel"
+
+    local HEV_VER=""
+    if [ -x "/usr/sbin/hev-socks5-tunnel" ] || [ -x "/usr/bin/hev-socks5-tunnel" ]; then
+        log_online "Актуальный hev-socks5-tunnel уже установлен"
+    else
+        log_online "Установка hev-socks5-tunnel"
+        if [ "$USE_APK" -eq 1 ]; then
+            apk cache clean >/dev/null 2>&1
+            apk add hev-socks5-tunnel >/dev/null 2>&1
+        else
+            manage_pkg install hev-socks5-tunnel >/dev/null 2>&1
+        fi
+    fi
 
     if [ "$USE_APK" -eq 1 ]; then
-        apk cache clean
-        apk add hev-socks5-tunnel >/dev/null 2>&1
+        HEV_VER=$(apk list -I 2>/dev/null | grep -m1 '^hev-socks5-tunnel-' | sed 's/^hev-socks5-tunnel-//;s/[ \t].*//')
     else
-        manage_pkg install hev-socks5-tunnel >/dev/null 2>&1
+        HEV_VER=$(opkg list-installed 2>/dev/null | awk '$1=="hev-socks5-tunnel"{print $3}')
+    fi
+    if [ -n "$HEV_VER" ]; then
+        mkdir -p /etc/hev-socks5-tunnel 2>/dev/null || true
+        echo "$HEV_VER" > "$HEV_VERSION_FILE"
     fi
 
     rm -f /etc/hev-socks5-tunnel/main.yml
@@ -1258,28 +2145,6 @@ socks5:
 EOF
     chmod 600 /etc/hev-socks5-tunnel/main.yml
 
-    echo "Очистка старых настроек UCI"
-    uci delete network.Mihomo 2>/dev/null || true
-
-    local fw_section
-    for fw_section in $(uci show firewall 2>/dev/null \
-            | grep -E "\.name='Mihomo'" \
-            | sed "s/\.name.*//"); do
-        uci delete "$fw_section" 2>/dev/null || true
-    done
-
-    for fw_section in $(uci show firewall 2>/dev/null \
-            | grep -E "\.(src|dest)='Mihomo'" \
-            | sed -E "s/\.(src|dest).*//"); do
-        uci delete "$fw_section" 2>/dev/null || true
-    done
-
-    uci delete firewall.Mihomo 2>/dev/null || true
-    uci delete firewall.lan_to_Mihomo 2>/dev/null || true
-    uci commit firewall
-    /etc/init.d/firewall restart 2>/dev/null || true
-    sleep 1
-
     echo "Настройка UCI-сервиса hev-socks5-tunnel"
     uci set hev-socks5-tunnel.config.enabled='1'
     uci set hev-socks5-tunnel.config.configfile='/etc/hev-socks5-tunnel/main.yml'
@@ -1288,55 +2153,57 @@ EOF
     sleep 2
 
     echo "Настройка сетевого интерфейса"
-    uci set network.Mihomo=interface
-    uci set network.Mihomo.proto='none'
-    uci set network.Mihomo.device='Mihomo'
+    if ! uci -q get network.Mihomo >/dev/null 2>&1; then
+        uci set network.Mihomo=interface
+        uci set network.Mihomo.proto='none'
+        uci set network.Mihomo.device='Mihomo'
+    else
+        uci set network.Mihomo.proto='none'
+        uci set network.Mihomo.device='Mihomo'
+    fi
     uci commit network
     /etc/init.d/network reload
+    sleep 1
 
-    echo "Настройка firewall"
-    local FW_ZONE
-    FW_ZONE=$(uci add firewall zone)
-    uci set "firewall.${FW_ZONE}.name=Mihomo"
-    uci set "firewall.${FW_ZONE}.input=REJECT"
-    uci set "firewall.${FW_ZONE}.output=REJECT"
-    uci set "firewall.${FW_ZONE}.forward=REJECT"
-    uci set "firewall.${FW_ZONE}.masq=1"
-    uci set "firewall.${FW_ZONE}.mtu_fix=1"
-    uci add_list "firewall.${FW_ZONE}.network=Mihomo"
-
-    local FW_FWD
-    FW_FWD=$(uci add firewall forwarding)
-    uci set "firewall.${FW_FWD}.src=lan"
-    uci set "firewall.${FW_FWD}.dest=Mihomo"
+    echo "Настройка Firewall"
+    local FW_ZONE=""
+    local FW_FWD=""
+    FW_ZONE=$(uci show firewall 2>/dev/null | grep "\.name='Mihomo'" | head -1 | sed "s/\.name=.*//; s/^firewall\.//")
+    if [ -n "$FW_ZONE" ]; then
+        for fw_fwd in $(uci show firewall 2>/dev/null | grep -E "\.src='lan'" | sed -E "s/\.src=.*//; s/^firewall\.//"); do
+            if [ "$(uci -q get firewall.$fw_fwd.dest 2>/dev/null)" = "Mihomo" ]; then
+                FW_FWD="$fw_fwd"; break
+            fi
+        done
+    fi
+    if [ -z "$FW_ZONE" ]; then
+        FW_ZONE=$(uci add firewall zone)
+        uci set "firewall.${FW_ZONE}.name=Mihomo"
+        uci set "firewall.${FW_ZONE}.input=REJECT"
+        uci set "firewall.${FW_ZONE}.output=REJECT"
+        uci set "firewall.${FW_ZONE}.forward=REJECT"
+        uci set "firewall.${FW_ZONE}.masq=1"
+        uci set "firewall.${FW_ZONE}.mtu_fix=1"
+        uci add_list "firewall.${FW_ZONE}.network=Mihomo"
+    fi
+    if [ -z "$FW_FWD" ]; then
+        FW_FWD=$(uci add firewall forwarding)
+        uci set "firewall.${FW_FWD}.src=lan"
+        uci set "firewall.${FW_FWD}.dest=Mihomo"
+    fi
 
     uci commit firewall
     /etc/init.d/firewall restart
 }
 
-install_magitrickle() {
-    local CONFIG_PATH="/etc/magitrickle/state/config.yaml"
-    local BACKUP_PATH="/tmp/magitrickle_config_backup.yaml"
-
-    if [ -f "$CONFIG_PATH" ]; then
-        cp "$CONFIG_PATH" "$BACKUP_PATH"
-        rm -f "$CONFIG_PATH"
-    fi
-
-    if [ "$USE_APK" -eq 1 ]; then
-        apk del magitrickle >/dev/null 2>&1 || true
-    else
-        opkg remove magitrickle_mod >/dev/null 2>&1 || true
-        opkg remove magitrickle >/dev/null 2>&1 || true
-    fi
-
+install_magitrickle_original_package() {
+    log_online "Добавление репозитория MagiTrickle"
     if ! curl -sSL http://bin.magitrickle.dev/packages/add_repo.sh | sh >/dev/null 2>&1; then
         if ! wget -qO- http://bin.magitrickle.dev/packages/add_repo.sh | sh >/dev/null 2>&1; then
             log_error "Ошибка: не удалось добавить репозиторий MagiTrickle!"
             return 1
         fi
     fi
-
     log_online "Загрузка пакета MagiTrickle"
     if [ "$USE_APK" -eq 1 ]; then
         apk update >/dev/null 2>&1 || true
@@ -1345,16 +2212,159 @@ install_magitrickle() {
         opkg update >/dev/null 2>&1 || true
         opkg install magitrickle >/dev/null 2>&1 || true
     fi
+    [ -x /etc/init.d/magitrickle ] || return 1
+    return 0
+}
 
-    service magitrickle enable 2>/dev/null || true
-    service magitrickle restart 2>/dev/null || true
+install_magitrickle_mod_package() {
+    local LOG="/tmp/mixomo-mod-install.log"
+    local rc=1
+    log_online "Установка MagiTrickle Mod от badigit"
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL --connect-timeout 10 -m 300 \
+            "https://raw.githubusercontent.com/badigit/MagiTrickle_mod_badigit/mod_badigit/scripts/install.sh" | sh >"$LOG" 2>&1
+        rc=$?
+    elif command -v wget >/dev/null 2>&1; then
+        wget -qO- --timeout=300 \
+            "https://raw.githubusercontent.com/badigit/MagiTrickle_mod_badigit/mod_badigit/scripts/install.sh" | sh >"$LOG" 2>&1
+        rc=$?
+    else
+        log_error "Не найден curl или wget для установки mod"
+        return 1
+    fi
+    if [ -x /etc/init.d/magitrickle ]; then
+        rm -f "$LOG"
+        return 0
+    fi
+    log_error "Не удалось установить MagiTrickle Mod от badigit. Подробный лог: $LOG"
+    return 1
+}
 
-    if ! service magitrickle running >/dev/null 2>&1; then
-        sleep 2
-        if ! service magitrickle running >/dev/null 2>&1; then
-            log_error "Ошибка: MagiTrickle не запускается!"
-            return 1
+install_mixomo_redir() {
+    mkdir -p /usr/libexec 2>/dev/null || true
+    cat > /usr/libexec/mixomo-redir <<'EOF'
+#!/bin/sh
+PREFIX="mihomo_route_"
+CHAIN="MIXOMO_CLASSIFY"
+MARK_DEFAULT="1298229097"
+
+IPT=""
+if command -v iptables >/dev/null 2>&1; then IPT=iptables
+elif command -v iptables-nft >/dev/null 2>&1; then IPT=iptables-nft
+else exit 0; fi
+
+REDIR_PORT=$(grep -E '^[[:space:]]*redir-port:' /etc/mihomo/config.yaml 2>/dev/null | awk '{print $2}' | tr -d ' \r\n')
+MARK=$(grep -E '^[[:space:]]*startMarkTableIndex:' /etc/magitrickle/state/config.yaml 2>/dev/null | awk '{print $2}' | tr -d ' \r\n')
+[ -n "$MARK" ] || MARK="$MARK_DEFAULT"
+
+: > /tmp/mixomo-redir-rules
+for sec in $(uci show network 2>/dev/null | sed -n "s/^network\\.\\(${PREFIX}client_[^.=]*\\)=mihomo_rule$/\\1/p"); do
+    [ "$(uci -q get network.$sec.disabled)" = "1" ] && continue
+    src=$(uci -q get network.$sec.src)
+    [ -n "$src" ] || continue
+    prio=$(uci -q get network.$sec.priority)
+    [ -n "$prio" ] || prio=0
+    echo "$prio|$src"
+done | sort -n -t'|' -k1 > /tmp/mixomo-redir-rules
+
+"$IPT" -t nat -F "$CHAIN" 2>/dev/null
+"$IPT" -t nat -D PREROUTING -i lo -j "$CHAIN" 2>/dev/null
+"$IPT" -t nat -D PREROUTING ! -i lo -j "$CHAIN" 2>/dev/null
+"$IPT" -t nat -X "$CHAIN" 2>/dev/null
+"$IPT" -t mangle -F "$CHAIN" 2>/dev/null
+"$IPT" -t mangle -D PREROUTING -i lo -j "$CHAIN" 2>/dev/null
+"$IPT" -t mangle -D PREROUTING ! -i lo -j "$CHAIN" 2>/dev/null
+"$IPT" -t mangle -X "$CHAIN" 2>/dev/null
+
+[ -n "$REDIR_PORT" ] || exit 0
+[ -s /tmp/mixomo-redir-rules ] || exit 0
+
+"$IPT" -t nat -N "$CHAIN"
+"$IPT" -t mangle -N "$CHAIN"
+
+LOCAL="127.0.0.0/8"
+ip -4 route show table main proto kernel scope link 2>/dev/null > /tmp/mixomo-local-routes
+while read -r subnet rest; do
+    case "$subnet" in */*) LOCAL="$LOCAL $subnet";; esac
+done < /tmp/mixomo-local-routes
+for net in $LOCAL; do
+    "$IPT" -t nat -A "$CHAIN" -d "$net" -j RETURN
+    "$IPT" -t mangle -A "$CHAIN" -d "$net" -j RETURN
+done
+
+"$IPT" -t nat -I PREROUTING 1 ! -i lo -j "$CHAIN"
+"$IPT" -t mangle -I PREROUTING 1 ! -i lo -j "$CHAIN"
+
+while IFS='|' read -r prio src; do
+    "$IPT" -t nat -A "$CHAIN" -s "$src" -p tcp -j REDIRECT --to-ports "$REDIR_PORT"
+    "$IPT" -t mangle -A "$CHAIN" -s "$src" -p udp -j TPROXY --on-port "$REDIR_PORT" --tproxy-mark "$MARK/$MARK" 2>/dev/null || true
+done < /tmp/mixomo-redir-rules
+
+if ! ip rule list 2>/dev/null | grep -Eq "lookup[[:space:]]+$MARK([[:space:]]|$)"; then
+    ip rule add fwmark "$MARK" lookup "$MARK" 2>/dev/null || true
+fi
+ip route replace local default dev lo table "$MARK" 2>/dev/null || true
+
+exit 0
+EOF
+    chmod +x /usr/libexec/mixomo-redir
+}
+
+install_magitrickle() {
+    local CONFIG_PATH="/etc/magitrickle/state/config.yaml"
+    local BACKUP_PATH="/tmp/magitrickle_config_backup.yaml"
+
+    local NEED_INSTALL=1 INSTALLED NOW_TAG LATEST
+    INSTALLED="$(read_variant_now)"
+    NOW_TAG="$(read_version_now)"
+    LATEST="$(magitrickle_latest_version "$MAGI_VARIANT")"
+
+    if [ "$INSTALLED" = "$MAGI_VARIANT" ] && [ -n "$NOW_TAG" ] && [ -n "$LATEST" ] && [ "$NOW_TAG" = "$LATEST" ] && [ -x /etc/init.d/magitrickle ]; then
+        NEED_INSTALL=0
+        log_online "Актуальный MagiTrickle $LATEST уже установлен"
+    fi
+
+    if [ "$NEED_INSTALL" -eq 1 ]; then
+        if [ -f "$CONFIG_PATH" ]; then
+            cp "$CONFIG_PATH" "$BACKUP_PATH"
+            rm -f "$CONFIG_PATH"
         fi
+
+        if [ "$USE_APK" -eq 1 ]; then
+            apk del magitrickle >/dev/null 2>&1 || true
+        else
+            opkg remove magitrickle_mod >/dev/null 2>&1 || true
+            opkg remove magitrickle >/dev/null 2>&1 || true
+        fi
+
+        if [ "$MAGI_VARIANT" = "mod" ]; then
+            if ! install_magitrickle_mod_package; then
+                log_error "Ошибка: не удалось установить MagiTrickle Mod от badigit!"
+                return 1
+            fi
+        else
+            if ! install_magitrickle_original_package; then
+                log_error "Ошибка: не удалось установить MagiTrickle!"
+                return 1
+            fi
+        fi
+
+        service magitrickle enable 2>/dev/null || true
+        if [ "$MAGI_VARIANT" = "mod" ]; then
+            uci -q set magitrickle.main.enabled='1' 2>/dev/null
+            uci -q commit magitrickle 2>/dev/null
+        fi
+        service magitrickle restart 2>/dev/null || true
+
+        if ! service magitrickle running >/dev/null 2>&1; then
+            sleep 2
+            if ! service magitrickle running >/dev/null 2>&1; then
+                log_error "Ошибка: MagiTrickle не запускается!"
+                return 1
+            fi
+        fi
+
+        save_magitrickle_variant "$MAGI_VARIANT" "$LATEST"
     fi
 
     if [ -f "$BACKUP_PATH" ]; then
@@ -1375,13 +2385,21 @@ install_magitrickle() {
                 echo "Версии конфигураций совпадают ($OLD_VERSION). Использование бэкапа..."
                 cp "$BACKUP_PATH" "$CONFIG_PATH"
             else
-                log_warn "Версии конфигураций отличаются! (Старая: $OLD_VERSION, Новая: $NEW_VERSION)"
-                log_warn "Старая конфигурация сохранена как ${CONFIG_PATH}.backup"
+                log_warn "Версии конфигураций отличаются! (Прошлая: $OLD_VERSION, Нынешняя: $NEW_VERSION)"
+                log_warn "Прошлая конфигурация сохранена как ${CONFIG_PATH}.backup"
                 cp "$BACKUP_PATH" "${CONFIG_PATH}.backup"
             fi
         fi
         rm -f "$BACKUP_PATH"
     fi
+
+    if [ "$MAGI_VARIANT" = "mod" ]; then
+        local REDIR_PORT
+        REDIR_PORT="$(ensure_mihomo_redir_port)" || return 1
+        sync_tproxy_port "$REDIR_PORT"
+        service magitrickle restart 2>/dev/null || true
+    fi
+    install_mixomo_redir
 
     echo "Создание страницы MagiTrickle в LuCI"
     mkdir -p /www/luci-static/resources/view/magitrickle
@@ -1449,12 +2467,15 @@ finalize_install() {
     rm -rf /tmp/luci-indexcache /tmp/luci-modulecache/
     /etc/init.d/rpcd restart > /dev/null 2>&1
     /etc/init.d/uhttpd restart > /dev/null 2>&1
+    /etc/init.d/hev-socks5-tunnel restart > /dev/null 2>&1
     /etc/init.d/mihomo restart > /dev/null 2>&1
 }
 
 main() {
     clear
     log_done "=== Mixomo OpenWrt $SCRIPT_VERSION от Internet Helper ==="
+
+    choose_magitrickle_variant
     echo ""
 
     log_done "[1/5] Установка зависимостей"
@@ -1472,12 +2493,11 @@ main() {
     log_done "[4/5] Установка MagiTrickle"
     install_magitrickle || step_fail
     echo ""
-    
+
     log_done "[5/5] Завершение"
     finalize_install || step_fail
     echo ""
 
-    clear
     log_done "Установка Mixomo OpenWrt $SCRIPT_VERSION прошла успешно!"
     echo ""
     log_done "┌───────────────────────────────────────────────────────────────────────┐"
