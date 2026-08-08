@@ -1,12 +1,19 @@
 #!/bin/sh
 
-SCRIPT_VERSION="v0.2.2-alpha"
+SCRIPT_VERSION="v0.2.3-alpha"
 
 MIHOMO_INSTALL_DIR="/etc/mihomo"
 MIHOMO_BIN="/usr/bin/mihomo"
-MIHOMO_VERSION_FILE="/etc/mihomo/.mihomo-version-now"
-HEV_VERSION_FILE="/etc/hev-socks5-tunnel/.hev-socks5-tunnel-version-now"
-MAGI_VERSION_FILE="/etc/magitrickle/.magitrickle-version-now"
+MIXOMO_DIR="/etc/mixomo"
+MIXOMO_REDIR_DIR="$MIXOMO_DIR/routing"
+MIXOMO_VERSIONS_DIR="$MIXOMO_DIR/versions"
+MIXOMO_REDIR_SCRIPT="$MIXOMO_REDIR_DIR/redir"
+MIXOMO_REDIR_PORT_FILE="$MIXOMO_REDIR_DIR/redir-port"
+MIXOMO_REDIR_MARK_FILE="$MIXOMO_REDIR_DIR/redir-mark"
+MIXOMO_REDIR_DEFAULT_MARK="1298229097"
+MIHOMO_VERSION_FILE="$MIXOMO_VERSIONS_DIR/mihomo"
+HEV_VERSION_FILE="$MIXOMO_VERSIONS_DIR/hev-socks5-tunnel"
+MAGI_VERSION_FILE="$MIXOMO_VERSIONS_DIR/magitrickle"
 
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -465,6 +472,7 @@ install_mihomo() {
     if [ -x "$MIHOMO_BIN" ] && [ -n "$NOW_VER" ] && [ "$NOW_VER" = "$RELEASE_TAG" ] && "$MIHOMO_BIN" -v >/dev/null 2>&1; then
         NEED_UPDATE=0
         log_online "Актуальный Mihomo $RELEASE_TAG уже установлен"
+        mkdir -p "$MIXOMO_VERSIONS_DIR"
         echo "$RELEASE_TAG" > "$MIHOMO_VERSION_FILE"
     fi
 
@@ -523,6 +531,7 @@ install_mihomo() {
         return 1
     fi
     rm -f "$BACKUP_BIN"
+    mkdir -p "$MIXOMO_VERSIONS_DIR"
     echo "$RELEASE_TAG" > "$MIHOMO_VERSION_FILE"
     fi
 
@@ -612,11 +621,12 @@ proxy-groups:
 rule-providers:
 
 rules:
+
   - MATCH,Домашний интернет
 EOF
     fi
 
-    ensure_mihomo_redir_port >/dev/null || log_warn "Не удалось настроить redir-port Mihomo (необходим для redir-tproxy)"
+    ensure_mihomo_redir_port >/dev/null || log_warn "Не удалось настроить redir-port Mihomo (необходим для мода от badigit)"
 
     echo "Создание службы /etc/init.d/mihomo"
     cat > /etc/init.d/mihomo <<'EOF'
@@ -645,10 +655,10 @@ service_triggers() {
 }
 EOF
     chmod +x /etc/init.d/mihomo
-    /etc/init.d/mihomo enable || log_warn "Не удалось включить автозапуск"
+    /etc/init.d/mihomo enable || log_warn "Не удалось включить автозапуск Mihomo"
     if [ "$MIHOMO_WAS_RUNNING" -eq 1 ]; then
         echo "Запуск Mihomo"
-        /etc/init.d/mihomo start || log_warn "Не удалось запустить Mihomo; повторная попытка будет в конце установки"
+        /etc/init.d/mihomo start || log_warn "Не удалось запустить Mihomo. Повторная попытка будет в конце установки"
     fi
 
     echo "Настройка страницы LuCI для управления Mihomo"
@@ -866,7 +876,8 @@ src_exists() {
 }
 
 rebuild_mixomo_redir() {
-    [ -x /usr/libexec/mixomo-redir ] && /usr/libexec/mixomo-redir 2>/dev/null
+    [ -x /etc/mixomo/routing/redir ] && /etc/mixomo/routing/redir 2>/dev/null
+    return 0
 }
 
 network_sync() {
@@ -1164,9 +1175,11 @@ EOF
     fi
 
     local ACE_FILES="ace.js theme-merbivore_soft.js theme-tomorrow.js mode-yaml.js worker-yaml.js"
-    local ACE_VERSION_FILE="$ACE_PATH/.ace-version"
+    local ACE_VERSION_FILE="$MIXOMO_VERSIONS_DIR/ace"
     local ACE_UP_TO_DATE=1
     local f fname
+    mkdir -p "$MIXOMO_VERSIONS_DIR" 2>/dev/null || true
+    rm -f "$ACE_PATH/.ace-version" 2>/dev/null || true
     if [ -f "$ACE_VERSION_FILE" ] && [ "$(tr -d ' \r\n' < "$ACE_VERSION_FILE")" = "$LATEST_ACE_VER" ]; then
         for fname in $ACE_FILES; do
             [ -s "$ACE_PATH/$fname" ] || { ACE_UP_TO_DATE=0; break; }
@@ -2153,7 +2166,7 @@ install_hev_tunnel() {
         HEV_VER=$(opkg list-installed 2>/dev/null | awk '$1=="hev-socks5-tunnel"{print $3}')
     fi
     if [ -n "$HEV_VER" ]; then
-        mkdir -p /etc/hev-socks5-tunnel 2>/dev/null || true
+        mkdir -p "$MIXOMO_VERSIONS_DIR" 2>/dev/null || true
         echo "$HEV_VER" > "$HEV_VERSION_FILE"
     fi
 
@@ -2268,9 +2281,11 @@ install_magitrickle_mod_package() {
 }
 
 install_mixomo_redir() {
-    mkdir -p /usr/libexec 2>/dev/null || true
-    cat > /usr/libexec/mixomo-redir <<'EOF'
+    mkdir -p "$MIXOMO_REDIR_DIR" "$MIXOMO_VERSIONS_DIR" 2>/dev/null || true
+    rm -f /usr/libexec/mixomo-redir 2>/dev/null || true
+    cat > "$MIXOMO_REDIR_SCRIPT" <<'EOF'
 #!/bin/sh
+# rebuild MIXOMO_CLASSIFY from persistent state in /etc/mixomo/routing/
 PREFIX="mihomo_route_"
 CHAIN="MIXOMO_CLASSIFY"
 MARK_DEFAULT="1298229097"
@@ -2280,8 +2295,8 @@ if command -v iptables >/dev/null 2>&1; then IPT=iptables
 elif command -v iptables-nft >/dev/null 2>&1; then IPT=iptables-nft
 else exit 0; fi
 
-REDIR_PORT=$(grep -E '^[[:space:]]*redir-port:' /etc/mihomo/config.yaml 2>/dev/null | awk '{print $2}' | tr -d ' \r\n')
-MARK=$(grep -E '^[[:space:]]*startMarkTableIndex:' /etc/magitrickle/state/config.yaml 2>/dev/null | awk '{print $2}' | tr -d ' \r\n')
+REDIR_PORT=$(tr -d ' \r\n' < /etc/mixomo/routing/redir-port 2>/dev/null)
+MARK=$(tr -d ' \r\n' < /etc/mixomo/routing/redir-mark 2>/dev/null)
 [ -n "$MARK" ] || MARK="$MARK_DEFAULT"
 
 : > /tmp/mixomo-redir-rules
@@ -2334,7 +2349,37 @@ ip route replace local default dev lo table "$MARK" 2>/dev/null || true
 
 exit 0
 EOF
-    chmod +x /usr/libexec/mixomo-redir
+    chmod +x "$MIXOMO_REDIR_SCRIPT"
+
+    echo "Создание службы /etc/init.d/mixomo-local-routing"
+    cat > /etc/init.d/mixomo-local-routing <<'EOF'
+#!/bin/sh /etc/rc.common
+START=97
+STOP=10
+
+start() {
+    [ -x /etc/mixomo/routing/redir ] || return 0
+    [ -s /etc/mixomo/routing/redir-port ] || return 0
+    /etc/mixomo/routing/redir 2>/dev/null
+}
+
+stop() {
+    [ -x /etc/mixomo/routing/redir ] || return 0
+    /etc/mixomo/routing/redir 2>/dev/null
+}
+EOF
+    chmod +x /etc/init.d/mixomo-local-routing
+    service mixomo-local-routing enable 2>/dev/null || true
+}
+
+write_mixomo_routing_state() {
+    mkdir -p "$MIXOMO_REDIR_DIR" "$MIXOMO_VERSIONS_DIR" 2>/dev/null || true
+    local P M
+    P="$(ensure_mihomo_redir_port 2>/dev/null)"
+    [ -n "$P" ] && echo "$P" > "$MIXOMO_REDIR_PORT_FILE"
+    M=$(grep -E '^[[:space:]]*startMarkTableIndex:' /etc/magitrickle/state/config.yaml 2>/dev/null | awk '{print $2}' | tr -d ' \r\n')
+    [ -n "$M" ] || M="$MIXOMO_REDIR_DEFAULT_MARK"
+    echo "$M" > "$MIXOMO_REDIR_MARK_FILE"
 }
 
 install_magitrickle() {
@@ -2426,6 +2471,7 @@ install_magitrickle() {
         sync_tproxy_port "$REDIR_PORT"
         service magitrickle restart 2>/dev/null || true
     fi
+    write_mixomo_routing_state
     install_mixomo_redir
 
     echo "Создание страницы MagiTrickle в LuCI"
@@ -2543,6 +2589,10 @@ main() {
     log_done "│ 4. Наслаждайтесь интернетом :)                                        │"
     log_done "└───────────────────────────────────────────────────────────────────────┘"
     echo ""
+
+    case "$0" in
+        /tmp/*) rm -f "$0" 2>/dev/null || true ;;
+    esac
 }
 
 main
