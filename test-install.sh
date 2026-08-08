@@ -1261,7 +1261,7 @@ function escapeHtml(text) {
 }
 
 function backendLabel(backend) {
-    return (backend === 'redir-tproxy') ? 'TProxy' : 'Socks5';
+    return (backend === 'redir-tproxy') ? 'Redir-TProxy' : 'Tun-Socks5';
 }
 
 function displaySource(source) {
@@ -1378,8 +1378,8 @@ return view.extend({
         var source = E('input', { type: 'text', value: displaySource(rule.source), style: 'width:100%;' });
         var label = E('input', { type: 'text', value: rule.label || '', style: 'width:100%;' });
         var opts = [];
-        if (redirAvail) opts.push(E('option', { value: 'redir-tproxy' }, 'TProxy'));
-        opts.push(E('option', { value: 'tun-socks5' }, 'Socks5'));
+        if (redirAvail) opts.push(E('option', { value: 'redir-tproxy' }, 'Redir-TProxy'));
+        opts.push(E('option', { value: 'tun-socks5' }, 'Tun-Socks5'));
         var backend = E('select', { style: 'width:100%;' }, opts);
         backend.value = (rule.backend === 'redir-tproxy' && redirAvail) ? 'redir-tproxy' : 'tun-socks5';
         ui.showModal(_('Редактировать правило'), [
@@ -1425,8 +1425,8 @@ return view.extend({
         var defaultBackend = (status.variant === 'redir-tproxy') ? 'redir-tproxy' : 'tun-socks5';
         function mkBackend(def) {
             var opts = [];
-            if (redirAvail) opts.push(E('option', { value: 'redir-tproxy' }, 'TProxy'));
-            opts.push(E('option', { value: 'tun-socks5' }, 'Socks5'));
+            if (redirAvail) opts.push(E('option', { value: 'redir-tproxy' }, 'Redir-TProxy'));
+            opts.push(E('option', { value: 'tun-socks5' }, 'Tun-Socks5'));
             var s = E('select', { style: 'min-width:8rem;' }, opts);
             s.value = def;
             return s;
