@@ -83,6 +83,12 @@ manage_pkg() {
 
 MAGI_VARIANT_MARKER="$MAGI_VERSION_FILE"
 MAGI_VARIANT="original"
+MAGI_OVERRIDE=""
+if [ -n "$1" ] && { [ "$1" = "original" ] || [ "$1" = "mod" ]; }; then
+    MAGI_OVERRIDE="$1"
+elif [ -n "$MIXOMO_VARIANT" ] && { [ "$MIXOMO_VARIANT" = "original" ] || [ "$MIXOMO_VARIANT" = "mod" ]; }; then
+    MAGI_OVERRIDE="$MIXOMO_VARIANT"
+fi
 
 read_variant_now() { sed -n '1p' "$MAGI_VERSION_FILE" 2>/dev/null | tr -d ' \r\n'; }
 read_version_now() { sed -n '2p' "$MAGI_VERSION_FILE" 2>/dev/null | tr -d ' \r\n'; }
@@ -122,6 +128,13 @@ magitrickle_latest_version() {
 choose_magitrickle_variant() {
     local installed choice
     local inst_label="" opt1="" opt2=""
+
+    if [ -n "$MAGI_OVERRIDE" ]; then
+        MAGI_VARIANT="$MAGI_OVERRIDE"
+        save_magitrickle_variant "$MAGI_VARIANT"
+        log_done "Выбран вариант MagiTrickle: $MAGI_VARIANT (задан заранее)"
+        return
+    fi
     installed="$(detect_magitrickle_variant)"
 
     if [ -d "/etc/magitrickle" ] || [ -f "/etc/init.d/magitrickle" ]; then
