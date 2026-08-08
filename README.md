@@ -62,11 +62,11 @@ wget -qO- --no-check-certificate https://raw.githubusercontent.com/Internet-Help
 # Установка или обновление тестовой версии  
 #### Команда для установки:
 ```
-curl -fsSL https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/main/test-install.sh | sh
+curl -fsSL -o /tmp/mixomo.sh https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/main/test-install.sh && sh /tmp/mixomo.sh
 ```
 #### Альтернативная команда для установки:
 ```
-wget -qO- --no-check-certificate https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/main/test-install.sh | sh
+wget -q --no-check-certificate -O /tmp/mixomo.sh https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/main/test-install.sh && sh /tmp/mixomo.sh
 ```
 
 # Удаление  
