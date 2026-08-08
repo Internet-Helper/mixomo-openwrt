@@ -29,10 +29,24 @@ kill_stale_pkg() {
     done
 }
 
+read_user_input() {
+    local _v=""
+    if read -r _v < /dev/tty 2>/dev/null; then
+        eval "$1=\$_v"
+        return 0
+    fi
+    if read -r _v 2>/dev/null; then
+        eval "$1=\$_v"
+        return 0
+    fi
+    eval "$1=''"
+    return 1
+}
+
 ask_menu() {
     local def="${1:-1}" ans
     while :; do
-        read -r ans
+        read_user_input ans
         ans=$(printf '%s' "$ans" | tr -d ' \r\n' | tr 'Q' 'q')
         case "$ans" in
             1) echo "1"; return ;;
@@ -382,7 +396,7 @@ install_mihomo() {
         if [ -f "$MIHOMO_BIN" ]; then
             log_warn "Найдена установленная версия: $MIHOMO_BIN"
             printf "Удалить старую версию для освобождения места? [y/+/д или n/-/н]: "
-            read -r response
+            read_user_input response
             case "$response" in
                 [yY+дД]*)
                     rm -f "$MIHOMO_BIN"
