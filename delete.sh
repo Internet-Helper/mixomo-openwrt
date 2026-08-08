@@ -1,6 +1,6 @@
 #!/bin/sh
 
-SCRIPT_VERSION="v0.2.2-alpha"
+SCRIPT_VERSION="v0.2.3-alpha"
 
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -120,13 +120,17 @@ cleanup_mixomo_routing() {
     log_info "Проверка файлов локальной маршрутизации Mixomo"
     local PRESENT=0
     local MARK=1298229097
-    if [ -f /etc/magitrickle/state/config.yaml ]; then
+
+    if [ -r /etc/mixomo/routing/redir-mark ]; then
+        MARK=$(tr -d ' \r\n' < /etc/mixomo/routing/redir-mark 2>/dev/null)
+    elif [ -f /etc/magitrickle/state/config.yaml ]; then
         local m
         m=$(grep -E '^[[:space:]]*startMarkTableIndex:' /etc/magitrickle/state/config.yaml 2>/dev/null | awk '{print $2}' | tr -d ' \r\n')
         [ -n "$m" ] && MARK="$m"
     fi
 
-    if [ -e /usr/libexec/mixomo-redir ] || [ -e /etc/mihomo/mihomo-router-routing.nft ]; then
+    if [ -e /etc/mixomo ] || [ -e /etc/init.d/mixomo-local-routing ] || \
+       [ -e /usr/libexec/mixomo-redir ] || [ -e /etc/mihomo/mihomo-router-routing.nft ]; then
         PRESENT=1
     fi
     uci show network 2>/dev/null | grep -q 'mihomo_route_\|mihomo_routing_table' && PRESENT=1
@@ -162,9 +166,13 @@ cleanup_mixomo_routing() {
     nft delete chain inet fw4 mihomo_router_routing 2>/dev/null || true
     nft delete table inet mihomo_router_routing 2>/dev/null || true
 
+    /etc/init.d/mixomo-local-routing stop 2>/dev/null || true
+    rm -f /etc/init.d/mixomo-local-routing
+    rm -rf /etc/mixomo
+    rm -f /usr/libexec/mixomo-redir
+
     /etc/init.d/network reload 2>/dev/null || true
     /etc/init.d/firewall reload 2>/dev/null || true
-    rm -f /usr/libexec/mixomo-redir
 
     if [ "$PRESENT" -eq 1 ]; then
         log_done "Локальная маршрутизация Mixomo удалена."
