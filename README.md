@@ -59,6 +59,16 @@ wget -qO- --no-check-certificate https://raw.githubusercontent.com/Internet-Help
 - При нехватке места и наличии Mihomo будет предложено его удалить и продолжить установку, но конфигурация сохраниться только если в ней есть строка `mixed-port: 7890`  
 - **Если всё равно не хватило места для обновления** - сохраните конфигурации Mihomo и MagiTrickle, запустите скрипт удаления и заново запустите скрипт установки 
 
+# Установка или обновление тестовой версии  
+#### Команда для установки:
+```
+curl -fsSL https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/main/test-install.sh | sh
+```
+#### Альтернативная команда для установки:
+```
+wget -qO- --no-check-certificate https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/main/test-install.sh | sh
+```
+
 # Удаление  
 #### Команда для удаления:
 ```
