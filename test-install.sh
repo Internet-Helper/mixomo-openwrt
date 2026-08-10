@@ -1,6 +1,6 @@
 #!/bin/sh
 
-SCRIPT_VERSION="v0.2.3-alpha"
+SCRIPT_VERSION="v0.2.4-alpha"
 
 MIHOMO_INSTALL_DIR="/etc/mihomo"
 MIHOMO_BIN="/usr/bin/mihomo"
@@ -32,6 +32,8 @@ kill_stale_pkg() {
     for pid in $(ps 2>/dev/null | grep -v grep | grep -E "[ /]${name}([ /]|$)" | awk '{print $1}'); do
         [ "$pid" = "$$" ] && continue
         echo "Принудительно завершаю зависший процесс: $(ps -o args= -p "$pid" 2>/dev/null || echo pid=$pid)"
+        kill -15 "$pid" 2>/dev/null
+        sleep 2
         kill -9 "$pid" 2>/dev/null || true
     done
 }
@@ -139,7 +141,7 @@ choose_magitrickle_variant() {
     if [ -n "$MAGI_OVERRIDE" ]; then
         MAGI_VARIANT="$MAGI_OVERRIDE"
         save_magitrickle_variant "$MAGI_VARIANT"
-        log_done "Выбран вариант MagiTrickle: $MAGI_VARIANT (задан заранее)"
+        log_done "Выбран вариант MagiTrickle: $MAGI_VARIANT"
         return
     fi
     installed="$(detect_magitrickle_variant)"
@@ -147,27 +149,28 @@ choose_magitrickle_variant() {
     if [ -d "/etc/magitrickle" ] || [ -f "/etc/init.d/magitrickle" ]; then
         if [ "$installed" = "mod" ]; then
             inst_label="MagiTrickle Mod от badigit"
-            opt1="Обновить Mod от badigit (можно нажать Enter)"
+            opt1="Обновить Mod от badigit (можно нажать Enter для продолжения)"
             opt2="Установить оригинальную версию MagiTrickle"
         else
             inst_label="оригинальный MagiTrickle"
-            opt1="Обновить оригинальный MagiTrickle (можно нажать Enter)"
+            opt1="Обновить оригинальный MagiTrickle (можно нажать Enter для продолжения)"
             opt2="Установить MagiTrickle Mod от badigit"
         fi
     else
         installed=""
         inst_label="не установлен"
-        opt1="Установить оригинальный MagiTrickle (можно нажать Enter)"
+        opt1="Установить оригинальный MagiTrickle (можно нажать Enter для продолжения)"
         opt2="Установить MagiTrickle Mod от badigit"
     fi
 
     while true; do
+        log_done "=== Mixomo OpenWrt $SCRIPT_VERSION от Internet Helper ==="
         echo ""
         log_done "Сейчас установлен $inst_label"
         echo ""
-        echo "[1] $opt1"
-        echo "[2] $opt2"
-        echo "[q] Выход"
+        echo "1) $opt1"
+        echo "2) $opt2"
+        echo "0) Выход"
         echo ""
         printf "Ваш выбор: "
         read choice
@@ -177,7 +180,7 @@ choose_magitrickle_variant() {
         fi
 
         case "$choice" in
-            q)
+            0)
                 echo ""
                 exit 0
                 ;;
@@ -710,7 +713,7 @@ EOF
             "ubus": {
                 "file": ["write"],
                 "service": ["list"],
-                "mihomo-routing": ["add", "update", "delete", "set_enabled", "set_router"]
+                "mihomo-routing": ["add", "update", "delete", "set_enabled", "set_router", "exclude_add", "exclude_delete", "exclude_update", "exclude_set_enabled", "reorder", "reload"]
             }
         }
     }
@@ -761,14 +764,11 @@ normalize_ipv4_cidr() {
 
 find_table() {
     existing="$(uci -q get network.$TABLE_SECTION.table)"
-    # Once chosen, Mixomo never changes its table merely because netifd has
-    # not installed the route yet. This keeps all rules on one stable table.
     if [ -n "$existing" ] && [ "$existing" -ge 1 ] 2>/dev/null; then
         echo "$existing"; return
     fi
     table=100
     while [ "$table" -lt 1000 ]; do
-        # A table is ours only when its default route already uses Mihomo.
         if ! ip route show table "$table" 2>/dev/null | grep -q . && \
            ! ip rule list 2>/dev/null | grep -Eq "[[:space:]]lookup[[:space:]]+$table([[:space:]]|$)"; then
             echo "$table"; return
@@ -785,7 +785,6 @@ ensure_base() {
     uci -q set "network.$TABLE_SECTION.target=0.0.0.0/0"
     uci -q set "network.$TABLE_SECTION.table=$table"
 
-    # Rebuild only Mixomo's own local-destination exclusions.
     for section in $(uci show network 2>/dev/null | sed -n "s/^network\\.\\(${PREFIX}local_[^.=]*\\)=rule$/\\1/p"); do uci -q delete "network.$section"; done
     number=0
     ip -4 route show table main proto kernel scope link 2>/dev/null | while read -r subnet rest; do
@@ -807,8 +806,6 @@ apply_network() {
     uci commit network
     /etc/init.d/network reload
     sleep 1
-    # Some proto-none TUN interfaces are not handled consistently by netifd.
-    # Keep the UCI route for persistence, then verify the live kernel route.
     if ! ip route show table "$table" 2>/dev/null | grep -Eq '^default[[:space:]].*dev[[:space:]]Mihomo([[:space:]]|$)'; then
         ip route replace default dev Mihomo table "$table" 2>/dev/null || return 1
     fi
@@ -875,6 +872,20 @@ src_exists() {
     return 1
 }
 
+excl_exists() {
+    cidr="$1"; skip="$2"
+    for s in $(list_excl_sections); do
+        key="${s#${PREFIX}excl_}"
+        [ "$key" = "$skip" ] && continue
+        [ "$(uci -q get network.$s.dest)" = "$cidr" ] && return 0
+    done
+    return 1
+}
+
+list_excl_sections() {
+    uci show network 2>/dev/null | sed -n "s/^network\\.\\(${PREFIX}excl_[^.=]*\\)=mihomo_excl$/\\1/p"
+}
+
 rebuild_mixomo_redir() {
     [ -x /etc/mixomo/routing/redir ] && /etc/mixomo/routing/redir 2>/dev/null
     return 0
@@ -894,13 +905,19 @@ network_sync() {
 }
 
 local_ipv4_nft_set() {
-    # Never mark replies to LuCI/LAN clients or traffic to an upstream gateway.
-    # These connected prefixes are discovered at runtime, not hard-coded.
-    local_nets="127.0.0.0/8"
+    local_nets="127.0.0.0/8, 192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12, 100.64.0.0/10, 169.254.0.0/16"
+    
     ip -4 route show table main proto kernel scope link 2>/dev/null > /tmp/mihomo-local-routes
     while read -r subnet rest; do
         case "$subnet" in */*) local_nets="$local_nets, $subnet";; esac
     done < /tmp/mihomo-local-routes
+    
+    for sec in $(uci show network 2>/dev/null | sed -n "s/^network\.\(mihomo_route_excl_[^.=]*\)=mihomo_excl$/\1/p"); do
+        [ "$(uci -q get network.$sec.disabled)" = "1" ] && continue
+        d="$(uci -q get network.$sec.dest)"
+        [ -n "$d" ] && local_nets="$local_nets, $d"
+    done
+    
     printf '%s\n' "$local_nets"
 }
 
@@ -967,6 +984,20 @@ emit_status() {
         json_add_string source "$(uci -q get network.$section.src)"
         json_add_string label "$(uci -q get network.$section.name)"
         json_add_string backend "$(uci -q get network.$section.backend)"
+        prio_val="$(uci -q get network.$section.priority)"; [ -n "$prio_val" ] || prio_val=0
+        json_add_int priority "$prio_val"
+        json_add_boolean enabled "$( [ "$(uci -q get network.$section.disabled)" != 1 ] && echo 1 || echo 0 )"
+        json_close_object
+    done
+    json_close_array
+    json_add_array exclusions
+    for section in $(list_excl_sections); do
+        json_add_object
+        json_add_string id "${section#${PREFIX}excl_}"
+        json_add_string dest "$(uci -q get network.$section.dest)"
+        json_add_string label "$(uci -q get network.$section.name)"
+        excl_prio="$(uci -q get network.$section.priority)"; [ -n "$excl_prio" ] || excl_prio=0
+        json_add_int priority "$excl_prio"
         json_add_boolean enabled "$( [ "$(uci -q get network.$section.disabled)" != 1 ] && echo 1 || echo 0 )"
         json_close_object
     done
@@ -985,7 +1016,6 @@ emit_clients() {
         seen_ips="$seen_ips$1 "
         return 0
     }
-    # DHCP names have priority; ARP neighbours only fill the remaining IPs.
     if [ -r /tmp/dhcp.leases ]; then
         while read -r expiry mac ip name clientid; do
             valid_ipv4_cidr "$ip" || continue
@@ -1004,12 +1034,81 @@ emit_clients() {
 }
 
 case "$1" in
-list) echo '{"status":{},"clients":{},"add":{"source":"String","label":"String","backend":"String"},"update":{"id":"String","source":"String","label":"String","backend":"String"},"delete":{"id":"String"},"set_enabled":{"id":"String","enabled":true},"set_router":{"enabled":true}}' ;;
+list) echo '{"status":{},"clients":{},"add":{"source":"String","label":"String","backend":"String"},"update":{"id":"String","source":"String","label":"String","backend":"String"},"delete":{"id":"String"},"set_enabled":{"id":"String","enabled":true},"set_router":{"enabled":true},"exclude_add":{"dest":"String","label":"String"},"exclude_delete":{"id":"String"},"exclude_update":{"id":"String","dest":"String","label":"String"},"exclude_set_enabled":{"id":"String","enabled":true},"reorder":{"type":"String","order":"String"}}' ;;
 call)
     json_load "$(cat)"
     case "$2" in
     status) emit_status ;;
     clients) emit_clients ;;
+    exclude_add)
+        json_get_var dest dest; json_get_var label label
+        valid_ipv4_cidr "$dest" || fail "Введите корректный IPv4-адрес или CIDR"
+        dest="$(normalize_ipv4_cidr "$dest")" || fail "Не удалось определить маску подсети"
+        [ "${#label}" -le 64 ] || fail "Название не длиннее 64 символов"
+        printf '%s' "$label" | grep -q '[[:cntrl:]]' && fail "Недопустимое название"
+        excl_exists "$dest" "" && fail "Такая подсеть уже в списке исключений"
+        id="$(date +%s)_$$"
+        uci -q set "network.${PREFIX}excl_$id=mihomo_excl"
+        uci -q set "network.${PREFIX}excl_$id.dest=$dest"
+        uci -q set "network.${PREFIX}excl_$id.name=${label:-$dest}"
+        uci -q set "network.${PREFIX}excl_$id.priority=$((1000 + $(list_excl_sections | wc -l)))"
+        uci -q delete "network.${PREFIX}excl_$id.disabled"
+        uci -q delete "network.${PREFIX}excl_$id.enabled"
+        uci commit network
+        rebuild_mixomo_redir
+        emit_status ;;
+    exclude_delete)
+        json_get_var id id
+        printf '%s' "$id" | grep -Eq '^[0-9_]+$' || fail "Некорректный идентификатор исключения"
+        uci -q get "network.${PREFIX}excl_$id" >/dev/null || fail "Исключение не найдено"
+        uci -q delete "network.${PREFIX}excl_$id"
+        uci commit network
+        rebuild_mixomo_redir
+        emit_status ;;
+    exclude_update)
+        json_get_var id id; json_get_var dest dest; json_get_var label label
+        printf '%s' "$id" | grep -Eq '^[0-9_]+$' || fail "Некорректный идентификатор исключения"
+        uci -q get "network.${PREFIX}excl_$id" >/dev/null || fail "Исключение не найдено"
+        valid_ipv4_cidr "$dest" || fail "Введите корректный IPv4-адрес или CIDR"
+        dest="$(normalize_ipv4_cidr "$dest")" || fail "Не удалось определить маску подсети"
+        [ "${#label}" -le 64 ] || fail "Название не длиннее 64 символов"
+        printf '%s' "$label" | grep -q '[[:cntrl:]]' && fail "Недопустимое название"
+        excl_exists "$dest" "$id" && fail "Такая подсеть уже в списке исключений"
+        uci -q set "network.${PREFIX}excl_$id.dest=$dest"
+        uci -q set "network.${PREFIX}excl_$id.name=${label:-$dest}"
+        uci commit network
+        rebuild_mixomo_redir
+        emit_status ;;
+    exclude_set_enabled)
+        json_get_var id id; json_get_var enabled enabled
+        printf '%s' "$id" | grep -Eq '^[0-9_]+$' || fail "Некорректный идентификатор исключения"
+        uci -q get "network.${PREFIX}excl_$id" >/dev/null || fail "Исключение не найдено"
+        case "$enabled" in 1|true) enabled=1;; *) enabled=0;; esac
+        if [ "$enabled" = 1 ]; then
+            uci -q delete "network.${PREFIX}excl_$id.disabled"
+            uci -q delete "network.${PREFIX}excl_$id.enabled"
+        else
+            uci -q set "network.${PREFIX}excl_$id.disabled=1"
+        fi
+        uci commit network
+        rebuild_mixomo_redir
+        emit_status ;;
+    reorder)
+        json_get_var type type; json_get_var order order
+        case "$type" in rule|exclude) :;; *) fail "Неизвестный тип правила" ;; esac
+        oldifs="$IFS"; IFS=","; n=0
+        for id in $order; do
+            printf '%s' "$id" | grep -Eq '^[0-9_]+$' || continue
+            if [ "$type" = "rule" ]; then
+                uci -q set "network.${PREFIX}client_$id.priority=$((20000 + n))"
+            else
+                uci -q set "network.${PREFIX}excl_$id.priority=$((1000 + n))"
+            fi
+            n=$((n + 1))
+        done
+        IFS="$oldifs"
+        network_sync
+        emit_status ;;
     add)
         json_get_var source source; json_get_var label label; json_get_var backend backend
         valid_ipv4_cidr "$source" || fail "Введите корректный IPv4-адрес или CIDR"
@@ -1018,7 +1117,7 @@ call)
         printf '%s' "$label" | grep -q '[[:cntrl:]]' && fail "Недопустимое название"
         [ -z "$backend" ] && backend="$(get_backend_default)"
         case "$backend" in redir-tproxy|tun-socks5) :;; *) fail "Неизвестный backend" ;; esac
-        src_exists "$source" "" && fail "Такой источник уже добавлен"
+        src_exists "$source" "" && fail "Такой адрес уже добавлен"
         id="$(date +%s)_$$"
         prio="$(next_priority "$source" "")"
         if [ "$backend" = "redir-tproxy" ]; then
@@ -1056,7 +1155,7 @@ call)
         [ -z "$backend" ] && backend="$(uci -q get network.${PREFIX}client_$id.backend)"
         [ -z "$backend" ] && backend="$(get_backend_default)"
         case "$backend" in redir-tproxy|tun-socks5) :;; *) fail "Неизвестный backend" ;; esac
-        src_exists "$source" "$id" && fail "Такой источник уже добавлен"
+        src_exists "$source" "$id" && fail "Такой адрес уже добавлен"
         prio="$(next_priority "$source" "$id")"
         uci -q set "network.${PREFIX}client_$id.src=$source"
         uci -q set "network.${PREFIX}client_$id.name=${label:-$source}"
@@ -1252,6 +1351,11 @@ var callRoutingUpdate = rpc.declare({ object: 'mihomo-routing', method: 'update'
 var callRoutingDelete = rpc.declare({ object: 'mihomo-routing', method: 'delete', params: ['id'], expect: { '': {} } });
 var callRoutingEnabled = rpc.declare({ object: 'mihomo-routing', method: 'set_enabled', params: ['id', 'enabled'], expect: { '': {} } });
 var callRoutingRouter = rpc.declare({ object: 'mihomo-routing', method: 'set_router', params: ['enabled'], expect: { '': {} } });
+var callRoutingExcludeAdd = rpc.declare({ object: 'mihomo-routing', method: 'exclude_add', params: ['dest', 'label'], expect: { '': {} } });
+var callRoutingExcludeDelete = rpc.declare({ object: 'mihomo-routing', method: 'exclude_delete', params: ['id'], expect: { '': {} } });
+var callRoutingExcludeUpdate = rpc.declare({ object: 'mihomo-routing', method: 'exclude_update', params: ['id', 'dest', 'label'], expect: { '': {} } });
+var callRoutingExcludeEnabled = rpc.declare({ object: 'mihomo-routing', method: 'exclude_set_enabled', params: ['id', 'enabled'], expect: { '': {} } });
+var callRoutingReorder = rpc.declare({ object: 'mihomo-routing', method: 'reorder', params: ['type', 'order'], expect: { '': {} } });
 
 function escapeHtml(text) {
     if (typeof text !== 'string') return text;
@@ -1358,9 +1462,9 @@ return view.extend({
     confirmRouterRouting: function(enable) {
         var self = this;
         var text = enable
-            ? _('Вы уверены что хотите ВКЛЮЧИТЬ все исходящие соединения от роутера через Mihomo? Других клиентов это не затронет.')
-            : _('Вы уверены что хотите ВЫКЛЮЧИТЬ все исходящие соединения от роутера через Mihomo? Других клиентов это не затронет.');
-        ui.showModal(_('Дополнительное подтверждение...'), [
+            ? _('Включить особое правило?')
+            : _('Выключить особое правило?');
+        ui.showModal(_('Дополнительное подтверждение'), [
             E('p', {}, text),
             E('div', { class: 'right', style: 'margin-top:1rem;' }, [
                 E('button', { class: 'btn cbi-button-neutral', click: ui.hideModal }, _('Отменить')), ' ',
@@ -1383,7 +1487,7 @@ return view.extend({
         var backend = E('select', { style: 'width:100%;' }, opts);
         backend.value = (rule.backend === 'redir-tproxy' && redirAvail) ? 'redir-tproxy' : 'tun-socks5';
         ui.showModal(_('Редактировать правило'), [
-            E('div', {}, [E('label', {}, _('Источник (IP или CIDR)')), source]),
+            E('div', {}, [E('label', {}, _('Адрес (IP или CIDR)')), source]),
             E('div', { style: 'margin-top:.7rem;' }, [E('label', {}, _('Название')), label]),
             E('div', { style: 'margin-top:.7rem;' }, [E('label', {}, _('Тип подключения')), backend]),
             E('div', { class: 'right', style: 'margin-top:1rem;' }, [
@@ -1393,6 +1497,34 @@ return view.extend({
                 }}, _('Сохранить'))
             ])
         ]);
+    },
+
+    editExclusion: function(ex) {
+        var self = this;
+        var dest = E('input', { type: 'text', value: displaySource(ex.dest), style: 'width:100%;' });
+        var label = E('input', { type: 'text', value: ex.label || '', style: 'width:100%;' });
+        ui.showModal(_('Редактировать исключение'), [
+            E('div', {}, [E('label', {}, _('Адрес (IP или CIDR)')), dest]),
+            E('div', { style: 'margin-top:.7rem;' }, [E('label', {}, _('Название')), label]),
+            E('div', { class: 'right', style: 'margin-top:1rem;' }, [
+                E('button', { class: 'btn cbi-button-neutral', click: ui.hideModal }, _('Отменить')), ' ',
+                E('button', { class: 'btn cbi-button-positive btn-save-custom', click: function() {
+                    callRoutingExcludeUpdate(ex.id, dest.value.trim(), label.value.trim()).then(function(res) { if (self.showRoutingError(res)) { ui.hideModal(); self.refreshRouting(); } }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
+                }}, _('Сохранить'))
+            ])
+        ]);
+    },
+
+    handleReorder: function(type, ids) {
+        var self = this;
+        return callRoutingReorder(type, ids.join(',')).then(function(res) { if (self.showRoutingError(res)) self.refreshRouting(); }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
+    },
+
+    moveItem: function(type, arr, idx, dir) {
+        var j = idx + dir;
+        if (j < 0 || j >= arr.length) return;
+        var tmp = arr[idx]; arr[idx] = arr[j]; arr[j] = tmp;
+        this.handleReorder(type, arr.map(function(r) { return r.id; }));
     },
 
     refreshRouting: function() {
@@ -1407,7 +1539,7 @@ return view.extend({
         if (!this.routingPanel) return;
         var open = this.routingPanel.style.display !== 'none';
         this.routingPanel.style.display = open ? 'none' : 'block';
-        if (!open) { this.routingPanel.scrollIntoView({ behavior: 'smooth', block: 'start' }); this.refreshRouting(); }
+        if (!open) { this.refreshRouting(); }
     },
 
     renderRoutingPanel: function() {
@@ -1435,7 +1567,7 @@ return view.extend({
         var backendSel2 = mkBackend(defaultBackend);
         panel.appendChild(E('h3', {}, _('Локальная маршрутизация')));
         panel.appendChild(E('p', { style: 'opacity:.75; margin-top:0;' }, [
-        _('При использовании абсолютно весь трафик направляется в ядро Mihomo.'),
+        _('При использовании абсолютно весь трафик направляется через Mihomo.'),
         E('br'),
         _('Добавлять устройства и подсети можно только из локальных диапазонов.'),
         E('br'),
@@ -1452,25 +1584,97 @@ return view.extend({
             var label = deviceLabel.value.trim() || (selected && selected.name) || '';
             callRoutingAdd(known.value, label, backendSel.value).then(function(res) { if (self.showRoutingError(res)) { known.value = ''; deviceLabel.value = ''; self.refreshRouting(); } });
         }}, _('Добавить правило'))]));
-        var source = E('input', { type: 'text', placeholder: 'Напишите IP или CIDR...', style: 'min-width:15rem;' });
+        var source = E('input', { type: 'text', placeholder: 'IP или CIDR', style: 'min-width:15rem;' });
         var manualLabel = E('input', { type: 'text', placeholder: _('Название (необязательно)'), style: 'min-width:12rem;' });
         panel.appendChild(E('div', { style: 'opacity:.75; margin-top:.35rem; margin-bottom:.35rem;' }, _('Или')));
         panel.appendChild(E('div', { class: 'mihomo-route-add' }, [source, manualLabel, backendSel2, E('button', { class: 'btn cbi-button-positive btn-save-custom', click: function() {
             callRoutingAdd(source.value.trim(), manualLabel.value.trim(), backendSel2.value).then(function(res) { if (self.showRoutingError(res)) { source.value = ''; manualLabel.value = ''; self.refreshRouting(); } });
         }}, _('Добавить правило'))]));
 
-        var rules = status.rules || [];
+        var dragSource = null;
+        function makeDraggable(grip, tr, type, arr, idx) {
+            grip.setAttribute('draggable', 'true');
+            grip.style.cursor = 'move';
+            grip.addEventListener('dragstart', function(ev) { dragSource = idx; try { ev.dataTransfer.effectAllowed = 'move'; } catch(e) {} });
+            tr.addEventListener('dragover', function(ev) { if (ev.preventDefault) ev.preventDefault(); });
+            tr.addEventListener('drop', function(ev) {
+                ev.preventDefault();
+                if (dragSource === null || dragSource === idx || dragSource < 0 || dragSource >= arr.length) return;
+                var item = arr.splice(dragSource, 1)[0];
+                arr.splice(idx, 0, item);
+                self.handleReorder(type, arr.map(function(r) { return r.id; }));
+            });
+            tr.addEventListener('dragend', function() { dragSource = null; });
+        }
+
+        var rules = (status.rules || []).slice().sort(function(a, b) { return (a.priority || 0) - (b.priority || 0); });
         if (!rules.length) panel.appendChild(E('p', { style: 'opacity:.75; margin-top:.35rem; margin-bottom:1.35rem;' }, [
             _('Правил пока нет.')
         ]));
         else {
-            var table = E('table', { class: 'table mihomo-routing-table', style: 'width:100%; margin-top:.8rem;' }, [E('thead', {}, E('tr', {}, [E('th', {}, _('Название')), E('th', {}, _('Источник')), E('th', {}, _('Тип подключения')), E('th', {}, _('Статус')), E('th', {}, _('Действие'))]))]);
-            var body = E('tbody'); rules.forEach(function(rule) { body.appendChild(E('tr', {}, [E('td', {}, rule.label || '—'), E('td', {}, displaySource(rule.source)), E('td', {}, backendLabel(rule.backend || 'tun-socks5')), E('td', {}, rule.enabled ? _('Включено') : _('Отключено')), E('td', {}, E('div', { class: 'mihomo-route-actions' }, [E('button', { class: 'btn cbi-button-neutral', click: function() { self.editRoutingRule(rule); } }, _('Редактировать')), E('button', { class: 'btn cbi-button-neutral', click: function() { callRoutingEnabled(rule.id, !rule.enabled).then(function(res) { if (self.showRoutingError(res)) self.refreshRouting(); }); } }, rule.enabled ? _('Отключить') : _('Включить')), E('button', { class: 'btn cbi-button-reset', click: function() { if (confirm(_('Удалить это правило?'))) callRoutingDelete(rule.id).then(function(res) { if (self.showRoutingError(res)) self.refreshRouting(); }); } }, _('Удалить'))])) ])); });
+            var table = E('table', { class: 'table mihomo-routing-table', style: 'width:100%; margin-top:.8rem;' }, [E('thead', {}, E('tr', {}, [E('th', { class: 'mihomo-grip' }, ''), E('th', {}, _('Название')), E('th', {}, _('Адрес')), E('th', {}, _('Тип подключения')), E('th', {}, _('Статус')), E('th', {}, _('Действие'))]))]);
+            var body = E('tbody'); rules.forEach(function(rule, idx) {
+                var tr = E('tr', {}, [
+                    E('td', { class: 'mihomo-grip' }, E('span', { class: 'mihomo-grip-handle' }, '≡')),
+                    E('td', {}, rule.label || '—'),
+                    E('td', {}, displaySource(rule.source)),
+                    E('td', {}, backendLabel(rule.backend || 'tun-socks5')),
+                    E('td', {}, rule.enabled ? _('Включено') : _('Отключено')),
+                    E('td', {}, E('div', { class: 'mihomo-route-actions' }, [
+                        E('button', { class: 'btn cbi-button-neutral', title: _('Вверх'), click: function() { self.moveItem('rule', rules, idx, -1); } }, '↑'),
+                        E('button', { class: 'btn cbi-button-neutral', title: _('Вниз'), click: function() { self.moveItem('rule', rules, idx, 1); } }, '↓'),
+                        E('button', { class: 'btn cbi-button-neutral', click: function() { self.editRoutingRule(rule); } }, _('Редактировать')),
+                        E('button', { class: 'btn cbi-button-neutral', click: function() { callRoutingEnabled(rule.id, !rule.enabled).then(function(res) { if (self.showRoutingError(res)) self.refreshRouting(); }); } }, rule.enabled ? _('Отключить') : _('Включить')),
+                        E('button', { class: 'btn cbi-button-reset', click: function() { if (confirm(_('Удалить это правило?'))) callRoutingDelete(rule.id).then(function(res) { if (self.showRoutingError(res)) self.refreshRouting(); }); } }, _('Удалить'))
+                    ]))
+                ]);
+                makeDraggable(tr.firstChild, tr, 'rule', rules, idx);
+                body.appendChild(tr);
+            });
             table.appendChild(body); panel.appendChild(table);
         }
-        panel.appendChild(E('p', { style: 'opacity:.75; margin-top:.35rem; margin-bottom:.35rem;' }, _('Особое правило:')));
-        panel.appendChild(E('label', { style: 'display:block; margin:.4rem 0;' }, [routerToggle, ' ', _('Направлять трафик самого роутера через Mihomo')]));
-        panel.appendChild(E('p', { style: 'opacity:.75; margin-top:.35rem; margin-bottom:.35rem;' }, _('Применяется только к исходящим соединениям, которые инициирует сам роутер (обновления пакетов, wget, curl и другие системные запросы). Не затрагивает других клиентов.')));
+
+        panel.appendChild(E('h3', { style: 'margin-top:1rem;' }, _('Исключённые адреса')));
+        panel.appendChild(E('p', { style: 'opacity:.75; margin-top:0;' }, [
+            _('Трафик к этим адресам никогда не направляется через Mihomo.'),
+            E('br'),
+            _('По умолчанию добавлены следующие подсети, без возможности их удалить:'),
+            E('br'),
+            _('127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10, 169.254.0.0/16, 224.0.0.0/4, 255.255.255.255/32')
+        ]));
+        var exDest = E('input', { type: 'text', placeholder: 'IP или CIDR', style: 'min-width:12rem;' });
+        var exDest = E('input', { type: 'text', placeholder: 'IP или CIDR', style: 'min-width:12rem;' });
+        var exLabel = E('input', { type: 'text', placeholder: _('Название (необязательно)'), style: 'min-width:12rem;' });
+        panel.appendChild(E('div', { class: 'mihomo-route-add' }, [exDest, exLabel, E('button', { class: 'btn cbi-button-positive btn-save-custom', click: function() {
+            callRoutingExcludeAdd(exDest.value.trim(), exLabel.value.trim()).then(function(res) { if (self.showRoutingError(res)) { exDest.value = ''; exLabel.value = ''; self.refreshRouting(); } }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
+        }}, _('Добавить правило'))]));
+        var exclusions = (status.exclusions || []).slice().sort(function(a, b) { return (a.priority || 0) - (b.priority || 0); });
+        if (!exclusions.length) {
+            panel.appendChild(E('p', { style: 'opacity:.75; margin-top:.35rem;' }, _('Правил пока нет.')));
+        } else {
+            var t2 = E('table', { class: 'table mihomo-routing-table', style: 'width:100%; margin-top:.6rem;' }, [E('thead', {}, E('tr', {}, [E('th', { class: 'mihomo-grip' }, ''), E('th', {}, _('Название')), E('th', {}, _('Адрес')), E('th', {}, _('Статус')), E('th', {}, _('Действие'))]))]);
+            var b2 = E('tbody'); exclusions.forEach(function(ex, idx) {
+                var tr2 = E('tr', {}, [
+                    E('td', { class: 'mihomo-grip' }, E('span', { class: 'mihomo-grip-handle' }, '≡')),
+                    E('td', {}, ex.label || '—'),
+                    E('td', {}, displaySource(ex.dest)),
+                    E('td', {}, ex.enabled ? _('Включено') : _('Отключено')),
+                    E('td', {}, E('div', { class: 'mihomo-route-actions' }, [
+                        E('button', { class: 'btn cbi-button-neutral', title: _('Вверх'), click: function() { self.moveItem('exclude', exclusions, idx, -1); } }, '↑'),
+                        E('button', { class: 'btn cbi-button-neutral', title: _('Вниз'), click: function() { self.moveItem('exclude', exclusions, idx, 1); } }, '↓'),
+                        E('button', { class: 'btn cbi-button-neutral', click: function() { self.editExclusion(ex); } }, _('Редактировать')),
+                        E('button', { class: 'btn cbi-button-neutral', click: function() { callRoutingExcludeEnabled(ex.id, !ex.enabled).then(function(res) { if (self.showRoutingError(res)) self.refreshRouting(); }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); }); } }, ex.enabled ? _('Отключить') : _('Включить')),
+                        E('button', { class: 'btn cbi-button-reset', click: function() { if (confirm(_('Удалить этот адрес?'))) callRoutingExcludeDelete(ex.id).then(function(res) { if (self.showRoutingError(res)) self.refreshRouting(); }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); }); } }, _('Удалить'))
+                    ]))
+                ]);
+                makeDraggable(tr2.firstChild, tr2, 'exclude', exclusions, idx);
+                b2.appendChild(tr2);
+            });
+            t2.appendChild(b2); panel.appendChild(t2);
+        }
+        panel.appendChild(E('h3', { style: 'margin-top:1rem;' }, _('Особое правило')));
+        panel.appendChild(E('p', { style: 'opacity:.75; margin-top:0;' }, _('Применяется только к исходящим соединениям этого устройства — apk update, wget, curl и тому подобное.')));
+        panel.appendChild(E('label', { style: 'display:block; margin:.4rem 0;' }, [routerToggle, ' ', _('Направлять исходящий трафик этого устройства через Mihomo')]));
     },
 	
     getMihomoVersion: function() {
@@ -1493,19 +1697,32 @@ return view.extend({
         var currentVersion = this.currentVersion || 'Неизвестно';
         this.latestVersion = latestVersion;
 
+        var cleanCurrent = currentVersion.replace('v', '');
+        var cleanLatest = latestVersion.replace('v', '');
+
         if (this.latestVersionEl) {
-            this.latestVersionEl.textContent = _('(актуальное ядро %s)').format(latestVersion.replace('v', ''));
             this.latestVersionEl.style.display = 'inline';
-            this.latestVersionEl.style.color = (latestVersion !== currentVersion) ? '#5cb85c' : '';
-            this.latestVersionEl.style.opacity = (latestVersion !== currentVersion) ? '1' : '0.6';
+            
+            if (cleanLatest === cleanCurrent) {
+                this.latestVersionEl.style.color = ''; 
+                this.latestVersionEl.style.opacity = '0.6';
+                this.latestVersionEl.style.fontWeight = 'normal';
+            } else {
+                this.latestVersionEl.textContent = _('(доступна новая версия %s)').format(cleanLatest);
+                this.latestVersionEl.style.color = '#5cb85c';
+                this.latestVersionEl.style.opacity = '1';
+            }
         }
 
         if (latestVersion === currentVersion) {
             this.updateButton.textContent = _('Проверить обновление');
             this.updateButton.className = 'btn cbi-button-neutral';
             this.updateButton.disabled = false;
-            this.updateButton.onclick = function() { window.location.reload(); };
-            if (isManual) window.location.reload();
+            var self = this;
+            this.updateButton.onclick = function() { self.checkForUpdates(true); };
+            if (isManual) {
+                ui.addNotification(null, E('p', _('У вас установлена самая актуальная версия')), 'info');
+            }
         } else {
             this.updateButton.textContent = _('Установить обновление');
             this.updateButton.className = 'btn cbi-button-action';
@@ -1651,7 +1868,7 @@ return view.extend({
         this.getMihomoVersion().then(function(version) {
             self.currentVersion = version;
             var versionEl = document.getElementById('mihomo-version');
-            if (versionEl) versionEl.textContent = _('%s').format(version.replace('v', ''));
+            if (versionEl) versionEl.textContent = version.startsWith('v') ? version : 'v' + version;
             var updateBtn = document.getElementById('mihomo-update-btn');
             if (updateBtn) {
                 updateBtn.disabled = false;
@@ -1698,7 +1915,7 @@ return view.extend({
                 align-items: center;
                 justify-content: center;
                 vertical-align: middle;
-                box-sizing: border-box !important; /* Чтобы padding не раздувал кнопку */
+                box-sizing: border-box !important;
                 padding: 0 1rem !important;
                 line-height: 1 !important;
             }
@@ -1731,6 +1948,11 @@ return view.extend({
             .mihomo-route-actions { display: flex; gap: 1rem; padding: 0.2rem 0; }
             .mihomo-routing-panel input, .mihomo-routing-panel select { background: var(--bg-input); color: var(--text-main); border: 1px solid var(--border-color); padding: .4em; }
             .mihomo-routing-table th, .mihomo-routing-table td { text-align: left !important; }
+            .mihomo-routing-table tbody tr:hover { background-color: rgba(125,125,125,0.15); }
+            .mihomo-grip { width: 1.8rem; text-align: center; cursor: grab; user-select: none; color: var(--text-dim); }
+            .mihomo-grip:active { cursor: grabbing; }
+            .mihomo-grip-handle { display: inline-block; padding: 0 .4rem; border: 1px solid var(--border-color); border-radius: 4px; line-height: 1.3; }
+            .mihomo-grip:hover .mihomo-grip-handle { background-color: rgba(125,125,125,0.2); color: var(--text-main); }
             .snippet-header { margin-bottom: 0.4rem; color: var(--text-main); font-size: 0.85em; }
             .snippet-text { width: 100%; height: 9.5em; background: var(--bg-tab-active); color: var(--text-main); border: 1px solid var(--border-color); font-family: monospace; font-size: 0.9em; padding: 0.8em; resize: none; }
             .output-box-close { background: transparent; border: none; color: var(--text-main); font-size: 1.5em; line-height: 1; cursor: pointer; margin-left: 1rem; padding: 0 0.4rem; }
@@ -2233,7 +2455,7 @@ EOF
     fi
 
     uci commit firewall
-    /etc/init.d/firewall restart
+    /etc/init.d/firewall reload
 }
 
 install_magitrickle_original_package() {
@@ -2285,19 +2507,40 @@ install_mixomo_redir() {
     rm -f /usr/libexec/mixomo-redir 2>/dev/null || true
     cat > "$MIXOMO_REDIR_SCRIPT" <<'EOF'
 #!/bin/sh
-# rebuild MIXOMO_CLASSIFY from persistent state in /etc/mixomo/routing/
 PREFIX="mihomo_route_"
 CHAIN="MIXOMO_CLASSIFY"
 MARK_DEFAULT="1298229097"
+EXCL_PRIO_BASE=18000
 
 IPT=""
 if command -v iptables >/dev/null 2>&1; then IPT=iptables
 elif command -v iptables-nft >/dev/null 2>&1; then IPT=iptables-nft
-else exit 0; fi
+fi
 
 REDIR_PORT=$(tr -d ' \r\n' < /etc/mixomo/routing/redir-port 2>/dev/null)
 MARK=$(tr -d ' \r\n' < /etc/mixomo/routing/redir-mark 2>/dev/null)
 [ -n "$MARK" ] || MARK="$MARK_DEFAULT"
+
+: > /tmp/mixomo-user-excl
+for sec in $(uci show network 2>/dev/null | sed -n "s/^network\\.\\(${PREFIX}excl_[^.=]*\\)=mihomo_excl$/\\1/p"); do
+    [ "$(uci -q get network.$sec.disabled)" = "1" ] && continue
+    d=$(uci -q get network.$sec.dest)
+    [ -n "$d" ] && echo "$d" >> /tmp/mixomo-user-excl
+done
+sort -u /tmp/mixomo-user-excl > /tmp/mixomo-user-excl-u
+
+if command -v ip >/dev/null 2>&1; then
+    p=$EXCL_PRIO_BASE
+    while [ "$p" -lt $((EXCL_PRIO_BASE + 100)) ]; do
+        ip rule del priority "$p" 2>/dev/null
+        p=$((p + 1))
+    done
+    n=0
+    while read -r excl; do
+        ip rule add priority $((EXCL_PRIO_BASE + n)) to "$excl" lookup main 2>/dev/null
+        n=$((n + 1))
+    done < /tmp/mixomo-user-excl-u
+fi
 
 : > /tmp/mixomo-redir-rules
 for sec in $(uci show network 2>/dev/null | sed -n "s/^network\\.\\(${PREFIX}client_[^.=]*\\)=mihomo_rule$/\\1/p"); do
@@ -2309,26 +2552,32 @@ for sec in $(uci show network 2>/dev/null | sed -n "s/^network\\.\\(${PREFIX}cli
     echo "$prio|$src"
 done | sort -n -t'|' -k1 > /tmp/mixomo-redir-rules
 
-"$IPT" -t nat -F "$CHAIN" 2>/dev/null
-"$IPT" -t nat -D PREROUTING -i lo -j "$CHAIN" 2>/dev/null
-"$IPT" -t nat -D PREROUTING ! -i lo -j "$CHAIN" 2>/dev/null
-"$IPT" -t nat -X "$CHAIN" 2>/dev/null
-"$IPT" -t mangle -F "$CHAIN" 2>/dev/null
-"$IPT" -t mangle -D PREROUTING -i lo -j "$CHAIN" 2>/dev/null
-"$IPT" -t mangle -D PREROUTING ! -i lo -j "$CHAIN" 2>/dev/null
-"$IPT" -t mangle -X "$CHAIN" 2>/dev/null
+if [ -n "$IPT" ]; then
+    "$IPT" -t nat -F "$CHAIN" 2>/dev/null
+    "$IPT" -t nat -D PREROUTING -i lo -j "$CHAIN" 2>/dev/null
+    "$IPT" -t nat -D PREROUTING ! -i lo -j "$CHAIN" 2>/dev/null
+    "$IPT" -t nat -X "$CHAIN" 2>/dev/null
+    "$IPT" -t mangle -F "$CHAIN" 2>/dev/null
+    "$IPT" -t mangle -D PREROUTING -i lo -j "$CHAIN" 2>/dev/null
+    "$IPT" -t mangle -D PREROUTING ! -i lo -j "$CHAIN" 2>/dev/null
+    "$IPT" -t mangle -X "$CHAIN" 2>/dev/null
+fi
 
+[ -n "$IPT" ] || exit 0
 [ -n "$REDIR_PORT" ] || exit 0
 [ -s /tmp/mixomo-redir-rules ] || exit 0
 
 "$IPT" -t nat -N "$CHAIN"
 "$IPT" -t mangle -N "$CHAIN"
 
-LOCAL="127.0.0.0/8"
+LOCAL="127.0.0.0/8 192.168.0.0/16 10.0.0.0/8 172.16.0.0/12 100.64.0.0/10 169.254.0.0/16 224.0.0.0/4 255.255.255.255/32"
 ip -4 route show table main proto kernel scope link 2>/dev/null > /tmp/mixomo-local-routes
 while read -r subnet rest; do
     case "$subnet" in */*) LOCAL="$LOCAL $subnet";; esac
 done < /tmp/mixomo-local-routes
+while read -r excl; do
+    LOCAL="$LOCAL $excl"
+done < /tmp/mixomo-user-excl-u
 for net in $LOCAL; do
     "$IPT" -t nat -A "$CHAIN" -d "$net" -j RETURN
     "$IPT" -t mangle -A "$CHAIN" -d "$net" -j RETURN
@@ -2354,13 +2603,36 @@ EOF
     echo "Создание службы /etc/init.d/mixomo-local-routing"
     cat > /etc/init.d/mixomo-local-routing <<'EOF'
 #!/bin/sh /etc/rc.common
-START=97
+START=99
 STOP=10
 
 start() {
-    [ -x /etc/mixomo/routing/redir ] || return 0
-    [ -s /etc/mixomo/routing/redir-port ] || return 0
-    /etc/mixomo/routing/redir 2>/dev/null
+    if [ -x /etc/mixomo/routing/redir ] && [ -s /etc/mixomo/routing/redir-port ]; then
+        /etc/mixomo/routing/redir 2>/dev/null
+    fi
+
+    local tunsocks_table
+    tunsocks_table="$(uci -q get network.mihomo_routing_table.table)"
+    if [ -n "$tunsocks_table" ]; then
+        local i=0
+        while [ $i -lt 10 ]; do
+            if ip link show Mihomo >/dev/null 2>&1; then
+                break
+            fi
+            sleep 1
+            i=$((i + 1))
+        done
+        
+        if ! ip route show table "$tunsocks_table" 2>/dev/null | grep -Eq '^default[[:space:]].*dev[[:space:]]Mihomo([[:space:]]|$)'; then
+            ip route replace default dev Mihomo table "$tunsocks_table" 2>/dev/null || true
+        fi
+
+        if [ "$(uci -q get network.mihomo_route_router.mark)" = "0x233" ]; then
+            if ! ip rule list 2>/dev/null | grep -Eq "^[[:space:]]*19000:.*fwmark 0x233.*lookup $tunsocks_table([[:space:]]|$)"; then
+                ip rule add priority 19000 fwmark 0x233 lookup "$tunsocks_table" 2>/dev/null || true
+            fi
+        fi
+    fi
 }
 
 stop() {
@@ -2542,11 +2814,11 @@ finalize_install() {
     /etc/init.d/uhttpd restart > /dev/null 2>&1
     /etc/init.d/hev-socks5-tunnel restart > /dev/null 2>&1
     /etc/init.d/mihomo restart > /dev/null 2>&1
+    /etc/init.d/mixomo-local-routing restart > /dev/null 2>&1 || true
 }
 
 main() {
     clear
-    log_done "=== Mixomo OpenWrt $SCRIPT_VERSION от Internet Helper ==="
 
     choose_magitrickle_variant
     echo ""
@@ -2570,10 +2842,9 @@ main() {
     log_done "[5/5] Завершение"
     finalize_install || step_fail
     echo ""
-
-    log_done "Установка Mixomo OpenWrt $SCRIPT_VERSION прошла успешно!"
-    echo ""
     log_done "┌───────────────────────────────────────────────────────────────────────┐"
+    log_done "│ Установка Mixomo OpenWrt $SCRIPT_VERSION прошла успешно!                 │"
+    log_done "├───────────────────────────────────────────────────────────────────────┤"
     log_done "│ 1. Перезагрузите страницу роутера, далее перейдите в...               │"
     log_done "├───────────────────────────────────────────────────────────────────────┤"
     log_done "│ 2. Службы или Services → Mihomo → Настройте конфигурацию прокси       │"
