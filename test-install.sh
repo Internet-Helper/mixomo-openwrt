@@ -1004,6 +1004,13 @@ emit_status() {
     json_close_array; json_dump
 }
 
+finalize_changes() {
+    if [ -x /etc/init.d/magitrickle ] && /etc/init.d/magitrickle running >/dev/null 2>&1; then
+        (/etc/init.d/magitrickle restart >/dev/null 2>&1) &
+    fi
+    emit_status
+}
+
 emit_clients() {
     json_init; json_add_boolean ok 1; json_add_array clients
     router_ips=" $(ip -4 addr show 2>/dev/null | awk '/inet / {sub(/\/.*/, "", $2); printf "%s ", $2}')"
@@ -1056,7 +1063,7 @@ call)
         uci -q delete "network.${PREFIX}excl_$id.enabled"
         uci commit network
         rebuild_mixomo_redir
-        emit_status ;;
+        finalize_changes ;;
     exclude_delete)
         json_get_var id id
         printf '%s' "$id" | grep -Eq '^[0-9_]+$' || fail "Некорректный идентификатор исключения"
@@ -1064,7 +1071,7 @@ call)
         uci -q delete "network.${PREFIX}excl_$id"
         uci commit network
         rebuild_mixomo_redir
-        emit_status ;;
+        finalize_changes ;;
     exclude_update)
         json_get_var id id; json_get_var dest dest; json_get_var label label
         printf '%s' "$id" | grep -Eq '^[0-9_]+$' || fail "Некорректный идентификатор исключения"
@@ -1078,7 +1085,7 @@ call)
         uci -q set "network.${PREFIX}excl_$id.name=${label:-$dest}"
         uci commit network
         rebuild_mixomo_redir
-        emit_status ;;
+        finalize_changes ;;
     exclude_set_enabled)
         json_get_var id id; json_get_var enabled enabled
         printf '%s' "$id" | grep -Eq '^[0-9_]+$' || fail "Некорректный идентификатор исключения"
@@ -1092,7 +1099,7 @@ call)
         fi
         uci commit network
         rebuild_mixomo_redir
-        emit_status ;;
+        finalize_changes ;;
     reorder)
         json_get_var type type; json_get_var order order
         case "$type" in rule|exclude) :;; *) fail "Неизвестный тип правила" ;; esac
@@ -1108,7 +1115,7 @@ call)
         done
         IFS="$oldifs"
         network_sync
-        emit_status ;;
+        finalize_changes ;;
     add)
         json_get_var source source; json_get_var label label; json_get_var backend backend
         valid_ipv4_cidr "$source" || fail "Введите корректный IPv4-адрес или CIDR"
@@ -1143,7 +1150,7 @@ call)
             apply_network "$table" || fail "Не удалось создать маршрут по умолчанию через интерфейс Mihomo"
             rebuild_mixomo_redir
         fi
-        emit_status ;;
+        finalize_changes ;;
     update)
         json_get_var id id; json_get_var source source; json_get_var label label; json_get_var backend backend
         printf '%s' "$id" | grep -Eq '^[0-9_]+$' || fail "Некорректный идентификатор правила"
@@ -1172,7 +1179,7 @@ call)
             apply_network "$table" || fail "Не удалось применить сетевые настройки"
             rebuild_mixomo_redir
         fi
-        emit_status ;;
+        finalize_changes ;;
     delete)
         json_get_var id id
         printf '%s' "$id" | grep -Eq '^[0-9_]+$' || fail "Некорректный идентификатор правила"
@@ -1187,7 +1194,7 @@ call)
             /etc/init.d/network reload 2>/dev/null
         fi
         rebuild_mixomo_redir
-        emit_status ;;
+        finalize_changes ;;
     set_enabled)
         json_get_var id id; json_get_var enabled enabled
         printf '%s' "$id" | grep -Eq '^[0-9_]+$' || fail "Некорректный идентификатор правила"
@@ -1221,7 +1228,7 @@ call)
                 network_sync
             fi
         fi
-        emit_status ;;
+        finalize_changes ;;
     set_router)
         json_get_var enabled enabled
         table="$(ensure_base)" || fail "Не удалось подобрать свободную таблицу маршрутизации"
@@ -1239,7 +1246,7 @@ call)
             cleanup_if_unused
             [ -n "$(uci -q get network.$TABLE_SECTION.table)" ] && apply_network "$table" || true
         fi
-        emit_status ;;
+        finalize_changes ;;
     *) fail "Неизвестный метод";;
     esac ;;
 esac
@@ -2633,6 +2640,11 @@ start() {
             fi
         fi
     fi
+
+    if [ -x /etc/init.d/magitrickle ] && /etc/init.d/magitrickle running >/dev/null 2>&1; then
+        (/etc/init.d/magitrickle restart >/dev/null 2>&1) &
+    fi
+
 }
 
 stop() {
