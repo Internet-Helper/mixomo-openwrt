@@ -1,6 +1,6 @@
 #!/bin/sh
 
-SCRIPT_VERSION="v0.2.4-alpha"
+SCRIPT_VERSION="v0.2.5-alpha"
 
 MIHOMO_INSTALL_DIR="/etc/mihomo"
 MIHOMO_BIN="/usr/bin/mihomo"
@@ -31,7 +31,7 @@ kill_stale_pkg() {
     local name="$1"
     for pid in $(ps 2>/dev/null | grep -v grep | grep -E "[ /]${name}([ /]|$)" | awk '{print $1}'); do
         [ "$pid" = "$$" ] && continue
-        echo "Принудительно завершаю зависший процесс: $(ps -o args= -p "$pid" 2>/dev/null || echo pid=$pid)"
+        echo "$(T "Принудительно завершаю зависший процесс: " "Force-killing stale process: ")$(ps -o args= -p "$pid" 2>/dev/null || echo pid=$pid)"
         kill -15 "$pid" 2>/dev/null
         sleep 2
         kill -9 "$pid" 2>/dev/null || true
@@ -62,7 +62,40 @@ ask_menu() {
             2) echo "2"; return ;;
             q) echo "q"; return ;;
             '') echo "$def"; return ;;
-            *) log_warn "Некорректный ответ: \"$ans\". Введите 1, 2, q или Enter." ;;
+            *) log_warn "$(T "Некорректный ответ: \"$ans\". Введите 1, 2, q или Enter." "Invalid answer: \"$ans\". Enter 1, 2, q or press Enter.")" ;;
+        esac
+    done
+}
+
+LANG_MODE="ru"
+
+T() {
+    if [ "$LANG_MODE" = "en" ]; then
+        printf '%s' "$2"
+    else
+        printf '%s' "$1"
+    fi
+}
+
+choose_language() {
+    local choice
+    while :; do
+        log_done "=== Mixomo OpenWrt $SCRIPT_VERSION ==="
+        echo ""
+        echo "1) Русский (Enter для продолжения)"
+        echo "2) English"
+        echo "0) Выход | Exit"
+        echo ""
+        printf "Ваш выбор | Your choice: "
+        read choice
+        if [ -z "$choice" ]; then
+            choice="1"
+        fi
+        case "$choice" in
+            0) echo ""; exit 0 ;;
+            1) LANG_MODE="ru"; break ;;
+            2) LANG_MODE="en"; break ;;
+            *) echo ""; clear; continue ;;
         esac
     done
 }
@@ -141,38 +174,37 @@ choose_magitrickle_variant() {
     if [ -n "$MAGI_OVERRIDE" ]; then
         MAGI_VARIANT="$MAGI_OVERRIDE"
         save_magitrickle_variant "$MAGI_VARIANT"
-        log_done "Выбран вариант MagiTrickle: $MAGI_VARIANT"
+        log_done "$(T "Выбран вариант MagiTrickle: $MAGI_VARIANT" "Selected MagiTrickle variant: $MAGI_VARIANT")"
         return
     fi
     installed="$(detect_magitrickle_variant)"
 
     if [ -d "/etc/magitrickle" ] || [ -f "/etc/init.d/magitrickle" ]; then
         if [ "$installed" = "mod" ]; then
-            inst_label="MagiTrickle Mod от badigit"
-            opt1="Обновить Mod от badigit (можно нажать Enter для продолжения)"
-            opt2="Установить оригинальную версию MagiTrickle"
+            inst_label="$(T "MagiTrickle Mod от badigit" "MagiTrickle Mod by badigit")"
+            opt1="$(T "Обновить Mod от badigit (можно нажать Enter для продолжения)" "Update Mod by badigit (press Enter to continue)")"
+            opt2="$(T "Установить оригинальную версию MagiTrickle" "Install the original MagiTrickle")"
         else
-            inst_label="оригинальный MagiTrickle"
-            opt1="Обновить оригинальный MagiTrickle (можно нажать Enter для продолжения)"
-            opt2="Установить MagiTrickle Mod от badigit"
+            inst_label="$(T "оригинальный MagiTrickle" "original MagiTrickle")"
+            opt1="$(T "Обновить оригинальный MagiTrickle (можно нажать Enter для продолжения)" "Update the original MagiTrickle (press Enter to continue)")"
+            opt2="$(T "Установить MagiTrickle Mod от badigit" "Install MagiTrickle Mod by badigit")"
         fi
     else
         installed=""
-        inst_label="не установлен"
-        opt1="Установить оригинальный MagiTrickle (можно нажать Enter для продолжения)"
-        opt2="Установить MagiTrickle Mod от badigit"
+        inst_label="$(T "не установлен" "not installed")"
+        opt1="$(T "Установить оригинальный MagiTrickle (можно нажать Enter для продолжения)" "Install the original MagiTrickle (press Enter to continue)")"
+        opt2="$(T "Установить MagiTrickle Mod от badigit" "Install MagiTrickle Mod by badigit")"
     fi
 
     while true; do
-        log_done "=== Mixomo OpenWrt $SCRIPT_VERSION от Internet Helper ==="
-        echo ""
-        log_done "Сейчас установлен $inst_label"
+        clear
+        log_done "$(T "Сейчас установлен $inst_label" "Currently installed: $inst_label")"
         echo ""
         echo "1) $opt1"
         echo "2) $opt2"
-        echo "0) Выход"
+        echo "$(T "0) Выход" "0) Exit")"
         echo ""
-        printf "Ваш выбор: "
+        printf "$(T "Ваш выбор: " "Your choice: ")"
         read choice
 
         if [ -z "$choice" ]; then
@@ -235,7 +267,7 @@ ensure_mihomo_redir_port() {
         port=$((port + 1))
     done
     if [ "$port" -gt 65535 ]; then
-        log_error "Не удалось найти свободный redir-port для Mihomo"
+        log_error "$(T "Не удалось найти свободный redir-port для Mihomo" "Could not find a free redir-port for Mihomo")"
         return 1
     fi
     if grep -qE '^[[:space:]]*mixed-port:' "$CONFIG_FILE"; then
@@ -300,7 +332,7 @@ detect_mihomo_arch() {
             ;;
         riscv64) echo "riscv64" ;;
         *)
-            log_error "Архитектура $arch не распознана"
+            log_error "$(T "Архитектура $arch не распознана" "Architecture $arch is not recognized")"
             exit 1
             ;;
     esac
@@ -310,19 +342,19 @@ verify_required_deps() {
     local missing=0
 
     if ! command -v curl >/dev/null 2>&1; then
-        log_error "Пакет curl не найден!"
+        log_error "$(T "Пакет curl не найден!" "Package curl not found!")"
         missing=1
     fi
 
     if [ ! -f /etc/ssl/certs/ca-certificates.crt ] && [ ! -f /etc/ssl/certs/ca-bundle.crt ]; then
-        log_error "Пакет ca-certificates не найден!"
+        log_error "$(T "Пакет ca-certificates не найден!" "Package ca-certificates not found!")"
         missing=1
     fi
 
     if [ ! -c /dev/net/tun ]; then
         modprobe tun >/dev/null 2>&1 || true
         if [ ! -c /dev/net/tun ]; then
-            log_error "В ядре нет поддержки TUN (/dev/net/tun)!"
+            log_error "$(T "В ядре нет поддержки TUN (/dev/net/tun)!" "Kernel has no TUN support (/dev/net/tun)!")"
             missing=1
         fi
     fi
@@ -335,7 +367,7 @@ verify_required_deps() {
 }
 
 install_deps() {
-    log_online "Установка зависимостей"
+    log_online "$(T "Установка зависимостей" "Installing dependencies")"
 
     local PKG_LOG="/tmp/install_deps.log"
 
@@ -345,19 +377,19 @@ install_deps() {
         AVAIL_PKG=$(grep -o '[0-9]* distinct packages available' "$PKG_LOG" | grep -o '^[0-9]*')
         if [ -z "$AVAIL_PKG" ] || [ "$AVAIL_PKG" -eq 0 ]; then
             if grep -q "Resource temporarily unavailable" "$PKG_LOG"; then
-                log_warn "apk заблокирован. Автоматически завершаю зависший процесс apk и повторяю..."
+                log_warn "$(T "apk заблокирован. Автоматически завершаю зависший процесс apk и повторяю..." "apk is locked. Automatically killing the stale apk process and retrying...")"
                 kill_stale_pkg apk
                 sleep 2
                 apk update > "$PKG_LOG" 2>&1 || true
                 AVAIL_PKG=$(grep -o '[0-9]* distinct packages available' "$PKG_LOG" | grep -o '^[0-9]*')
             else
-                log_warn "apk update не вернул доступных пакетов, повторная попытка..."
+                log_warn "$(T "apk update не вернул доступных пакетов, повторная попытка..." "apk update returned no available packages, retrying...")"
                 sleep 3
                 apk update > "$PKG_LOG" 2>&1 || true
                 AVAIL_PKG=$(grep -o '[0-9]* distinct packages available' "$PKG_LOG" | grep -o '^[0-9]*')
             fi
             if [ -z "$AVAIL_PKG" ] || [ "$AVAIL_PKG" -eq 0 ]; then
-                log_error "apk update завершился без доступных пакетов:"
+                log_error "$(T "apk update завершился без доступных пакетов:" "apk update finished with no available packages:")"
                 cat "$PKG_LOG"
                 rm -f "$PKG_LOG"
                 return 1
@@ -369,17 +401,17 @@ install_deps() {
     else
         if ! opkg update > "$PKG_LOG" 2>&1; then
             if grep -qiE "Resource temporarily unavailable|lock" "$PKG_LOG"; then
-                log_warn "opkg заблокирован. Автоматически завершаю зависший процесс opkg и повторяю..."
+                log_warn "$(T "opkg заблокирован. Автоматически завершаю зависший процесс opkg и повторяю..." "opkg is locked. Automatically killing the stale opkg process and retrying...")"
                 kill_stale_pkg opkg
                 sleep 2
                 if ! opkg update > "$PKG_LOG" 2>&1; then
-                    log_error "Ошибка обновления списков пакетов (opkg update):"
+                    log_error "$(T "Ошибка обновления списков пакетов (opkg update):" "Error updating package lists (opkg update):")"
                     cat "$PKG_LOG"
                     rm -f "$PKG_LOG"
                     return 1
                 fi
             else
-                log_error "Ошибка обновления списков пакетов (opkg update):"
+                log_error "$(T "Ошибка обновления списков пакетов (opkg update):" "Error updating package lists (opkg update):")"
                 cat "$PKG_LOG"
                 rm -f "$PKG_LOG"
                 return 1
@@ -393,7 +425,7 @@ install_deps() {
     rm -f "$PKG_LOG"
 
     if ! verify_required_deps; then
-        log_error "Не удалось подтвердить наличие обязательных компонентов!"
+        log_error "$(T "Не удалось подтвердить наличие обязательных компонентов!" "Could not confirm the presence of required components!")"
         return 1
     fi
 }
@@ -405,7 +437,7 @@ install_mihomo() {
     local AVAIL_TMP_KB
     AVAIL_TMP_KB=$(df -k /tmp | awk 'NR==2 {print $4}')
     if [ "$AVAIL_TMP_KB" -lt "$REQ_TMP_KB" ]; then
-        log_error "Недостаточно места в /tmp: доступно $((AVAIL_TMP_KB/1024)) MB, требуется $((REQ_TMP_KB/1024)) MB"
+        log_error "$(T "Недостаточно места в /tmp: доступно $((AVAIL_TMP_KB/1024)) MB, требуется $((REQ_TMP_KB/1024)) MB" "Not enough space in /tmp: $((AVAIL_TMP_KB/1024)) MB available, $((REQ_TMP_KB/1024)) MB required")"
         return 1
     fi
 
@@ -415,27 +447,27 @@ install_mihomo() {
     AVAIL_ROOT_KB=$(df -k "$INSTALL_DIR_PATH" | awk 'NR==2 {print $4}')
 
     if [ "$AVAIL_ROOT_KB" -lt "$REQ_ROOT_KB" ]; then
-        log_error "Недостаточно места на диске: доступно $((AVAIL_ROOT_KB/1024)) MB, требуется $((REQ_ROOT_KB/1024)) MB"
+        log_error "$(T "Недостаточно места на диске: доступно $((AVAIL_ROOT_KB/1024)) MB, требуется $((REQ_ROOT_KB/1024)) MB" "Not enough disk space: $((AVAIL_ROOT_KB/1024)) MB available, $((REQ_ROOT_KB/1024)) MB required")"
         if [ -f "$MIHOMO_BIN" ]; then
-            log_warn "Найдена установленная версия: $MIHOMO_BIN"
-            printf "Удалить старую версию для освобождения места? [y/+/д или n/-/н]: "
+            log_warn "$(T "Найдена установленная версия: $MIHOMO_BIN" "Found an installed version: $MIHOMO_BIN")"
+            printf "$(T "Удалить старую версию для освобождения места? [y/+/д или n/-/н]: " "Delete the old version to free up space? [y/+ or n/-]: ")"
             read_user_input response
             case "$response" in
                 [yY+дД]*)
                     rm -f "$MIHOMO_BIN"
                     AVAIL_ROOT_KB=$(df -k "$INSTALL_DIR_PATH" | awk 'NR==2 {print $4}')
                     if [ "$AVAIL_ROOT_KB" -lt "$REQ_ROOT_KB" ]; then
-                        log_error "Места всё равно недостаточно после удаления."
+                        log_error "$(T "Места всё равно недостаточно после удаления." "Still not enough space after deletion.")"
                         return 1
                     fi
                     ;;
                 *)
-                    log_warn "Установка отменена."
+                    log_warn "$(T "Установка отменена." "Installation cancelled.")"
                     return 1
                     ;;
             esac
         else
-            log_warn "Старая версия не найдена. Удалите лишние пакеты вручную."
+            log_warn "$(T "Старая версия не найдена. Удалите лишние пакеты вручную." "No old version found. Remove unneeded packages manually.")"
             return 1
         fi
     fi
@@ -448,7 +480,7 @@ install_mihomo() {
     if [ -z "${MIHOMO_ARCH+x}" ]; then
         MIHOMO_ARCH=$(detect_mihomo_arch)
     fi
-    echo "Архитектура системы: $(uname -m) -> выбран файл: $MIHOMO_ARCH"
+    echo "$(T "Архитектура системы: $(uname -m) -> выбран файл: $MIHOMO_ARCH" "System architecture: $(uname -m) -> selected file: $MIHOMO_ARCH")"
 
     mkdir -p "$MIHOMO_INSTALL_DIR" \
              /etc/mihomo/proxy-providers \
@@ -459,14 +491,14 @@ install_mihomo() {
 
     echo "$MIHOMO_ARCH" > /etc/mihomo/.arch
 
-    echo "Получение номера последней версии"
+    echo "$(T "Получение номера последней версии" "Fetching the latest version number")"
     local RELEASE_TAG
     RELEASE_TAG=$(curl -Ls -o /dev/null -w '%{url_effective}' https://github.com/MetaCubeX/mihomo/releases/latest | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
     if [ -z "$RELEASE_TAG" ]; then
-        log_error "Не удалось определить версию. Проверьте доступ к GitHub."
+        log_error "$(T "Не удалось определить версию. Проверьте доступ к GitHub." "Could not determine the version. Check GitHub access.")"
         return 1
     fi
-    echo "Последняя версия: $RELEASE_TAG"
+    echo "$(T "Последняя версия: $RELEASE_TAG" "Latest version: $RELEASE_TAG")"
 
     local NEED_UPDATE=1 NOW_VER=""
     if [ -f "$MIHOMO_VERSION_FILE" ]; then
@@ -474,7 +506,7 @@ install_mihomo() {
     fi
     if [ -x "$MIHOMO_BIN" ] && [ -n "$NOW_VER" ] && [ "$NOW_VER" = "$RELEASE_TAG" ] && "$MIHOMO_BIN" -v >/dev/null 2>&1; then
         NEED_UPDATE=0
-        log_online "Актуальный Mihomo $RELEASE_TAG уже установлен"
+        log_online "$(T "Актуальный Mihomo $RELEASE_TAG уже установлен" "Mihomo $RELEASE_TAG is already up to date")"
         mkdir -p "$MIXOMO_VERSIONS_DIR"
         echo "$RELEASE_TAG" > "$MIHOMO_VERSION_FILE"
     fi
@@ -486,34 +518,34 @@ install_mihomo() {
     local NEW_BIN="/tmp/mihomo.new"
     local BACKUP_BIN="/tmp/mihomo.previous"
 
-    log_online "Скачивание архива $FILENAME"
+    log_online "$(T "Скачивание архива " "Downloading archive ")$FILENAME"
     log_online "$DOWNLOAD_URL"
     if ! curl -Lf --retry 3 --retry-delay 2 "$DOWNLOAD_URL" -o "$TMP_FILE" >/dev/null 2>&1; then
-        log_error "Ошибка скачивания! Проверьте, существует ли файл $FILENAME в релизах."
+        log_error "$(T "Ошибка скачивания! Проверьте, существует ли файл $FILENAME в релизах." "Download error! Check that $FILENAME exists in the releases.")"
         return 1
     fi
 
-    echo "Распаковка архива во временный файл"
+    echo "$(T "Распаковка архива во временный файл" "Extracting archive to a temporary file")"
     rm -f "$NEW_BIN"
     if ! gunzip -c "$TMP_FILE" > "$NEW_BIN" 2>/dev/null || [ ! -s "$NEW_BIN" ]; then
-        log_error "Ошибка распаковки архива"
+        log_error "$(T "Ошибка распаковки архива" "Archive extraction error")"
         rm -f "$TMP_FILE" "$NEW_BIN"
         return 1
     fi
     chmod +x "$NEW_BIN"
     rm -f "$TMP_FILE"
 
-    echo "Проверка ядра Mihomo"
+    echo "$(T "Проверка ядра Mihomo" "Checking the Mihomo core")"
     if ! "$NEW_BIN" -v >/dev/null 2>&1; then
-        log_error "Ядро не запускается! Возможно, выбрана неверная архитектура."
+        log_error "$(T "Ядро не запускается! Возможно, выбрана неверная архитектура." "The core does not run! Possibly an incorrect architecture was selected.")"
         rm -f "$NEW_BIN"
         return 1
     fi
 
     if [ "$MIHOMO_WAS_RUNNING" -eq 1 ]; then
-        echo "Остановка текущего Mihomo для замены ядра"
+        echo "$(T "Остановка текущего Mihomo для замены ядра" "Stopping the current Mihomo to replace the core")"
         /etc/init.d/mihomo stop || {
-            log_error "Не удалось остановить текущий Mihomo"
+            log_error "$(T "Не удалось остановить текущий Mihomo" "Could not stop the current Mihomo")"
             rm -f "$NEW_BIN"
             return 1
         }
@@ -521,13 +553,13 @@ install_mihomo() {
 
     rm -f "$BACKUP_BIN"
     if [ -f "$MIHOMO_BIN" ] && ! cp "$MIHOMO_BIN" "$BACKUP_BIN"; then
-        log_error "Не удалось создать резервную копию текущего ядра"
+        log_error "$(T "Не удалось создать резервную копию текущего ядра" "Could not back up the current core")"
         [ "$MIHOMO_WAS_RUNNING" -eq 1 ] && /etc/init.d/mihomo start 2>/dev/null || true
         rm -f "$NEW_BIN"
         return 1
     fi
     if ! mv -f "$NEW_BIN" "$MIHOMO_BIN" || ! chmod +x "$MIHOMO_BIN"; then
-        log_error "Не удалось установить новое ядро"
+        log_error "$(T "Не удалось установить новое ядро" "Could not install the new core")"
         [ -f "$BACKUP_BIN" ] && cp "$BACKUP_BIN" "$MIHOMO_BIN"
         [ "$MIHOMO_WAS_RUNNING" -eq 1 ] && /etc/init.d/mihomo start 2>/dev/null || true
         rm -f "$NEW_BIN" "$BACKUP_BIN"
@@ -543,16 +575,16 @@ install_mihomo() {
 
     if [ -f "$CONFIG_FILE" ]; then
         if grep -q "mixed-port: 7890" "$CONFIG_FILE"; then
-            echo "Использование существующей конфигурации"
+            echo "$(T "Использование существующей конфигурации" "Using the existing configuration")"
             WRITE_NEW_CONFIG=0
         else
-            log_warn "Конфигурация найдена, но без 'mixed-port: 7890'. Создание резервной копии"
+            log_warn "$(T "Конфигурация найдена, но без 'mixed-port: 7890'. Создание резервной копии" "Configuration found but without 'mixed-port: 7890'. Creating a backup")"
             cp "$CONFIG_FILE" "${CONFIG_FILE}.bak"
         fi
     fi
 
     if [ "$WRITE_NEW_CONFIG" -eq 1 ]; then
-        echo "Создание конфигурации /etc/mihomo/config.yaml..."
+        echo "$(T "Создание конфигурации /etc/mihomo/config.yaml..." "Creating /etc/mihomo/config.yaml...")"
         cat > "$CONFIG_FILE" <<'EOF'
 mode: rule
 ipv6: false
@@ -629,9 +661,9 @@ rules:
 EOF
     fi
 
-    ensure_mihomo_redir_port >/dev/null || log_warn "Не удалось настроить redir-port Mihomo (необходим для мода от badigit)"
+    ensure_mihomo_redir_port >/dev/null || log_warn "$(T "Не удалось настроить redir-port Mihomo (необходим для мода от badigit)" "Could not configure the Mihomo redir-port (required for the badigit mod)")"
 
-    echo "Создание службы /etc/init.d/mihomo"
+    echo "$(T "Создание службы /etc/init.d/mihomo" "Creating the /etc/init.d/mihomo service")"
     cat > /etc/init.d/mihomo <<'EOF'
 #!/bin/sh /etc/rc.common
 START=99
@@ -658,13 +690,13 @@ service_triggers() {
 }
 EOF
     chmod +x /etc/init.d/mihomo
-    /etc/init.d/mihomo enable || log_warn "Не удалось включить автозапуск Mihomo"
+    /etc/init.d/mihomo enable || log_warn "$(T "Не удалось включить автозапуск Mihomo" "Could not enable Mihomo autostart")"
     if [ "$MIHOMO_WAS_RUNNING" -eq 1 ]; then
-        echo "Запуск Mihomo"
-        /etc/init.d/mihomo start || log_warn "Не удалось запустить Mihomo. Повторная попытка будет в конце установки"
+        echo "$(T "Запуск Mihomo" "Starting Mihomo")"
+        /etc/init.d/mihomo start || log_warn "$(T "Не удалось запустить Mihomo. Повторная попытка будет в конце установки" "Could not start Mihomo. It will be retried at the end of installation")"
     fi
 
-    echo "Настройка страницы LuCI для управления Mihomo"
+    echo "$(T "Настройка страницы LuCI для управления Mihomo" "Setting up the LuCI page to manage Mihomo")"
     mkdir -p /usr/share/luci/menu.d
     cat > /usr/share/luci/menu.d/luci-app-mihomo.json <<'EOF'
 {
@@ -691,7 +723,8 @@ EOF
             "ubus": {
                 "file": ["read", "list"],
                 "service": ["list"],
-                "mihomo-routing": ["status", "clients"]
+                "mihomo-routing": ["status", "clients"],
+                "mihomo-dns": ["status"]
             }
         },
         "write": {
@@ -713,7 +746,8 @@ EOF
             "ubus": {
                 "file": ["write"],
                 "service": ["list"],
-                "mihomo-routing": ["add", "update", "delete", "set_enabled", "set_router", "exclude_add", "exclude_delete", "exclude_update", "exclude_set_enabled", "reorder", "reload"]
+                "mihomo-routing": ["add", "update", "delete", "set_enabled", "set_router", "set_udp443", "exclude_add", "exclude_delete", "exclude_update", "exclude_set_enabled", "reorder", "reload"],
+                "mihomo-dns": ["apply", "clear", "add_preset", "remove_preset"]
             }
         }
     }
@@ -975,8 +1009,10 @@ emit_status() {
     variant="$(get_backend_default)"
     redir_available=0
     [ "$variant" = "redir-tproxy" ] && redir_available=1
+    udp443=0
+    [ "$(uci -q get firewall.Block_443_UDP)" = "rule" ] && [ "$(uci -q get firewall.Block_443_UDP.disabled)" != "1" ] && udp443=1
     json_init; json_add_boolean ok 1; json_add_int table "${table:-0}"; json_add_boolean router "$router"
-    json_add_string variant "$variant"; json_add_boolean redirAvailable "$redir_available"
+    json_add_string variant "$variant"; json_add_boolean redirAvailable "$redir_available"; json_add_boolean udp443 "$udp443"
     json_add_array rules
     for section in $(list_client_sections); do
         json_add_object
@@ -1041,7 +1077,7 @@ emit_clients() {
 }
 
 case "$1" in
-list) echo '{"status":{},"clients":{},"add":{"source":"String","label":"String","backend":"String"},"update":{"id":"String","source":"String","label":"String","backend":"String"},"delete":{"id":"String"},"set_enabled":{"id":"String","enabled":true},"set_router":{"enabled":true},"exclude_add":{"dest":"String","label":"String"},"exclude_delete":{"id":"String"},"exclude_update":{"id":"String","dest":"String","label":"String"},"exclude_set_enabled":{"id":"String","enabled":true},"reorder":{"type":"String","order":"String"}}' ;;
+list) echo '{"status":{},"clients":{},"add":{"source":"String","label":"String","backend":"String"},"update":{"id":"String","source":"String","label":"String","backend":"String"},"delete":{"id":"String"},"set_enabled":{"id":"String","enabled":true},"set_router":{"enabled":true},"set_udp443":{"enabled":true},"exclude_add":{"dest":"String","label":"String"},"exclude_delete":{"id":"String"},"exclude_update":{"id":"String","dest":"String","label":"String"},"exclude_set_enabled":{"id":"String","enabled":true},"reorder":{"type":"String","order":"String"}}' ;;
 call)
     json_load "$(cat)"
     case "$2" in
@@ -1247,15 +1283,187 @@ call)
             [ -n "$(uci -q get network.$TABLE_SECTION.table)" ] && apply_network "$table" || true
         fi
         finalize_changes ;;
+    set_udp443)
+        json_get_var enabled enabled
+        case "$enabled" in 1|true) enabled=1;; *) enabled=0;; esac
+        if [ "$enabled" = 1 ]; then
+            uci -q delete firewall.Block_443_UDP
+            uci -q set firewall.Block_443_UDP=rule
+            uci -q set firewall.Block_443_UDP.name='Block-443-UDP'
+            uci -q set firewall.Block_443_UDP.src='wan'
+            uci -q set firewall.Block_443_UDP.dest='*'
+            uci -q set firewall.Block_443_UDP.family='any'
+            uci -q set firewall.Block_443_UDP.proto='udp'
+            uci -q set firewall.Block_443_UDP.dest_port='443'
+            uci -q set firewall.Block_443_UDP.target='REJECT'
+        else
+            uci -q delete firewall.Block_443_UDP
+        fi
+        uci commit firewall
+        /etc/init.d/firewall reload
+        finalize_changes ;;
     *) fail "Неизвестный метод";;
     esac ;;
 esac
 EOF
     chmod 755 /usr/libexec/rpcd/mihomo-routing
+
+    echo "$(T "Создание RPC-бэкенда mihomo-dns" "Creating the mihomo-dns RPC backend")"
+    mkdir -p /usr/libexec/rpcd /etc/mixomo/dns
+    cat > /usr/libexec/rpcd/mihomo-dns <<'EOF'
+#!/bin/sh
+. /usr/share/libubox/jshn.sh
+
+DNS_CONF="/etc/dnsmasq.conf"
+DNS_MARK_START="# Rules from Mixomo"
+DNS_MARK_END="# End rules from Mixomo"
+DNS_CUSTOM_FILE="/etc/mixomo/dns/custom"
+
+fail() { json_init; json_add_boolean ok 0; json_add_string error "$1"; json_dump; exit 0; }
+
+extract_dns_block() {
+    [ -f "$DNS_CONF" ] || return 0
+    awk -v s="$DNS_MARK_START" -v e="$DNS_MARK_END" '
+        $0 == s { f=1; next }
+        $0 == e { f=0; next }
+        f { print }
+    ' "$DNS_CONF"
+}
+
+strip_trailing_blanks() {
+    awk '{ a[n++]=$0 } END { m=n; while (m>0 && a[m-1]=="") m--; for (i=0;i<m;i++) print a[i] }'
+}
+
+write_dns_block() {
+    local block="$1" clean="$2" tmp
+    block="$(printf '%s\n' "$block" | strip_trailing_blanks)"
+    tmp=$(mktemp) || return 1
+    if [ "$clean" = "1" ]; then
+        : > "$tmp"
+    elif [ -f "$DNS_CONF" ]; then
+        sed -e "/^${DNS_MARK_START}$/,/^${DNS_MARK_END}$/d" "$DNS_CONF" | strip_trailing_blanks > "$tmp"
+    else
+        : > "$tmp"
+    fi
+    [ -s "$tmp" ] && printf '\n' >> "$tmp"
+    printf '%s\n%s\n%s\n' "$DNS_MARK_START" "$block" "$DNS_MARK_END" >> "$tmp"
+    mv "$tmp" "$DNS_CONF"
+    return 0
+}
+
+remove_dns_block() {
+    [ -f "$DNS_CONF" ] || return 0
+    local tmp
+    tmp=$(mktemp) || return 1
+    sed -e "/^${DNS_MARK_START}$/,/^${DNS_MARK_END}$/d" "$DNS_CONF" | strip_trailing_blanks > "$tmp"
+    mv "$tmp" "$DNS_CONF"
+    return 0
+}
+
+restart_dnsmasq() {
+    service dnsmasq restart >/dev/null 2>&1 || /etc/init.d/dnsmasq restart >/dev/null 2>&1
+}
+
+emit_status() {
+    local block="" has_markers=0 no_resolv=0 strict_order=0 all_servers=0 tmp
+    [ -f "$DNS_CONF" ] && grep -q "^${DNS_MARK_START}$" "$DNS_CONF" && has_markers=1
+    block="$(extract_dns_block)"
+    tmp=$(mktemp) || tmp=""
+    if [ -n "$tmp" ]; then
+        extract_dns_block > "$tmp"
+        while IFS= read -r line; do
+            case "$line" in
+                no-resolv) no_resolv=1 ;;
+                strict-order) strict_order=1 ;;
+                all-servers) all_servers=1 ;;
+            esac
+        done < "$tmp"
+    fi
+    json_init
+    json_add_boolean ok 1
+    json_add_string block "$block"
+    json_add_boolean hasMarkers "$has_markers"
+    json_add_boolean noResolv "$no_resolv"
+    json_add_boolean strictOrder "$strict_order"
+    json_add_boolean allServers "$all_servers"
+    json_add_array servers
+    if [ -n "$tmp" ]; then
+        while IFS= read -r line; do
+            case "$line" in
+                server=*) json_add_string "" "${line#server=}" ;;
+            esac
+        done < "$tmp"
+    fi
+    json_close_array
+    [ -n "$tmp" ] && rm -f "$tmp"
+    json_add_array custom
+    if [ -f "$DNS_CUSTOM_FILE" ]; then
+        while IFS="$(printf '\t')" read -r name value; do
+            [ -n "$name" ] || continue
+            json_add_object
+            json_add_string name "$name"
+            json_add_string value "$value"
+            json_close_object
+        done < "$DNS_CUSTOM_FILE"
+    fi
+    json_close_array
+    json_dump
+}
+
+case "$1" in
+list) echo '{"status":{},"apply":{"block":"String","clean":false},"clear":{},"add_preset":{"name":"String","value":"String"},"remove_preset":{"name":"String"}}' ;;
+call)
+    json_load "$(cat)"
+    case "$2" in
+    status) emit_status ;;
+    apply)
+        json_get_var block block; json_get_var clean clean
+        case "$clean" in 1|true) clean=1;; *) clean=0;; esac
+        write_dns_block "$block" "$clean" || fail "Не удалось записать /etc/dnsmasq.conf"
+        restart_dnsmasq
+        json_init; json_add_boolean ok 1; json_dump ;;
+    clear)
+        remove_dns_block || fail "Не удалось изменить /etc/dnsmasq.conf"
+        restart_dnsmasq
+        json_init; json_add_boolean ok 1; json_dump ;;
+    add_preset)
+        json_get_var name name; json_get_var value value
+        name="$(printf '%s' "$name" | tr -d ' \r\n')"
+        value="$(printf '%s' "$value" | tr -d ' \r\n')"
+        [ -n "$name" ] || fail "Пустое название"
+        [ -n "$value" ] || fail "Пустое значение DNS"
+        [ "${#name}" -le 64 ] || fail "Название не длиннее 64 символов"
+        printf '%s' "$name" | grep -q '[[:cntrl:]]' && fail "Недопустимое название"
+        case "$value" in *[!A-Za-z0-9.#:\-@]*) fail "Недопустимый DNS: $value" ;; esac
+        ip_part="${value%%#*}"
+        oldifs="$IFS"; IFS=.; set -- $ip_part; IFS="$oldifs"
+        [ "$#" -eq 4 ] || fail "Укажите IPv4-адрес DNS"
+        for oct in "$@"; do
+            case "$oct" in ''|*[!0-9]*) fail "Недопустимый DNS: $value" ;; esac
+            [ "${#oct}" -le 3 ] || fail "Октет IP не длиннее 3 цифр: $oct"
+        done
+        mkdir -p "$(dirname "$DNS_CUSTOM_FILE")"
+        [ -f "$DNS_CUSTOM_FILE" ] || : > "$DNS_CUSTOM_FILE"
+        grep -Fq "$(printf '%s\t' "$name")" "$DNS_CUSTOM_FILE" && fail "Такой DNS уже добавлен"
+        printf '%s\t%s\n' "$name" "$value" >> "$DNS_CUSTOM_FILE"
+        json_init; json_add_boolean ok 1; json_dump ;;
+    remove_preset)
+        json_get_var name name
+        if [ -f "$DNS_CUSTOM_FILE" ]; then
+            tmp=$(mktemp) || fail "Не удалось создать временный файл"
+            grep -vF "$(printf '%s\t' "$name")" "$DNS_CUSTOM_FILE" > "$tmp" || true
+            mv "$tmp" "$DNS_CUSTOM_FILE"
+        fi
+        json_init; json_add_boolean ok 1; json_dump ;;
+    *) fail "Неизвестный метод" ;;
+    esac ;;
+esac
+EOF
+    chmod 755 /usr/libexec/rpcd/mihomo-dns
     
     if [ "$(uci -q get network.mihomo_route_router.mark)" = "0x233" ]; then
         printf '%s\n' '{"enabled":true}' | /usr/libexec/rpcd/mihomo-routing call set_router >/dev/null 2>&1 || \
-            log_warn "Не удалось автоматически обновить особое правило маршрутизации роутера"
+            log_warn "$(T "Не удалось автоматически обновить особое правило маршрутизации роутера" "Could not automatically update the router special routing rule")"
     else
         uci -q delete firewall.mihomo_router_routing
         rm -f /etc/mihomo/mihomo-router-routing.nft
@@ -1266,18 +1474,18 @@ EOF
     local ACE_PATH="$VIEW_PATH/ace"
     mkdir -p "$ACE_PATH"
 
-    echo "Определение актуальной версии ACE Editor"
+    echo "$(T "Определение актуальной версии ACE Editor" "Detecting the latest ACE Editor version")"
     local LATEST_ACE_VER
     LATEST_ACE_VER=$(curl -s "https://api.cdnjs.com/libraries/ace" | grep -o '"version":"[^"]*"' | cut -d'"' -f4 | head -1)
     if [ -z "$LATEST_ACE_VER" ]; then
-        log_warn "cdnjs API недоступен, пробуем GitHub API"
+        log_warn "$(T "cdnjs API недоступен, пробуем GitHub API" "cdnjs API unavailable, trying GitHub API")"
         LATEST_ACE_VER=$(curl -s "https://api.github.com/repos/ajaxorg/ace/releases/latest" | grep -o '"tag_name": *"[^"]*"' | cut -d'"' -f4 | sed 's/^v//' | head -1)
     fi
     if [ -z "$LATEST_ACE_VER" ]; then
-        log_warn "Используем фиксированную версию ACE Editor"
+        log_warn "$(T "Используем фиксированную версию ACE Editor" "Using a fixed ACE Editor version")"
         LATEST_ACE_VER="1.43.3"
     else
-        echo "Актуальная версия ACE Editor: $LATEST_ACE_VER"
+        echo "$(T "Актуальная версия ACE Editor: $LATEST_ACE_VER" "Latest ACE Editor version: $LATEST_ACE_VER")"
     fi
 
     local ACE_FILES="ace.js theme-merbivore_soft.js theme-tomorrow.js mode-yaml.js worker-yaml.js"
@@ -1295,9 +1503,9 @@ EOF
     fi
 
     if [ "$ACE_UP_TO_DATE" -eq 1 ]; then
-        log_online "Актуальный ACE Editor $LATEST_ACE_VER уже установлен"
+        log_online "$(T "Актуальный ACE Editor $LATEST_ACE_VER уже установлен" "ACE Editor $LATEST_ACE_VER is already up to date")"
     else
-        log_online "Скачивание файлов для ACE Editor $LATEST_ACE_VER:"
+        log_online "$(T "Скачивание файлов для ACE Editor $LATEST_ACE_VER:" "Downloading files for ACE Editor $LATEST_ACE_VER:")"
         local CDNJS_ACE_VER="1.43.6"
         for file in $ACE_FILES; do
             local dest="${ACE_PATH}/${file}"
@@ -1307,7 +1515,7 @@ EOF
                        "https://raw.githubusercontent.com/ajaxorg/ace-builds/master/src-min-noconflict/${file}" \
                        "https://cdnjs.cloudflare.com/ajax/libs/ace/${CDNJS_ACE_VER}/${file}"; do
                 
-                log_online "Скачивание $file"
+                log_online "$(T "Скачивание $file" "Downloading $file")"
                 if curl -Lf -s --connect-timeout 5 --max-time 30 -o "$dest" "$url" || wget -q -T 5 -O "$dest" "$url"; then
                     if [ -s "$dest" ]; then
                         success=1
@@ -1318,14 +1526,14 @@ EOF
             done
 
             if [ "$success" -eq 0 ]; then
-                log_error "Не удалось скачать $file ни из одного источника."
+                log_error "$(T "Не удалось скачать $file ни из одного источника." "Could not download $file from any source.")"
                 return 1
             fi
         done
         echo "$LATEST_ACE_VER" > "$ACE_VERSION_FILE"
     fi
 
-    echo "Создание config.js"
+    echo "$(T "Создание config.js" "Creating config.js")"
     cat > "$VIEW_PATH/config.js" <<'EOF'
 'use strict';
 'require view';
@@ -1345,6 +1553,184 @@ var mainConfigContent = '';
 var loadedScripts = {};
 var VALID_ACTIONS = ['start', 'stop', 'restart', 'check', 'logs'];
 
+var DNS_PRESETS = [
+    { name: 'Mihomo', values: ['127.0.0.1#7880'] },
+    { name: 'Google', values: ['8.8.8.8', '8.8.4.4'] },
+    { name: 'Cloudflare', values: ['1.1.1.1', '1.0.0.1'] },
+    { name: 'Quad9', values: ['9.9.9.9', '149.112.112.112'] },
+    { name: 'AdGuard', values: ['94.140.14.140', '94.140.14.141'] },
+    { name: 'Yandex', values: ['77.88.8.8', '77.88.8.1'] }
+];
+
+var MIXOMO_EN = {
+    '(доступна новая версия %s)': '(new version %s available)',
+    'Файл /etc/dnsmasq.conf будет полностью очищен, останутся только ваши правила.': 'The /etc/dnsmasq.conf file will be completely cleared; only your rules will remain.',
+    'DNS-серверы': 'DNS servers',
+    'Распаковка архива...': 'Extracting archive...',
+    'Режим использования DNS': 'DNS usage mode',
+    'Редактировать': 'Edit',
+    'Редактировать исключение': 'Edit exclusion',
+    'Редактировать правило': 'Edit rule',
+    'Ручной режим': 'Manual mode',
+    'В конфигурации есть строки server= вне пресетов: ': 'The configuration has server= lines outside presets: ',
+    'Включено': 'Enabled',
+    'Включить': 'Enable',
+    'Включить исходящий трафик этого устройства через Mihomo?': 'Route this devices outbound traffic through Mihomo?',
+    'Вниз': 'Down',
+    'Введите название': 'Enter a name',
+    'Вверх': 'Up',
+    'Выберите устройство...': 'Select a device...',
+    'Выдача постоянных прав...': 'Setting permanent permissions...',
+    'Выдача временных прав...': 'Setting temporary permissions...',
+    'Отключить исходящий трафик этого устройства через Mihomo?': 'Disable this devices outbound traffic via Mihomo?',
+    'Выполнение...': 'Running...',
+    'Вывод:': 'Output:',
+    'Действие': 'Action',
+    'Добавление...': 'Adding...',
+    'Добавлять устройства и подсети можно только из локальных диапазонов.': 'Devices and subnets can only be added from local ranges.',
+    'Добавить': 'Add',
+    'Добавить автоматически': 'Add automatically',
+    'Добавить правило': 'Add rule',
+    'Дополнительное подтверждение': 'Additional confirmation',
+    'Локальная маршрутизация': 'Local routing',
+    'Файл уже существует': 'File already exists',
+    'Чтобы Mihomo увидел файл, добавьте эту секцию в rule-providers:': 'For Mihomo to see the file, add this section to rule-providers:',
+    'Или': 'Or',
+    'Имя файла:': 'File name:',
+    'Исключённые адреса': 'Excluded addresses',
+    'Адрес': 'Address',
+    'Адрес (IP или CIDR)': 'Address (IP or CIDR)',
+    'остановлен': 'stopped',
+    'У вас установлена самая актуальная версия': 'You have the latest version installed',
+    'Удаление бэкапа...': 'Deleting backup...',
+    'Удаление...': 'Deleting...',
+    'Удалить': 'Delete',
+    'Удалить %s?': 'Delete %s?',
+    'Удалить правила DNS Mixomo из dnsmasq?': 'Delete Mixomo DNS rules from dnsmasq?',
+    'Удалить это правило?': 'Delete this rule?',
+    'Удалить этот адрес?': 'Delete this address?',
+    'Установить обновление': 'Install update',
+    'Установка ядра...': 'Installing the core...',
+    'Название': 'Name',
+    'Название (необязательно)': 'Name (optional)',
+    'Направлять исходящий трафик этого устройства через Mihomo': "Route this device's outgoing traffic through Mihomo",
+    'Настройка DNS-серверов через файл /etc/dnsmasq.conf. Изменения вступают в силу после нажатия «Применить».': "Configure DNS servers via the /etc/dnsmasq.conf file. Changes take effect after clicking 'Apply'.",
+    'Настройки': 'Settings',
+    'Не удалось получить состояние DNS': 'Could not get DNS status',
+    'Не удалось применить правило': 'Could not apply the rule',
+    'Недопустимый путь': 'Invalid path',
+    'Некорректное имя': 'Invalid name',
+    'Некорректный DNS: укажите IPv4 с октетами не длиннее 3 цифр (например 8.8.8.8 или 127.0.0.1#7880)': 'Invalid DNS: provide an IPv4 with octets no longer than 3 digits (e.g. 8.8.8.8 or 127.0.0.1#7880)',
+    'Ничего не выбрано. Удалить все правила DNS из dnsmasq?': 'Nothing selected. Delete all DNS rules from dnsmasq?',
+    'Новый файл правил': 'New rules file',
+    'Закрепить локальные IP за конкретными устройствами можно в ': 'You can pin local IPs to specific devices in ',
+    'Запуск Mihomo...': 'Starting Mihomo...',
+    'Запустить': 'Start',
+    'Загрузка...': 'Loading...',
+    'Обновлено успешно! Перезагрузка...': 'Updated successfully! Reloading...',
+    'Блокировать QUIC (UDP/443)': 'Block QUIC (UDP/443)',
+    'Отключено': 'Disabled',
+    'Отключить': 'Disable',
+    'Открыть панель управления': 'Open dashboard',
+    'Отмена': 'Cancel',
+    'Отменить': 'Cancel',
+    'Ошибка DNS: ': 'DNS error: ',
+    'Ошибка RPC': 'RPC error',
+    'Ошибка пути': 'Path error',
+    'Ошибка маршрутизации: ': 'Routing error: ',
+    'Ошибка. Повторить обновление?': 'Error. Retry the update?',
+    'Ошибка: ': 'Error: ',
+    'Ошибка: %s': 'Error: %s',
+    'Очистить /etc/dnsmasq.conf перед применением': 'Clear /etc/dnsmasq.conf before applying',
+    'Особые правила': 'Special rules',
+    'Остановить': 'Stop',
+    'Остановка Mihomo...': 'Stopping Mihomo...',
+    'Такое название уже есть среди пресетов': 'This name already exists among the presets',
+    'Текст помещается между маркерами # Rules from Mixomo и # End rules from Mixomo. В ручном режиме ничего не генерируется автоматически.': 'The text is placed between the # Rules from Mixomo and # End rules from Mixomo markers. In manual mode nothing is generated automatically.',
+    'Тип подключения': 'Connection type',
+    'Тип файла:': 'File type:',
+    'Скачивание архива %s...': 'Downloading archive %s...',
+    'Скопировать текст': 'Copy text',
+    'Сначала выберите устройство': 'First select a device',
+    'Создание бэкапа...': 'Creating backup...',
+    'Создание...': 'Creating...',
+    'Создать': 'Create',
+    'Создать новый': 'Create new',
+    'Сохранение...': 'Saving...',
+    'Сохранить': 'Save',
+    'Стандартный': 'Standard',
+    'Статических арендах DHCP': 'DHCP static leases',
+    'Статус': 'Status',
+    'Строгий порядок': 'Strict order',
+    'Строгий порядок — опрос по списку, переход к следующему при ошибке.<br>': 'Strict order - queries the list in order, moving to the next on error.<br>',
+    'Стандартный — автоматический выбор самого быстрого сервера.<br>': 'Standard - automatically picks the fastest server.<br>',
+    'Параллельный — запрос ко всем серверам сразу, ответ от самого первого.': 'Parallel - queries all servers at once, using the very first response.',
+    'После применения заменяет все правила из «Простого режима» на ваши.': "After applying, replaces all rules from the 'Simple mode' with yours.",
+    'Трафик к этим адресам никогда не направляется через Mihomo.': 'Traffic to these addresses is never routed through Mihomo.',
+    'Параллельный': 'Parallel',
+    'По умолчанию добавлены следующие подсети, без возможности их удалить:': 'The following subnets are added by default, without the ability to remove them:',
+    'Подождите...': 'Please wait...',
+    'Подтверждение': 'Confirmation',
+    'Показать журнал': 'Show log',
+    'Правил пока нет.': 'No rules yet.',
+    'При использовании абсолютно весь трафик направляется через Mihomo.': 'When enabled, all traffic is routed through Mihomo.',
+    'При применении они будут удалены.': 'They will be removed when applied.',
+    'Применение...': 'Applying...',
+    'Применить': 'Apply',
+    'Все устройства переходят на TCP вместо UDP (QUIC) на 443 порту, что упрощает маршрутизацию в Mihomo.': 'All devices switch to TCP instead of UDP (QUIC) on port 443, which simplifies routing in Mihomo.',
+    'Применяется только к исходящим соединениям этого устройства — apk update, opkg update, wget, curl и тому подобное.': "Applies only to this device's outgoing connections - apk update, opkg update, wget, curl and the like.",
+    'Продолжить': 'Continue',
+    'Проверить конфигурацию': 'Check configuration',
+    'Проверить обновление': 'Check for update',
+    'Проверка обновлений...': 'Checking for updates...',
+    'Проверка ядра...': 'Checking the core...',
+    'Проверка...': 'Checking...',
+    'Простой режим': 'Simple mode',
+    'работает': 'running'
+};
+
+function detectLuciLang() {
+    var lang = '';
+    if (window.LANG) {
+        lang = window.LANG;
+    } else if (document.documentElement && document.documentElement.lang) {
+        lang = document.documentElement.lang;
+    }
+    return (lang || 'ru').toLowerCase();
+}
+
+var MIXOMO_IS_EN = /^en/.test(detectLuciLang());
+
+(function() {
+    var orig = window._;
+    window._ = function(text) {
+        if (MIXOMO_IS_EN && MIXOMO_EN.hasOwnProperty(text)) {
+            return MIXOMO_EN[text];
+        }
+        if (orig) {
+            return orig.apply(window, arguments);
+        }
+        return text;
+    };
+})();
+
+function trError(text) {
+    if (!text || typeof text !== 'string' || !MIXOMO_IS_EN) {
+        return text;
+    }
+    if (MIXOMO_EN.hasOwnProperty(text)) {
+        return MIXOMO_EN[text];
+    }
+    if (/^Недопустимый DNS: /.test(text)) {
+        return 'Invalid DNS: ' + text.replace(/^Недопустимый DNS: /, '');
+    }
+    if (/^Октет IP не длиннее 3 цифр: /.test(text)) {
+        return 'IP octet no longer than 3 digits: ' + text.replace(/^Октет IP не длиннее 3 цифр: /, '');
+    }
+    return text;
+}
+
+
 var callServiceList = rpc.declare({
     object: 'service',
     method: 'list',
@@ -1358,11 +1744,17 @@ var callRoutingUpdate = rpc.declare({ object: 'mihomo-routing', method: 'update'
 var callRoutingDelete = rpc.declare({ object: 'mihomo-routing', method: 'delete', params: ['id'], expect: { '': {} } });
 var callRoutingEnabled = rpc.declare({ object: 'mihomo-routing', method: 'set_enabled', params: ['id', 'enabled'], expect: { '': {} } });
 var callRoutingRouter = rpc.declare({ object: 'mihomo-routing', method: 'set_router', params: ['enabled'], expect: { '': {} } });
+var callRoutingUdp443 = rpc.declare({ object: 'mihomo-routing', method: 'set_udp443', params: ['enabled'], expect: { '': {} } });
 var callRoutingExcludeAdd = rpc.declare({ object: 'mihomo-routing', method: 'exclude_add', params: ['dest', 'label'], expect: { '': {} } });
 var callRoutingExcludeDelete = rpc.declare({ object: 'mihomo-routing', method: 'exclude_delete', params: ['id'], expect: { '': {} } });
 var callRoutingExcludeUpdate = rpc.declare({ object: 'mihomo-routing', method: 'exclude_update', params: ['id', 'dest', 'label'], expect: { '': {} } });
 var callRoutingExcludeEnabled = rpc.declare({ object: 'mihomo-routing', method: 'exclude_set_enabled', params: ['id', 'enabled'], expect: { '': {} } });
 var callRoutingReorder = rpc.declare({ object: 'mihomo-routing', method: 'reorder', params: ['type', 'order'], expect: { '': {} } });
+var callDnsStatus = rpc.declare({ object: 'mihomo-dns', method: 'status', expect: { '': {} } });
+var callDnsApply = rpc.declare({ object: 'mihomo-dns', method: 'apply', params: ['block', 'clean'], expect: { '': {} } });
+var callDnsClear = rpc.declare({ object: 'mihomo-dns', method: 'clear', expect: { '': {} } });
+var callDnsAddPreset = rpc.declare({ object: 'mihomo-dns', method: 'add_preset', params: ['name', 'value'], expect: { '': {} } });
+var callDnsRemovePreset = rpc.declare({ object: 'mihomo-dns', method: 'remove_preset', params: ['name'], expect: { '': {} } });
 
 function escapeHtml(text) {
     if (typeof text !== 'string') return text;
@@ -1399,6 +1791,18 @@ function validateFilename(filename) {
     if (filename.length > 255) return false;
     var reservedNames = ['con', 'prn', 'aux', 'nul', 'com1', 'lpt1', '.'];
     if (reservedNames.includes(filename.toLowerCase())) return false;
+    return true;
+}
+
+function isValidDnsValue(value) {
+    if (!value || typeof value !== 'string') return false;
+    if (!/^[0-9A-Za-z.#:\-@]+$/.test(value)) return false;
+    var ip = value.split('#')[0];
+    var parts = ip.split('.');
+    if (parts.length !== 4) return false;
+    for (var i = 0; i < parts.length; i++) {
+        if (!/^\d{1,3}$/.test(parts[i])) return false;
+    }
     return true;
 }
 
@@ -1460,17 +1864,28 @@ return view.extend({
     updateButton: null,
     latestVersionEl: null,
     routingPanel: null,
+    dnsPanel: null,
+    settingsActive: null,
+    dnsModeRow: null,
+    dnsMode: 'simple',
+    dnsUsageMode: 'standard',
+    dnsChecks: {},
+    dnsForeign: [],
+    dnsData: null,
+    dnsManualText: '',
+    dnsClean: false,
+    dnsOrder: [],
 
     showRoutingError: function(result) {
-        if (!result || !result.ok) ui.addNotification(null, E('p', (result && result.error) || _('Не удалось применить правило')), 'error');
+        if (!result || !result.ok) ui.addNotification(null, E('p', (result && trError(result.error)) || _('Не удалось применить правило')), 'error');
         return result && result.ok;
     },
 
     confirmRouterRouting: function(enable) {
         var self = this;
         var text = enable
-            ? _('Включить особое правило?')
-            : _('Выключить особое правило?');
+            ? _('Включить исходящий трафик этого устройства через Mihomo?')
+            : _('Отключить исходящий трафик этого устройства через Mihomo?');
         ui.showModal(_('Дополнительное подтверждение'), [
             E('p', {}, text),
             E('div', { class: 'right', style: 'margin-top:1rem;' }, [
@@ -1481,6 +1896,11 @@ return view.extend({
                 }}, _('Продолжить'))
             ])
         ]);
+    },
+
+    setUdp443: function(enabled) {
+        var self = this;
+        callRoutingUdp443(enabled).then(function(res) { if (self.showRoutingError(res)) self.refreshRouting(); });
     },
 
     editRoutingRule: function(rule) {
@@ -1542,11 +1962,285 @@ return view.extend({
         }).catch(function(err) { ui.addNotification(null, E('p', _('Ошибка маршрутизации: ') + err.message), 'error'); });
     },
 
+    renderSettingsRow: function() {
+        if (!this.settingsRow) return;
+        L.dom.content(this.settingsRow, []);
+        this.settingsRow.appendChild(E('button', { 'class': 'btn cbi-button-neutral' + (this.settingsActive === 'routing' ? ' active' : ''), 'click': ui.createHandlerFn(this, 'toggleRoutingPanel') }, _('Локальная маршрутизация')));
+        this.settingsRow.appendChild(E('button', { 'class': 'btn cbi-button-neutral' + (this.settingsActive === 'dns' ? ' active' : ''), 'click': ui.createHandlerFn(this, 'toggleDnsPanel') }, _('DNS')));
+    },
+
     toggleRoutingPanel: function() {
         if (!this.routingPanel) return;
-        var open = this.routingPanel.style.display !== 'none';
-        this.routingPanel.style.display = open ? 'none' : 'block';
-        if (!open) { this.refreshRouting(); }
+        var wasOpen = this.routingPanel.style.display !== 'none';
+        this.routingPanel.style.display = wasOpen ? 'none' : 'block';
+        if (wasOpen) {
+            if (this.settingsActive === 'routing') this.settingsActive = null;
+            this.renderSettingsRow();
+            return;
+        }
+        if (this.dnsPanel) this.dnsPanel.style.display = 'none';
+        if (this.dnsModeRow) this.dnsModeRow.style.display = 'none';
+        this.settingsActive = 'routing';
+        this.renderSettingsRow();
+        this.refreshRouting();
+    },
+
+    toggleSettingsRow: function() {
+        if (!this.settingsRow) return;
+        var open = this.settingsRow.style.display !== 'none';
+        this.settingsRow.style.display = open ? 'none' : 'flex';
+        if (open) {
+            if (this.routingPanel) this.routingPanel.style.display = 'none';
+            if (this.dnsModeRow) this.dnsModeRow.style.display = 'none';
+            if (this.dnsPanel) this.dnsPanel.style.display = 'none';
+            this.settingsActive = null;
+            this.renderSettingsRow();
+        }
+    },
+
+    toggleDnsPanel: function() {
+        if (!this.dnsPanel) return;
+        var wasOpen = this.dnsPanel.style.display !== 'none';
+        this.dnsPanel.style.display = wasOpen ? 'none' : 'block';
+        if (wasOpen) {
+            if (this.dnsModeRow) this.dnsModeRow.style.display = 'none';
+            if (this.settingsActive === 'dns') this.settingsActive = null;
+            this.renderSettingsRow();
+        } else {
+            if (this.routingPanel) this.routingPanel.style.display = 'none';
+            this.renderDnsModeRow();
+            if (this.dnsModeRow) this.dnsModeRow.style.display = 'flex';
+            this.settingsActive = 'dns';
+            this.renderSettingsRow();
+            this.refreshDns();
+        }
+    },
+
+    mkSegRow: function(items, current, onclick) {
+        var row = E('div', { 'class': 'mihomo-seg' });
+        items.forEach(function(it) {
+            row.appendChild(E('button', { 'class': 'btn cbi-button-neutral' + (it.value === current ? ' active' : ''), 'click': function() { onclick(it.value); } }, it.label));
+        });
+        return row;
+    },
+
+    refreshDns: function() {
+        var self = this;
+        return callDnsStatus().then(function(res) {
+            if (!res || res.ok !== true) { self.showRoutingError(res || { ok: false, error: _('Не удалось получить состояние DNS') }); return; }
+            self.dnsData = res;
+            var servers = res.servers || [];
+            var custom = res.custom || [];
+            var checks = {};
+            DNS_PRESETS.forEach(function(p) { checks[p.name] = p.values.every(function(v) { return servers.indexOf(v) !== -1; }); });
+            custom.forEach(function(c) { checks[c.name] = servers.indexOf(c.value) !== -1; });
+            self.dnsChecks = checks;
+            var i, nm, order = [];
+            function nameForValue(v) {
+                for (i = 0; i < DNS_PRESETS.length; i++) { if (DNS_PRESETS[i].values.indexOf(v) !== -1) return DNS_PRESETS[i].name; }
+                for (i = 0; i < custom.length; i++) { if (custom[i].value === v) return custom[i].name; }
+                return null;
+            }
+            servers.forEach(function(v) { nm = nameForValue(v); if (nm && order.indexOf(nm) === -1) order.push(nm); });
+            DNS_PRESETS.forEach(function(p) { if (order.indexOf(p.name) === -1) order.push(p.name); });
+            custom.forEach(function(c) { if (order.indexOf(c.name) === -1) order.push(c.name); });
+            self.dnsOrder = order;
+            var known = [];
+            DNS_PRESETS.forEach(function(p) { known = known.concat(p.values); });
+            custom.forEach(function(c) { known.push(c.value); });
+            self.dnsForeign = [];
+            servers.forEach(function(v) { if (known.indexOf(v) === -1 && self.dnsForeign.indexOf(v) === -1) self.dnsForeign.push(v); });
+            self.dnsUsageMode = res.allServers ? 'parallel' : (res.strictOrder ? 'strict' : 'standard');
+            self.dnsManualText = res.block || '';
+            self.renderDnsModeRow();
+            self.renderDnsPanel();
+        }).catch(function(err) { ui.addNotification(null, E('p', _('Ошибка DNS: ') + err.message), 'error'); });
+    },
+
+    renderDnsPanel: function() {
+        var panel = this.dnsPanel;
+        if (!panel) return;
+        while (panel.firstChild) panel.removeChild(panel.firstChild);
+        panel.appendChild(E('h3', {}, _('DNS')));
+        panel.appendChild(E('p', { style: 'opacity:.75; margin-top:0;' }, _('Настройка DNS-серверов через файл /etc/dnsmasq.conf. Изменения вступают в силу после нажатия «Применить».')));
+        if (this.dnsMode === 'manual') {
+            this.renderDnsManual(panel);
+        } else {
+            this.renderDnsSimple(panel);
+        }
+    },
+
+    renderDnsModeRow: function() {
+        if (!this.dnsModeRow) return;
+        var self = this;
+        L.dom.content(this.dnsModeRow, []);
+        this.dnsModeRow.appendChild(this.mkSegRow([
+            { value: 'simple', label: _('Простой режим') },
+            { value: 'manual', label: _('Ручной режим') }
+        ], this.dnsMode, function(v) { self.switchDnsMode(v); }));
+    },
+
+    switchDnsMode: function(v) {
+        if (v === this.dnsMode) return;
+        if (v === 'manual') {
+            this.dnsManualText = (this.dnsData && this.dnsData.block) || '';
+        }
+        this.dnsMode = v;
+        this.renderDnsModeRow();
+        this.renderDnsPanel();
+    },
+
+    renderDnsSimple: function(panel) {
+        var self = this;
+        var checks = this.dnsChecks || {};
+        var order = this.dnsOrder || [];
+        var custom = (this.dnsData && this.dnsData.custom) || [];
+        panel.appendChild(E('h4', { style: 'margin-top:0.5rem;' }, _('Режим использования DNS')));
+        panel.appendChild(E('p', { style: 'opacity:.8;' }, 
+            _('Строгий порядок — опрос по списку, переход к следующему при ошибке.<br>') +
+            _('Стандартный — автоматический выбор самого быстрого сервера.<br>') +
+            _('Параллельный — запрос ко всем серверам сразу, ответ от самого первого.')
+        ));
+        panel.appendChild(this.mkSegRow([
+            { value: 'strict', label: _('Строгий порядок') },
+            { value: 'standard', label: _('Стандартный') },
+            { value: 'parallel', label: _('Параллельный') }
+        ], this.dnsUsageMode, function(v) { self.dnsUsageMode = v; self.renderDnsPanel(); }));
+        panel.appendChild(E('h4', { style: 'margin-top:0.5rem;' }, _('DNS-серверы')));
+        order.forEach(function(name, idx) {
+            var values = [], isCustom = false;
+            DNS_PRESETS.forEach(function(p) { if (p.name === name) values = values.concat(p.values); });
+            custom.forEach(function(c) { if (c.name === name) { isCustom = true; values.push(c.value); } });
+            if (!values.length) return;
+            var cb = E('input', { type: 'checkbox', click: function() { self.dnsChecks[name] = cb.checked; self.renderDnsPanel(); } });
+            cb.checked = !!checks[name];
+            var rowChildren = [
+                E('div', { class: 'mihomo-route-actions', style: 'gap:.3rem;' }, [
+                    E('button', { 'class': 'btn cbi-button-neutral', title: _('Вверх'), click: function() { self.moveDnsItem(idx, -1); } }, '↑'),
+                    E('button', { 'class': 'btn cbi-button-neutral', title: _('Вниз'), click: function() { self.moveDnsItem(idx, 1); } }, '↓')
+                ]),
+                E('label', { style: 'display:flex; align-items:center; gap:.4rem;' }, [
+                    cb, E('span', {}, name), E('span', { style: 'opacity:.6;' }, values.join(' , '))
+                ])
+            ];
+            if (isCustom) {
+                rowChildren.push(E('button', { 'class': 'btn cbi-button-reset', click: function() {
+                    callDnsRemovePreset(name).then(function(res) { if (self.showRoutingError(res)) self.refreshDns(); }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
+                }}, _('Удалить')));
+            }
+            panel.appendChild(E('div', { class: 'mihomo-route-add' }, rowChildren));
+        });
+        var foreign = this.dnsForeign || [];
+        if (foreign.length) {
+            panel.appendChild(E('p', { style: 'color:#F62B12; margin-top:.6rem;' }, _('В конфигурации есть строки server= вне пресетов: ') + foreign.join(', ') + '. ' + _('При применении они будут удалены.')));
+        }
+        var nameIn = E('input', { type: 'text', placeholder: _('Название'), style: 'min-width:12rem;' });
+        var valIn = E('input', { type: 'text', placeholder: '8.8.8.8', style: 'min-width:12rem;' });
+        panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'margin-top:.6rem;' }, [
+            nameIn, valIn,
+            E('button', { 'class': 'btn cbi-button-positive btn-save-custom', click: function() {
+                var nm = nameIn.value.trim();
+                if (!nm) { ui.addNotification(null, E('p', _('Введите название')), 'error'); return; }
+                var dup = DNS_PRESETS.some(function(p) { return p.name === nm; });
+                if (dup) { ui.addNotification(null, E('p', _('Такое название уже есть среди пресетов')), 'error'); return; }
+                if (!isValidDnsValue(valIn.value.trim())) { ui.addNotification(null, E('p', _('Некорректный DNS: укажите IPv4 с октетами не длиннее 3 цифр (например 8.8.8.8 или 127.0.0.1#7880)')), 'error'); return; }
+                callDnsAddPreset(nm, valIn.value.trim()).then(function(res) {
+                    if (self.showRoutingError(res)) self.refreshDns();
+                }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
+            }}, _('Добавить'))
+        ]));
+        var cleanCb = E('input', { type: 'checkbox', click: function() { self.dnsClean = cleanCb.checked; self.renderDnsPanel(); } });
+        cleanCb.checked = !!this.dnsClean;
+        panel.appendChild(E('label', { style: 'display:block; margin:.8rem 0 .4rem;' }, [cleanCb, ' ', _('Очистить /etc/dnsmasq.conf перед применением')]));
+        panel.appendChild(E('div', { style: 'margin-top:.8rem;' }, [
+            E('button', { 'class': 'btn cbi-button-positive btn-save-custom', click: function() { self.applySimpleDns(); } }, _('Применить'))
+        ]));
+    },
+
+    moveDnsItem: function(idx, dir) {
+        var order = this.dnsOrder;
+        var j = idx + dir;
+        if (j < 0 || j >= order.length) return;
+        var tmp = order[idx]; order[idx] = order[j]; order[j] = tmp;
+        this.renderDnsPanel();
+    },
+
+    applySimpleDns: function() {
+        var self = this;
+        var checks = this.dnsChecks || {};
+        var custom = (this.dnsData && this.dnsData.custom) || [];
+        var order = this.dnsOrder || [];
+        var selected = 0;
+        var lines = ['no-resolv'];
+        if (this.dnsUsageMode === 'parallel') lines.push('all-servers');
+        else if (this.dnsUsageMode === 'strict') lines.push('strict-order');
+        order.forEach(function(name) {
+            if (!checks[name]) return;
+            selected++;
+            var values = [];
+            DNS_PRESETS.forEach(function(p) { if (p.name === name) values = values.concat(p.values); });
+            custom.forEach(function(c) { if (c.name === name) values.push(c.value); });
+            values.forEach(function(v) { lines.push('server=' + v); });
+        });
+        if (selected === 0) {
+            if (!confirm(_('Ничего не выбрано. Удалить все правила DNS из dnsmasq?'))) return;
+            return callDnsClear().then(function(res) { if (self.showRoutingError(res)) self.refreshDns(); }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
+        }
+        var doApply = function() {
+            ui.showModal(null, [E('p', { 'class': 'spinning' }, _('Применение...'))]);
+            callDnsApply(lines.join('\n'), !!self.dnsClean).then(function(res) {
+                ui.hideModal();
+                if (self.showRoutingError(res)) self.refreshDns();
+            }).catch(function(err) { ui.hideModal(); self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
+        };
+        if (this.dnsClean) {
+            ui.showModal(_('Подтверждение'), [
+                E('p', {}, _('Файл /etc/dnsmasq.conf будет полностью очищен, останутся только ваши правила.')),
+                E('div', { class: 'right', style: 'margin-top:1rem;' }, [
+                    E('button', { class: 'btn cbi-button-neutral', click: ui.hideModal }, _('Отмена')), ' ',
+                    E('button', { class: 'btn cbi-button-positive btn-save-custom', click: function() { ui.hideModal(); doApply(); } }, _('Продолжить'))
+                ])
+            ]);
+        } else {
+            doApply();
+        }
+    },
+
+    renderDnsManual: function(panel) {
+        var self = this;
+        var ta = E('textarea', { 'class': 'mihomo-dns-text', style: 'width:100%; height:34em;' });
+        panel.appendChild(E('p', { style: 'opacity:.8;' }, _('После применения заменяет все правила из «Простого режима» на ваши.')));
+        ta.value = this.dnsManualText || '';
+        panel.appendChild(ta);
+        var cleanCb = E('input', { type: 'checkbox', click: function() { self.dnsClean = cleanCb.checked; } });
+        cleanCb.checked = !!this.dnsClean;
+        panel.appendChild(E('label', { style: 'display:block; margin:.8rem 0;' }, [cleanCb, ' ', _('Очистить /etc/dnsmasq.conf перед применением')]));
+        panel.appendChild(E('div', { style: 'margin-top:.8rem; display:flex; gap:.5rem;' }, [
+            E('button', { 'class': 'btn cbi-button-positive btn-save-custom', click: function() {
+                var doApply = function() {
+                    ui.showModal(null, [E('p', { 'class': 'spinning' }, _('Применение...'))]);
+                    callDnsApply(ta.value, !!self.dnsClean).then(function(res) {
+                        ui.hideModal();
+                        if (self.showRoutingError(res)) { self.dnsManualText = ta.value; self.refreshDns(); }
+                    }).catch(function(err) { ui.hideModal(); self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
+                };
+                if (self.dnsClean) {
+                    ui.showModal(_('Подтверждение'), [
+                        E('p', {}, _('Файл /etc/dnsmasq.conf будет полностью очищен, останутся только ваши правила.')),
+                        E('div', { class: 'right', style: 'margin-top:1rem;' }, [
+                            E('button', { class: 'btn cbi-button-neutral', click: ui.hideModal }, _('Отмена')), ' ',
+                            E('button', { class: 'btn cbi-button-positive btn-save-custom', click: function() { ui.hideModal(); doApply(); } }, _('Продолжить'))
+                        ])
+                    ]);
+                } else {
+                    doApply();
+                }
+            }}, _('Применить')),
+            E('button', { 'class': 'btn cbi-button-reset', click: function() {
+                if (!confirm(_('Удалить правила DNS Mixomo из dnsmasq?'))) return;
+                callDnsClear().then(function(res) { if (self.showRoutingError(res)) self.refreshDns(); }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
+            }}, _('Удалить'))
+        ]));
     },
 
     renderRoutingPanel: function() {
@@ -1560,6 +2254,9 @@ return view.extend({
             self.confirmRouterRouting(!routerEnabled);
         }});
         routerToggle.checked = routerEnabled;
+        var udp443Enabled = (status.udp443 === true || status.udp443 === 1 || status.udp443 === '1');
+        var udp443Toggle = E('input', { type: 'checkbox', click: function() { self.setUdp443(udp443Toggle.checked); } });
+        udp443Toggle.checked = udp443Enabled;
         var redirAvail = !!(status.redirAvailable === true || status.redirAvailable === 1 || status.redirAvailable === '1');
         var defaultBackend = (status.variant === 'redir-tproxy') ? 'redir-tproxy' : 'tun-socks5';
         function mkBackend(def) {
@@ -1679,9 +2376,11 @@ return view.extend({
             });
             t2.appendChild(b2); panel.appendChild(t2);
         }
-        panel.appendChild(E('h3', { style: 'margin-top:1rem;' }, _('Особое правило')));
-        panel.appendChild(E('p', { style: 'opacity:.75; margin-top:0;' }, _('Применяется только к исходящим соединениям этого устройства — apk update, wget, curl и тому подобное.')));
+        panel.appendChild(E('h3', { style: 'margin-top:1rem;' }, _('Особые правила')));
+        panel.appendChild(E('p', { style: 'opacity:.75; margin-top:0;' }, _('Применяется только к исходящим соединениям этого устройства — apk update, opkg update, wget, curl и тому подобное.')));
         panel.appendChild(E('label', { style: 'display:block; margin:.4rem 0;' }, [routerToggle, ' ', _('Направлять исходящий трафик этого устройства через Mihomo')]));
+        panel.appendChild(E('p', { style: 'opacity:.75; margin-top:0;' }, _('Все устройства переходят на TCP вместо UDP (QUIC) на 443 порту, что упрощает маршрутизацию в Mihomo.')));
+        panel.appendChild(E('label', { style: 'display:block; margin:.4rem 0;' }, [udp443Toggle, ' ', _('Блокировать QUIC (UDP/443)')]));
     },
 	
     getMihomoVersion: function() {
@@ -1840,12 +2539,12 @@ return view.extend({
         cachedRuleFiles = (data[2] || []).sort(function(a, b) { return a.name.localeCompare(b.name); });
         var isRunning = !!(serviceInfo.mihomo && serviceInfo.mihomo.instances.main.running);
         
-        var versionContainer = E('span', { 'id': 'mihomo-version', 'style': 'margin-left: 10px; font-size: 0.9em; opacity: 0.7;' }, _('Загрузка...'));
+        var versionContainer = E('span', { 'id': 'mihomo-version', 'style': 'margin-left: 12px; font-size: 0.9em; opacity: 0.7;' }, _('Загрузка...'));
         var latestVersionEl = E('span', { 'id': 'mihomo-latest-version', 'style': 'margin-left: 4px; font-size: 0.9em; opacity: 0.7; display: none;' }, '');
         this.latestVersionEl = latestVersionEl;
         var updateButton = E('button', { 'id': 'mihomo-update-btn', 'class': 'btn cbi-button-neutral', 'style': 'margin-left: 10px; padding: 0 0.6em; font-size: 0.9em;', 'disabled': true }, _('Проверить обновление'));
         this.updateButton = updateButton;
-        var routingButton = E('button', { 'class': 'btn cbi-button-neutral', 'style': 'margin-left: 10px;', 'click': ui.createHandlerFn(this, 'toggleRoutingPanel') }, _('Локальная маршрутизация'));
+        var settingsButton = E('button', { 'class': 'btn cbi-button-neutral', 'style': 'margin-left: 10px;', 'click': ui.createHandlerFn(this, 'toggleSettingsRow') }, _('Настройки'));
         
         var statusBadge = isRunning 
             ? E('span', { 
@@ -1868,7 +2567,7 @@ return view.extend({
             versionContainer, 
             latestVersionEl,
             updateButton,
-            routingButton
+            settingsButton
         ]);
 		
         var self = this;
@@ -1951,6 +2650,13 @@ return view.extend({
             .btn-generate:hover { border-color: #5cb85c !important; }
             .snippet-container { margin-top: 0; border: 1px solid var(--border-color); background: var(--bg-toolbar); padding: 0.8rem; display: none; }
             .mihomo-routing-panel { border: 1px solid var(--border-color); background: var(--bg-toolbar); padding: 1rem; margin: 0 0 1rem; }
+            .mihomo-settings-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+            .mihomo-dns-panel { border: 1px solid var(--border-color); background: var(--bg-toolbar); padding: 1rem; margin: 0 0 1rem; }
+            .mihomo-seg { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+            .mihomo-seg .btn.active { border-color: #5cb85c !important; color: #5cb85c !important; }
+            .mihomo-dns-mode-row { padding: 0.0rem 0; }
+            .mihomo-dns-text { background: var(--bg-input); color: var(--text-main); border: 1px solid var(--border-color); font-family: monospace; font-size: 0.9em; padding: 0.6em; box-sizing: border-box; }
+            .mihomo-dns-panel input[type=text] { background: var(--bg-input); color: var(--text-main); border: 1px solid var(--border-color); padding: .4em; }
             .mihomo-route-add { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
             .mihomo-route-actions { display: flex; gap: 1rem; padding: 0.2rem 0; }
             .mihomo-routing-panel input, .mihomo-routing-panel select { background: var(--bg-input); color: var(--text-main); border: 1px solid var(--border-color); padding: .4em; }
@@ -1999,8 +2705,18 @@ return view.extend({
             E('pre', { 'id': 'output-text', 'style': 'margin: 0; padding: 1rem; background: var(--bg-output); color: var(--text-output); font-family: monospace; font-size: 1em; white-space: pre-wrap; word-wrap: break-word; max-height: 25rem; overflow-y: auto;' }, '')
         ]);
 
+        var settingsRow = E('div', { 'class': 'mihomo-settings-row mihomo-seg', 'style': 'display:none; margin-bottom: 0.5rem;' });
+        this.settingsRow = settingsRow;
+        this.renderSettingsRow();
+
         var routingPanel = E('div', { 'class': 'mihomo-routing-panel', 'style': 'display:none;' });
         this.routingPanel = routingPanel;
+
+        var dnsModeRow = E('div', { 'class': 'mihomo-seg mihomo-dns-mode-row', 'style': 'display:none; margin-bottom: 0.5rem;' });
+        this.dnsModeRow = dnsModeRow;
+
+        var dnsPanel = E('div', { 'class': 'mihomo-dns-panel', 'style': 'display:none;' });
+        this.dnsPanel = dnsPanel;
         
         loadScript(ACE_DIR + 'ace.js').then(function() {
             ace.config.set('basePath', ACE_DIR);
@@ -2025,7 +2741,7 @@ return view.extend({
         setTimeout(function() { this.updateVisibility(MAIN_CONFIG); }.bind(this), 100);
         
         return E('div', { 'class': 'cbi-map' }, [
-            header, routingPanel, style, tabBar, toolbarContainer, editorContainer,
+            header, settingsRow, dnsModeRow, routingPanel, dnsPanel, style, tabBar, toolbarContainer, editorContainer,
             middleActions, snippetContainer, buttonContainer, outputBox
         ]);
     },
@@ -2374,26 +3090,70 @@ return view.extend({
 EOF
 }
 
-install_hev_tunnel() {
+install_hev_tunnel(){
+    local INSTALLED_VER="" LATEST_VER="" NEED_UPDATE=1
 
-    local HEV_VER=""
-    if [ -x "/usr/sbin/hev-socks5-tunnel" ] || [ -x "/usr/bin/hev-socks5-tunnel" ]; then
-        log_online "Актуальный hev-socks5-tunnel уже установлен"
-    else
-        log_online "Установка hev-socks5-tunnel"
-        if [ "$USE_APK" -eq 1 ]; then
-            apk cache clean >/dev/null 2>&1
-            apk add hev-socks5-tunnel >/dev/null 2>&1
+    if [ "$USE_APK" -eq 1 ]; then
+        INSTALLED_VER=$(apk info -e hev-socks5-tunnel 2>/dev/null | sed 's/^hev-socks5-tunnel-//')
+        [ -z "$INSTALLED_VER" ] && INSTALLED_VER=$(apk list -I 2>/dev/null | grep -m1 '^hev-socks5-tunnel-' | awk '{print $1}' | sed 's/^hev-socks5-tunnel-//')
+        
+        if [ -n "$INSTALLED_VER" ]; then
+            local UPGRADABLE
+            UPGRADABLE=$(apk list -u 2>/dev/null | grep -m1 '^hev-socks5-tunnel-')
+            if [ -n "$UPGRADABLE" ]; then
+                LATEST_VER=$(echo "$UPGRADABLE" | awk '{print $1}' | sed 's/^hev-socks5-tunnel-//')
+                log_online "$(T "Обновление hev-socks5-tunnel до $LATEST_VER" "Updating hev-socks5-tunnel to $LATEST_VER")"
+                NEED_UPDATE=1
+            else
+                log_online "$(T "Актуальный hev-socks5-tunnel уже установлен" "hev-socks5-tunnel is already up to date")"
+                NEED_UPDATE=0
+            fi
         else
-            manage_pkg install hev-socks5-tunnel >/dev/null 2>&1
+            log_online "$(T "Установка hev-socks5-tunnel" "Installing hev-socks5-tunnel")"
+            NEED_UPDATE=1
+        fi
+    else
+        INSTALLED_VER=$(opkg list-installed 2>/dev/null | awk '$1=="hev-socks5-tunnel"{print $3}')
+        
+        if [ -n "$INSTALLED_VER" ]; then
+            local UPGRADABLE
+            UPGRADABLE=$(opkg list-upgradable 2>/dev/null | grep -m1 '^hev-socks5-tunnel[[:space:]]')
+            if [ -n "$UPGRADABLE" ]; then
+                LATEST_VER=$(echo "$UPGRADABLE" | awk '{print $5}')
+                [ -z "$LATEST_VER" ] && LATEST_VER="новая версия"
+                log_online "$(T "Обновление hev-socks5-tunnel до $LATEST_VER" "Updating hev-socks5-tunnel to $LATEST_VER")"
+                NEED_UPDATE=1
+            else
+                log_online "$(T "Актуальный hev-socks5-tunnel уже установлен" "hev-socks5-tunnel is already up to date")"
+                NEED_UPDATE=0
+            fi
+        else
+            log_online "$(T "Установка hev-socks5-tunnel" "Installing hev-socks5-tunnel")"
+            NEED_UPDATE=1
         fi
     fi
 
+    if [ "$NEED_UPDATE" -eq 1 ]; then
+        if [ "$USE_APK" -eq 1 ]; then
+            apk cache clean >/dev/null 2>&1
+            apk add -u hev-socks5-tunnel >/dev/null 2>&1
+        else
+            if [ -n "$INSTALLED_VER" ]; then
+                opkg upgrade hev-socks5-tunnel >/dev/null 2>&1 || opkg install hev-socks5-tunnel >/dev/null 2>&1
+            else
+                manage_pkg install hev-socks5-tunnel >/dev/null 2>&1
+            fi
+        fi
+    fi
+
+    local HEV_VER=""
     if [ "$USE_APK" -eq 1 ]; then
-        HEV_VER=$(apk list -I 2>/dev/null | grep -m1 '^hev-socks5-tunnel-' | sed 's/^hev-socks5-tunnel-//;s/[ \t].*//')
+        HEV_VER=$(apk info -e hev-socks5-tunnel 2>/dev/null | sed 's/^hev-socks5-tunnel-//')
+        [ -z "$HEV_VER" ] && HEV_VER=$(apk list -I 2>/dev/null | grep -m1 '^hev-socks5-tunnel-' | sed 's/^hev-socks5-tunnel-//;s/[ \t].*//')
     else
         HEV_VER=$(opkg list-installed 2>/dev/null | awk '$1=="hev-socks5-tunnel"{print $3}')
     fi
+    
     if [ -n "$HEV_VER" ]; then
         mkdir -p "$MIXOMO_VERSIONS_DIR" 2>/dev/null || true
         echo "$HEV_VER" > "$HEV_VERSION_FILE"
@@ -2414,14 +3174,14 @@ socks5:
 EOF
     chmod 600 /etc/hev-socks5-tunnel/main.yml
 
-    echo "Настройка UCI-сервиса hev-socks5-tunnel"
+    echo "$(T "Настройка UCI-сервиса hev-socks5-tunnel" "Setting up the hev-socks5-tunnel UCI service")"
     uci set hev-socks5-tunnel.config.enabled='1'
     uci set hev-socks5-tunnel.config.configfile='/etc/hev-socks5-tunnel/main.yml'
     uci commit hev-socks5-tunnel
     /etc/init.d/hev-socks5-tunnel restart
     sleep 2
 
-    echo "Настройка сетевого интерфейса"
+    echo "$(T "Настройка сетевого интерфейса" "Setting up the network interface")"
     if ! uci -q get network.Mihomo >/dev/null 2>&1; then
         uci set network.Mihomo=interface
         uci set network.Mihomo.proto='none'
@@ -2434,7 +3194,7 @@ EOF
     /etc/init.d/network reload
     sleep 1
 
-    echo "Настройка Firewall"
+    echo "$(T "Настройка Firewall" "Setting up the Firewall")"
     local FW_ZONE=""
     local FW_FWD=""
     FW_ZONE=$(uci show firewall 2>/dev/null | grep "\.name='Mihomo'" | head -1 | sed "s/\.name=.*//; s/^firewall\.//")
@@ -2466,14 +3226,14 @@ EOF
 }
 
 install_magitrickle_original_package() {
-    log_online "Добавление репозитория MagiTrickle"
+    log_online "$(T "Добавление репозитория MagiTrickle" "Adding the MagiTrickle repository")"
     if ! curl -sSL http://bin.magitrickle.dev/packages/add_repo.sh | sh >/dev/null 2>&1; then
         if ! wget -qO- http://bin.magitrickle.dev/packages/add_repo.sh | sh >/dev/null 2>&1; then
-            log_error "Ошибка: не удалось добавить репозиторий MagiTrickle!"
+            log_error "$(T "Ошибка: не удалось добавить репозиторий MagiTrickle!" "Error: could not add the MagiTrickle repository!")"
             return 1
         fi
     fi
-    log_online "Загрузка пакета MagiTrickle"
+    log_online "$(T "Загрузка пакета MagiTrickle" "Downloading the MagiTrickle package")"
     if [ "$USE_APK" -eq 1 ]; then
         apk update >/dev/null 2>&1 || true
         apk add magitrickle >/dev/null 2>&1 || true
@@ -2488,7 +3248,7 @@ install_magitrickle_original_package() {
 install_magitrickle_mod_package() {
     local LOG="/tmp/mixomo-mod-install.log"
     local rc=1
-    log_online "Установка MagiTrickle Mod от badigit"
+    log_online "$(T "Установка MagiTrickle Mod от badigit" "Installing MagiTrickle Mod by badigit")"
     if command -v curl >/dev/null 2>&1; then
         curl -fsSL --connect-timeout 10 -m 300 \
             "https://raw.githubusercontent.com/badigit/MagiTrickle_mod_badigit/mod_badigit/scripts/install.sh" | sh >"$LOG" 2>&1
@@ -2498,14 +3258,14 @@ install_magitrickle_mod_package() {
             "https://raw.githubusercontent.com/badigit/MagiTrickle_mod_badigit/mod_badigit/scripts/install.sh" | sh >"$LOG" 2>&1
         rc=$?
     else
-        log_error "Не найден curl или wget для установки mod"
+        log_error "$(T "Не найден curl или wget для установки mod" "Neither curl nor wget found to install the mod")"
         return 1
     fi
     if [ -x /etc/init.d/magitrickle ]; then
         rm -f "$LOG"
         return 0
     fi
-    log_error "Не удалось установить MagiTrickle Mod от badigit. Подробный лог: $LOG"
+    log_error "$(T "Не удалось установить MagiTrickle Mod от badigit. Подробный лог: $LOG" "Could not install MagiTrickle Mod by badigit. Detailed log: $LOG")"
     return 1
 }
 
@@ -2607,7 +3367,7 @@ exit 0
 EOF
     chmod +x "$MIXOMO_REDIR_SCRIPT"
 
-    echo "Создание службы /etc/init.d/mixomo-local-routing"
+    echo "$(T "Создание службы /etc/init.d/mixomo-local-routing" "Creating the /etc/init.d/mixomo-local-routing service")"
     cat > /etc/init.d/mixomo-local-routing <<'EOF'
 #!/bin/sh /etc/rc.common
 START=99
@@ -2677,7 +3437,7 @@ install_magitrickle() {
 
     if [ "$INSTALLED" = "$MAGI_VARIANT" ] && [ -n "$NOW_TAG" ] && [ -n "$LATEST" ] && [ "$NOW_TAG" = "$LATEST" ] && [ -x /etc/init.d/magitrickle ]; then
         NEED_INSTALL=0
-        log_online "Актуальный MagiTrickle $LATEST уже установлен"
+        log_online "$(T "Актуальный MagiTrickle $LATEST уже установлен" "MagiTrickle $LATEST is already up to date")"
     fi
 
     if [ "$NEED_INSTALL" -eq 1 ]; then
@@ -2695,12 +3455,12 @@ install_magitrickle() {
 
         if [ "$MAGI_VARIANT" = "mod" ]; then
             if ! install_magitrickle_mod_package; then
-                log_error "Ошибка: не удалось установить MagiTrickle Mod от badigit!"
+                log_error "$(T "Ошибка: не удалось установить MagiTrickle Mod от badigit!" "Error: could not install MagiTrickle Mod by badigit!")"
                 return 1
             fi
         else
             if ! install_magitrickle_original_package; then
-                log_error "Ошибка: не удалось установить MagiTrickle!"
+                log_error "$(T "Ошибка: не удалось установить MagiTrickle!" "Error: could not install MagiTrickle!")"
                 return 1
             fi
         fi
@@ -2715,7 +3475,7 @@ install_magitrickle() {
         if ! service magitrickle running >/dev/null 2>&1; then
             sleep 2
             if ! service magitrickle running >/dev/null 2>&1; then
-                log_error "Ошибка: MagiTrickle не запускается!"
+                log_error "$(T "Ошибка: MagiTrickle не запускается!" "Error: MagiTrickle does not start!")"
                 return 1
             fi
         fi
@@ -2725,7 +3485,7 @@ install_magitrickle() {
 
     if [ -f "$BACKUP_PATH" ]; then
         if [ ! -f "$CONFIG_PATH" ]; then
-            echo "Начальная конфигурация отсутствует. Использование бэкапа..."
+            echo "$(T "Начальная конфигурация отсутствует. Использование бэкапа..." "No initial configuration found. Using the backup...")"
             mkdir -p "$(dirname "$CONFIG_PATH")"
             cp "$BACKUP_PATH" "$CONFIG_PATH"
         else
@@ -2734,15 +3494,15 @@ install_magitrickle() {
             NEW_VERSION=$(grep -E "^[[:space:]]*configVersion:" "$CONFIG_PATH" | awk '{print $2}' | tr -d ' "\r\n')
 
             if [ -z "$OLD_VERSION" ] || [ -z "$NEW_VERSION" ]; then
-                log_warn "Не удалось определить версию конфигурации."
-                log_warn "Бэкап сохранен как ${CONFIG_PATH}.backup"
+                log_warn "$(T "Не удалось определить версию конфигурации." "Could not determine the configuration version.")"
+                log_warn "$(T "Бэкап сохранен как ${CONFIG_PATH}.backup" "Backup saved as ${CONFIG_PATH}.backup")"
                 cp "$BACKUP_PATH" "${CONFIG_PATH}.backup"
             elif [ "$OLD_VERSION" = "$NEW_VERSION" ]; then
-                echo "Версии конфигураций совпадают ($OLD_VERSION). Использование бэкапа..."
+                echo "$(T "Версии конфигураций совпадают ($OLD_VERSION). Использование бэкапа..." "Configuration versions match ($OLD_VERSION). Using the backup...")"
                 cp "$BACKUP_PATH" "$CONFIG_PATH"
             else
-                log_warn "Версии конфигураций отличаются! (Прошлая: $OLD_VERSION, Нынешняя: $NEW_VERSION)"
-                log_warn "Прошлая конфигурация сохранена как ${CONFIG_PATH}.backup"
+                log_warn "$(T "Версии конфигураций отличаются! (Прошлая: $OLD_VERSION, Нынешняя: $NEW_VERSION)" "Configuration versions differ! (Previous: $OLD_VERSION, Current: $NEW_VERSION)")"
+                log_warn "$(T "Прошлая конфигурация сохранена как ${CONFIG_PATH}.backup" "Previous configuration saved as ${CONFIG_PATH}.backup")"
                 cp "$BACKUP_PATH" "${CONFIG_PATH}.backup"
             fi
         fi
@@ -2758,12 +3518,43 @@ install_magitrickle() {
     write_mixomo_routing_state
     install_mixomo_redir
 
-    echo "Создание страницы MagiTrickle в LuCI"
+    echo "$(T "Создание страницы MagiTrickle в LuCI" "Creating the MagiTrickle page in LuCI")"
     mkdir -p /www/luci-static/resources/view/magitrickle
 
     cat > /www/luci-static/resources/view/magitrickle/magitrickle.js <<'EOF'
 'use strict';
 'require view';
+
+var MIXOMO_EN = {
+    'HTTPS соединение блокирует встроенный интерфейс MagiTrickle через LuCI.': 'HTTPS connection blocks the built-in MagiTrickle interface through LuCI.',
+    'Пожалуйста, откройте MagiTrickle в новой вкладке для полноценного управления.': 'Please open MagiTrickle in a new tab for full management.',
+    'Открыть MagiTrickle': 'Open MagiTrickle'
+};
+
+function detectLuciLang() {
+    var lang = '';
+    if (window.LANG) {
+        lang = window.LANG;
+    } else if (document.documentElement && document.documentElement.lang) {
+        lang = document.documentElement.lang;
+    }
+    return (lang || 'ru').toLowerCase();
+}
+
+var MIXOMO_IS_EN = /^en/.test(detectLuciLang());
+
+(function() {
+    var orig = window._;
+    window._ = function(text) {
+        if (MIXOMO_IS_EN && MIXOMO_EN.hasOwnProperty(text)) {
+            return MIXOMO_EN[text];
+        }
+        if (orig) {
+            return orig.apply(window, arguments);
+        }
+        return text;
+    };
+})();
 
 return view.extend({
     handleSave: null,
@@ -2815,12 +3606,12 @@ EOF
 }
 
 finalize_install() {
-    echo "Выставление прав доступа"
+    echo "$(T "Выставление прав доступа" "Setting permissions")"
     chmod -R 755 /www/luci-static/resources/view/mihomo 2>/dev/null || true
     find /www/luci-static/resources/view/mihomo -type f -exec chmod 644 {} \; 2>/dev/null || true
     chmod 644 /www/luci-static/resources/view/magitrickle/magitrickle.js 2>/dev/null || true
 
-    echo "Очистка кэша LuCI и перезапуск сервисов"
+    echo "$(T "Очистка кэша LuCI и перезапуск сервисов" "Clearing the LuCI cache and restarting services")"
     rm -rf /tmp/luci-indexcache /tmp/luci-modulecache/
     /etc/init.d/rpcd restart > /dev/null 2>&1
     /etc/init.d/uhttpd restart > /dev/null 2>&1
@@ -2832,44 +3623,51 @@ finalize_install() {
 main() {
     clear
 
+    choose_language
+    echo ""
+
+    uci -q delete firewall.Block_443_UDP.direction
+    uci -q delete firewall.Block_443_UDP.reject_forward
+    uci commit firewall 2>/dev/null || true
+
     choose_magitrickle_variant
     echo ""
 
-    log_done "[1/5] Установка зависимостей"
+    log_done "$(T "[1/5] Установка зависимостей" "[1/5] Installing dependencies")"
     install_deps || step_fail
     echo ""
 
-    log_done "[2/5] Установка Mihomo"
+    log_done "$(T "[2/5] Установка Mihomo" "[2/5] Installing Mihomo")"
     install_mihomo || step_fail
     echo ""
 
-    log_done "[3/5] Установка Hev-Socks5-Tunnel"
+    log_done "$(T "[3/5] Установка Hev-Socks5-Tunnel" "[3/5] Installing Hev-Socks5-Tunnel")"
     install_hev_tunnel || step_fail
     echo ""
 
-    log_done "[4/5] Установка MagiTrickle"
+    log_done "$(T "[4/5] Установка MagiTrickle" "[4/5] Installing MagiTrickle")"
     install_magitrickle || step_fail
     echo ""
 
-    log_done "[5/5] Завершение"
+    log_done "$(T "[5/5] Завершение" "[5/5] Finalization")"
     finalize_install || step_fail
     echo ""
     log_done "┌───────────────────────────────────────────────────────────────────────┐"
-    log_done "│ Установка Mixomo OpenWrt $SCRIPT_VERSION прошла успешно!                 │"
+    log_done "$(T "│ Установка Mixomo OpenWrt $SCRIPT_VERSION прошла успешно!                 │" "│ Mixomo OpenWrt $SCRIPT_VERSION installed successfully!                  │")"
     log_done "├───────────────────────────────────────────────────────────────────────┤"
-    log_done "│ 1. Перезагрузите страницу роутера, далее перейдите в...               │"
+    log_done "$(T "│ 1. Перезагрузите страницу роутера, далее перейдите в...               │" "│ 1. Reload the router page, then go to...                               │")"
     log_done "├───────────────────────────────────────────────────────────────────────┤"
-    log_done "│ 2. Службы или Services → Mihomo → Настройте конфигурацию прокси       │"
-    log_done "│    ${CYAN}[Онлайн генератор конфигурации]                                    ${GREEN}│"
+    log_done "$(T "│ 2. Службы или Services → Mihomo → Настройте конфигурацию прокси       │" "│ 2. Services → Mihomo → Configure the proxy configuration               │")"
+    log_done "│    ${CYAN}[$(T "Онлайн генератор конфигурации" "Online config generator")]                                      ${GREEN}│"
     log_done "│    ${CYAN}https://spatiumstas.github.io/web4core/                            ${GREEN}│"
-    log_done "│    ${CYAN}[Готовые конфигурации]                                             ${GREEN}│"
+    log_done "│    ${CYAN}[$(T "Готовые конфигурации" "Ready-made configs")]                                               ${GREEN}│"
     log_done "│    ${CYAN}https://secret-harbor.notion.site/31345fc37b6f80fa82d3da96e9ae12cc ${GREEN}│"
     log_done "├───────────────────────────────────────────────────────────────────────┤"
-    log_done "│ 3. Службы или Services → MagiTrickle → Укажите сайты для прокси       │"
-    log_done "│    ${CYAN}[Готовые конфигурации]                                             ${GREEN}│"
+    log_done "$(T "│ 3. Службы или Services → MagiTrickle → Укажите сайты для прокси       │" "│ 3. Services → MagiTrickle → Specify sites to proxy                      │")"
+    log_done "│    ${CYAN}[$(T "Готовые конфигурации" "Ready-made configs")]                                               ${GREEN}│"
     log_done "│    ${CYAN}https://secret-harbor.notion.site/31345fc37b6f80fa82d3da96e9ae12cc ${GREEN}│"
     log_done "├───────────────────────────────────────────────────────────────────────┤"
-    log_done "│ 4. Наслаждайтесь интернетом :)                                        │"
+    log_done "$(T "│ 4. Наслаждайтесь интернетом :)                                        │" "│ 4. Enjoy the internet :)                                               │")"
     log_done "└───────────────────────────────────────────────────────────────────────┘"
     echo ""
 
