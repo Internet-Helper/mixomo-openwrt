@@ -21,7 +21,7 @@
 **Mixomo-OpenWrt** - это автоматическая установка трёх компонентов для умной маршрутизации трафика на роутерах OpenWrt:  
 - [Mihomo](https://github.com/MetaCubeX/mihomo) - многофункциональное прокси-ядро  
 - [hev-socks5-tunnel](https://github.com/heiher/hev-socks5-tunnel) - tun <-> socks5 мост (он нужен чтобы Mihomo связать с MagiTrickle)
-- [MagiTrickle](https://github.com/MagiTrickle/MagiTrickle) | [MagiTrickle Mod](https://github.com/badigit/MagiTrickle_mod_badigit) - направляет в прокси-ядро Mihomo только выбранные домены и подсети (IP/CIDR)  
+- [MagiTrickle](https://github.com/MagiTrickle/MagiTrickle) | [MagiTrickle Mod](https://github.com/badigit/MagiTrickle_mod_badigit) - направляет в прокси-ядро Mihomo только выбранные домены и адреса
 
 **Что это даёт на практике:**
 - Через прокси проходит только тот трафик, который Вы в него направили
