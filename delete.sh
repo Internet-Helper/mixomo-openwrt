@@ -1,17 +1,21 @@
 #!/bin/sh
 
-SCRIPT_VERSION="v0.2.3-alpha"
+SCRIPT_VERSION="v0.3.0"
 
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
+STEP=""
+
 log_info()  { echo -e "${GREEN}[INFO]${NC} $*"; }
-log_warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
+log_warn()  { echo -e "${YELLOW}[WARN]${NC} $*" >&2; }
 log_error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
-log_step()  { echo -e "${GREEN}=== $* ===${NC}"; }
+log_step()  { echo -e "${GREEN}$*${NC}"; }
 log_done()  { echo -e "${GREEN}$*${NC}"; }
+step_info() { echo -e "${GREEN}${STEP} [INFO] $*${NC}"; }
+step_done() { echo -e "${GREEN}${STEP} $*${NC}"; }
 
 USE_APK=0
 if command -v apk > /dev/null 2>&1; then
@@ -34,9 +38,27 @@ remove_pkg() {
     fi
 }
 
+mihomo_artifacts_present() {
+    [ -e "/etc/init.d/mihomo" ] || [ -e "/usr/bin/mihomo" ] || \
+    [ -e "/etc/mihomo" ] || [ -e "/www/luci-static/resources/view/mihomo" ] || \
+    [ -e "/usr/share/rpcd/ucode/mihomo-routing" ] || [ -e "/usr/share/rpcd/ucode/mihomo-dns" ] || \
+    [ -e "/usr/share/rpcd/ucode/mihomo-profiles" ] || [ -e "/usr/share/rpcd/ucode/mihomo-schedule" ] || \
+    [ -e "/usr/share/rpcd/ucode/mihomo-routing.uc" ] || [ -e "/usr/share/rpcd/ucode/mihomo-dns.uc" ] || \
+    [ -e "/usr/share/rpcd/ucode/mihomo-profiles.uc" ] || [ -e "/usr/share/rpcd/ucode/mihomo-schedule.uc" ] || \
+    [ -e "/usr/share/luci/menu.d/luci-app-mihomo.json" ] || \
+    [ -e "/usr/share/rpcd/acl.d/luci-app-mihomo.json" ] || \
+    [ -e "/usr/share/rpcd/acl.d/luci-app-mixomo.json" ] || \
+    [ -e "/usr/libexec/rpcd/mihomo-routing" ] || [ -e "/usr/libexec/rpcd/mihomo-dns" ] || \
+    [ -e "/usr/libexec/rpcd/mihomo-profiles" ] || [ -e "/usr/libexec/rpcd/mihomo-schedule" ]
+}
+
 remove_mihomo() {
-    log_info "Проверка наличия Mihomo"
+    step_info "Проверка наличия Mihomo"
     local CLEANED=0
+
+    if mihomo_artifacts_present; then
+        CLEANED=1
+    fi
 
     if [ -f "/etc/init.d/mihomo" ]; then
         /etc/init.d/mihomo stop 2>/dev/null || true
@@ -51,23 +73,52 @@ remove_mihomo() {
     fi
 
     if [ -d "/etc/mihomo" ] || [ -d "/www/luci-static/resources/view/mihomo" ]; then
-        rm -rf /etc/mihomo
-        rm -f /usr/share/luci/menu.d/luci-app-mihomo.json
-        rm -f /usr/share/rpcd/acl.d/luci-app-mihomo.json
-        rm -f /usr/libexec/rpcd/mihomo-routing
-        rm -rf /www/luci-static/resources/view/mihomo
         CLEANED=1
     fi
+    rm -rf /etc/mihomo
+    rm -f /usr/share/ucode/mixomo.uc
+    rm -f /usr/share/rpcd/ucode/mihomo-routing /usr/share/rpcd/ucode/mihomo-dns
+    rm -f /usr/share/rpcd/ucode/mihomo-profiles /usr/share/rpcd/ucode/mihomo-schedule
+    rm -f /usr/share/rpcd/ucode/mihomo-routing.uc /usr/share/rpcd/ucode/mihomo-dns.uc
+    rm -f /usr/share/rpcd/ucode/mihomo-profiles.uc /usr/share/rpcd/ucode/mihomo-schedule.uc
+    rm -f /usr/share/luci/menu.d/luci-app-mihomo.json
+    rm -f /usr/share/rpcd/acl.d/luci-app-mihomo.json /usr/share/rpcd/acl.d/luci-app-mixomo.json
+    rm -f /usr/libexec/rpcd/mihomo-routing /usr/libexec/rpcd/mihomo-dns
+    rm -f /usr/libexec/rpcd/mihomo-profiles /usr/libexec/rpcd/mihomo-schedule
+    rm -f /etc/init.d/mixomo-schedule
+    rm -rf /www/luci-static/resources/view/mihomo
 
     if [ "$CLEANED" -eq 1 ]; then
-        log_done "Mihomo и его файлы успешно удалены."
+        step_done "Mihomo и его файлы успешно удалены"
     else
-        log_done "Mihomo не найден или уже был удалён."
+        step_done "Mihomo не найден или уже был удалён"
+    fi
+}
+
+cleanup_dnsmasq_rules() {
+    local file=/etc/dnsmasq.conf
+    local temp
+    [ -f "$file" ] || return 0
+    temp=$(mktemp /tmp/mixomo-dnsmasq.XXXXXX 2>/dev/null) || return 0
+    if awk -v start='# Rules from Mixomo' -v end='# End rules from Mixomo' '
+        { lines[NR] = $0 }
+        !inside && $0 == start { begin = NR; inside = 1; next }
+        inside && $0 == end {
+            for (i = begin; i <= NR; i++) drop[i] = 1
+            inside = 0
+        }
+        END {
+            for (i = 1; i <= NR; i++) if (!drop[i]) print lines[i]
+        }
+    ' "$file" > "$temp"; then
+        mv "$temp" "$file"
+    else
+        rm -f "$temp"
     fi
 }
 
 remove_hev_tunnel() {
-    log_info "Проверка наличия Hev-Socks5-Tunnel..."
+    step_info "Проверка наличия hev-socks5-tunnel"
     local PRESENT=0
     if [ -e "/etc/init.d/hev-socks5-tunnel" ] || [ -e "/etc/hev-socks5-tunnel" ] || \
        [ -e "/etc/config/hev-socks5-tunnel" ] || is_pkg_installed hev-socks5-tunnel; then
@@ -110,14 +161,14 @@ remove_hev_tunnel() {
     /etc/init.d/firewall restart 2>/dev/null || true
 
     if [ "$PRESENT" -eq 1 ]; then
-        log_done "Hev-Socks5-Tunnel и настройки удалены."
+        step_done "hev-socks5-tunnel и настройки удалены"
     else
-        log_done "Hev-Socks5-Tunnel не найден или уже был удалён."
+        step_done "hev-socks5-tunnel не найден или уже был удалён"
     fi
 }
 
 cleanup_mixomo_routing() {
-    log_info "Проверка файлов локальной маршрутизации Mixomo"
+    step_info "Проверка файлов локальной маршрутизации Mixomo"
     local PRESENT=0
     local MARK=1298229097
 
@@ -129,7 +180,7 @@ cleanup_mixomo_routing() {
         [ -n "$m" ] && MARK="$m"
     fi
 
-    if [ -e /etc/mixomo ] || [ -e /etc/init.d/mixomo-local-routing ] || \
+    if [ -e /etc/mixomo ] || [ -e /etc/init.d/mixomo-local-routing ] || [ -e /etc/init.d/mixomo-routing ] || \
        [ -e /usr/libexec/mixomo-redir ] || [ -e /etc/mihomo/mihomo-router-routing.nft ]; then
         PRESENT=1
     fi
@@ -153,8 +204,14 @@ cleanup_mixomo_routing() {
     ip rule del fwmark "$MARK" lookup "$MARK" 2>/dev/null || true
     ip route del local default dev lo table "$MARK" 2>/dev/null || true
 
+    local p=18000
+    while [ "$p" -lt 19000 ]; do
+        ip rule del priority "$p" 2>/dev/null
+        p=$((p + 1))
+    done
+
     local sec
-    for sec in $(uci show network 2>/dev/null | sed -n "s/^network\\.\\(mihomo_route_[^.=]*\\)=\\(rule\\|mihomo_rule\\)$/\\1/p"); do
+    for sec in $(uci show network 2>/dev/null | sed -n "s/^network\\.\\(mihomo_route_[^.=]*\\)=\\(rule\\|mihomo_rule\\|mihomo_excl\\)$/\\1/p"); do
         uci -q delete "network.$sec"
     done
     uci -q delete network.mihomo_routing_table
@@ -167,7 +224,8 @@ cleanup_mixomo_routing() {
     nft delete table inet mihomo_router_routing 2>/dev/null || true
 
     /etc/init.d/mixomo-local-routing stop 2>/dev/null || true
-    rm -f /etc/init.d/mixomo-local-routing
+    /etc/init.d/mixomo-routing stop 2>/dev/null || true
+    rm -f /etc/init.d/mixomo-local-routing /etc/init.d/mixomo-routing
     rm -rf /etc/mixomo
     rm -f /usr/libexec/mixomo-redir
 
@@ -175,14 +233,14 @@ cleanup_mixomo_routing() {
     /etc/init.d/firewall reload 2>/dev/null || true
 
     if [ "$PRESENT" -eq 1 ]; then
-        log_done "Локальная маршрутизация Mixomo удалена."
+        step_done "Локальная маршрутизация Mixomo удалена"
     else
-        log_done "Локальная маршрутизация Mixomo не найдена или уже была удалена."
+        step_done "Локальная маршрутизация Mixomo не найдена или уже была удалена"
     fi
 }
 
 remove_magitrickle() {
-    log_info "Проверка наличия MagiTrickle..."
+    step_info "Проверка наличия MagiTrickle"
     local PRESENT=0
 
     if [ -f "/etc/init.d/magitrickle" ]; then
@@ -190,16 +248,15 @@ remove_magitrickle() {
         /etc/init.d/magitrickle disable 2>/dev/null || true
     fi
 
-    if is_pkg_installed magitrickle_mod; then
-        log_info "Найден MagiTrickle Mod."
-        PRESENT=1
-    fi
-    if is_pkg_installed magitrickle; then
-        log_info "Найден MagiTrickle."
+    if is_pkg_installed magitrickle_mod || is_pkg_installed magitrickle; then
         PRESENT=1
     fi
     if [ -e "/etc/init.d/magitrickle" ] || [ -e "/etc/magitrickle" ] || [ -e "/etc/config/magitrickle" ]; then
         PRESENT=1
+    fi
+
+    if [ "$PRESENT" -eq 1 ]; then
+        step_info "Найден MagiTrickle"
     fi
 
     if [ "$USE_APK" -eq 1 ]; then
@@ -211,52 +268,53 @@ remove_magitrickle() {
 
     rm -rf /www/luci-static/resources/view/magitrickle
     rm -f /usr/share/luci/menu.d/luci-app-magitrickle.json
+    rm -f /etc/init.d/magitrickle
     rm -rf /etc/magitrickle
     rm -f /etc/config/magitrickle
     uci -q delete magitrickle
     uci -q commit magitrickle 2>/dev/null
 
     if [ "$PRESENT" -eq 1 ]; then
-        log_done "MagiTrickle и его файлы удалены."
+        step_done "MagiTrickle и его файлы удалены"
     else
-        log_done "MagiTrickle не найден или уже был удалён."
+        step_done "MagiTrickle не найден или уже был удалён"
     fi
 }
 
 cleanup_system() {
-    log_info "Очистка кэша и перезапуск служб"
+    step_info "Очистка кэша и перезапуск служб"
     rm -rf /tmp/luci-indexcache /tmp/luci-modulecache/
     /etc/init.d/rpcd restart > /dev/null 2>&1 || true
     /etc/init.d/uhttpd restart > /dev/null 2>&1 || true
 }
 
 main() {
-    clear
-    log_done "Скрипт удаления Mixomo OpenWrt $SCRIPT_VERSION от Internet Helper"
+    echo ""
+    log_done "Mixomo OpenWrt $SCRIPT_VERSION"
     echo ""
 
+    STEP="[1/5]"
     log_step "[1/5] Удаление Mihomo"
     remove_mihomo
-    echo ""
+    cleanup_dnsmasq_rules
 
+    STEP="[2/5]"
     log_step "[2/5] Удаление локальной маршрутизации Mixomo"
     cleanup_mixomo_routing
-    echo ""
 
-    log_step "[3/5] Удаление Hev-Socks5-Tunnel"
+    STEP="[3/5]"
+    log_step "[3/5] Удаление hev-socks5-tunnel"
     remove_hev_tunnel
-    echo ""
 
+    STEP="[4/5]"
     log_step "[4/5] Удаление MagiTrickle"
     remove_magitrickle
-    echo ""
 
+    STEP="[5/5]"
     log_step "[5/5] Завершение"
     cleanup_system
-    echo ""
 
-    log_done "Полное удаление произведено успешно!"
-    echo ""
+    log_done "Удаление Mixomo OpenWrt $SCRIPT_VERSION завершено"
 }
 
 main

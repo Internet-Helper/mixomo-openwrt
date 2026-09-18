@@ -1,0 +1,77 @@
+#!/bin/sh
+PREFIX="mihomo_route_"
+CHAIN="MIXOMO_CLASSIFY"
+MARK_DEFAULT="1298229097"
+EXCL_PRIO_BASE=18000
+IPT=""
+if command -v iptables >/dev/null 2>&1; then
+    IPT=iptables
+elif command -v iptables-nft >/dev/null 2>&1; then
+    IPT=iptables-nft
+fi
+REDIR_PORT=$(tr -d ' \r\n' < /etc/mixomo/routing/redir-port 2>/dev/null)
+MARK=$(tr -d ' \r\n' < /etc/mixomo/routing/redir-mark 2>/dev/null)
+[ -n "$MARK" ] || MARK="$MARK_DEFAULT"
+: > /tmp/mixomo-user-excl
+for section in $(uci show network 2>/dev/null | sed -n "s/^network\\.${PREFIX}excl_[^.=]*=mihomo_excl$/&/p"); do
+    [ "$(uci -q get "network.${section#network.}.disabled")" = 1 ] && continue
+    destination=$(uci -q get "network.${section#network.}.dest")
+    [ -n "$destination" ] && printf '%s\n' "$destination" >> /tmp/mixomo-user-excl
+done
+sort -u /tmp/mixomo-user-excl > /tmp/mixomo-user-excl-u
+p=$EXCL_PRIO_BASE
+while [ "$p" -lt $((EXCL_PRIO_BASE + 100)) ]; do
+    ip rule del priority "$p" 2>/dev/null || true
+    p=$((p + 1))
+done
+n=0
+while read -r exclusion; do
+    ip rule add priority $((EXCL_PRIO_BASE + n)) to "$exclusion" lookup main 2>/dev/null || true
+    n=$((n + 1))
+done < /tmp/mixomo-user-excl-u
+: > /tmp/mixomo-redir-rules
+for section in $(uci show network 2>/dev/null | sed -n "s/^network\\.${PREFIX}client_[^.=]*=mihomo_rule$/&/p"); do
+    [ "$(uci -q get "network.${section#network.}.disabled")" = 1 ] && continue
+    source=$(uci -q get "network.${section#network.}.src")
+    [ -n "$source" ] || continue
+    priority=$(uci -q get "network.${section#network.}.priority")
+    [ -n "$priority" ] || priority=0
+    printf '%s|%s\n' "$priority" "$source" >> /tmp/mixomo-redir-rules
+done
+sort -n -t'|' -k1 /tmp/mixomo-redir-rules > /tmp/mixomo-redir-rules.sorted
+if [ -n "$IPT" ]; then
+    for table in nat mangle; do
+        "$IPT" -t "$table" -F "$CHAIN" 2>/dev/null || true
+        "$IPT" -t "$table" -D PREROUTING -i lo -j "$CHAIN" 2>/dev/null || true
+        "$IPT" -t "$table" -D PREROUTING ! -i lo -j "$CHAIN" 2>/dev/null || true
+        "$IPT" -t "$table" -X "$CHAIN" 2>/dev/null || true
+    done
+fi
+[ -n "$IPT" ] || exit 0
+[ -n "$REDIR_PORT" ] || exit 0
+[ -s /tmp/mixomo-redir-rules.sorted ] || exit 0
+"$IPT" -t nat -N "$CHAIN" 2>/dev/null || exit 1
+"$IPT" -t mangle -N "$CHAIN" 2>/dev/null || exit 1
+LOCAL="127.0.0.0/8 192.168.0.0/16 10.0.0.0/8 172.16.0.0/12 100.64.0.0/10 169.254.0.0/16 224.0.0.0/4 255.255.255.255/32"
+ip -4 route show table main proto kernel scope link 2>/dev/null > /tmp/mixomo-local-routes
+while read -r subnet rest; do
+    case "$subnet" in
+        */*) LOCAL="$LOCAL $subnet" ;;
+    esac
+done < /tmp/mixomo-local-routes
+while read -r exclusion; do
+    LOCAL="$LOCAL $exclusion"
+done < /tmp/mixomo-user-excl-u
+for network in $LOCAL; do
+    "$IPT" -t nat -A "$CHAIN" -d "$network" -j RETURN
+    "$IPT" -t mangle -A "$CHAIN" -d "$network" -j RETURN
+done
+"$IPT" -t nat -I PREROUTING 1 ! -i lo -j "$CHAIN"
+"$IPT" -t mangle -I PREROUTING 1 ! -i lo -j "$CHAIN"
+while IFS='|' read -r priority source; do
+    "$IPT" -t nat -A "$CHAIN" -s "$source" -p tcp -j REDIRECT --to-ports "$REDIR_PORT"
+    "$IPT" -t mangle -A "$CHAIN" -s "$source" -p udp -j TPROXY --on-port "$REDIR_PORT" --tproxy-mark "$MARK/$MARK" 2>/dev/null || true
+done < /tmp/mixomo-redir-rules.sorted
+ip rule add fwmark "$MARK" lookup "$MARK" 2>/dev/null || true
+ip route replace local default dev lo table "$MARK" 2>/dev/null || true
+exit 0

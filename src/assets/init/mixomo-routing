@@ -1,0 +1,24 @@
+#!/bin/sh /etc/rc.common
+START=99
+STOP=10
+
+start() {
+    [ -x /etc/mixomo/routing/redir ] && /etc/mixomo/routing/redir 2>/dev/null
+    local routing_table
+    routing_table=$(uci -q get network.mihomo_routing_table.table)
+    [ -n "$routing_table" ] || return 0
+    i=0
+    while [ "$i" -lt 10 ] && ! ip link show Mihomo >/dev/null 2>&1; do
+        sleep 1
+        i=$((i + 1))
+    done
+    ip route replace default dev Mihomo table "$routing_table" 2>/dev/null || true
+    if [ "$(uci -q get network.mihomo_route_router.mark)" = 0x233 ]; then
+        ip rule add priority 19000 fwmark 0x233 lookup "$routing_table" 2>/dev/null || true
+    fi
+    [ -x /etc/init.d/magitrickle ] && /etc/init.d/magitrickle restart >/dev/null 2>&1 || true
+}
+
+stop() {
+    [ -x /etc/mixomo/routing/redir ] && /etc/mixomo/routing/redir 2>/dev/null || true
+}

@@ -1,0 +1,37 @@
+{
+    "luci-app-mixomo": {
+        "description": "Mihomo control",
+        "read": {
+            "file": {
+                "/etc/mihomo/config.yaml": ["read", "stat"],
+                "/etc/mihomo/profiles/": ["list"],
+                "/etc/mihomo/profiles/*": ["read", "stat"],
+                "/etc/mihomo/rule-files/": ["list"],
+                "/etc/mihomo/rule-files/*": ["read", "stat"]
+            },
+            "ubus": {
+                "service": ["list"],
+                "mihomo-routing": ["status", "clients"],
+                "mihomo-dns": ["status"],
+                "mihomo-profiles": ["list"],
+                "mihomo-schedule": ["list"]
+            }
+        },
+        "write": {
+            "file": {
+                "/etc/mihomo/config.yaml": ["write"],
+                "/etc/mihomo/profiles/*": ["write"],
+                "/etc/mihomo/rule-files/*": ["write"],
+                "/usr/bin/mihomo": ["exec"],
+                "/etc/init.d/mihomo": ["exec"],
+                "/sbin/logread": ["exec"]
+            },
+            "ubus": {
+                "mihomo-routing": ["add", "update", "delete", "set_enabled", "set_router", "set_udp443", "exclude_add", "exclude_delete", "exclude_update", "exclude_set_enabled", "reorder", "reload"],
+                "mihomo-dns": ["apply", "clear", "add_preset", "remove_preset", "rename_preset", "set_order"],
+                "mihomo-profiles": ["apply", "normalize", "import", "import_full", "create", "rename_profile", "delete", "rule_import", "rule_rename", "rule_delete", "refresh", "set_interval", "set_url", "set_order"],
+                "mihomo-schedule": ["default", "save", "delete", "set_enabled"]
+            }
+        }
+    }
+}

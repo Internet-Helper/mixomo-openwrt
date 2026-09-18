@@ -1,0 +1,64 @@
+mode: rule
+ipv6: false
+mixed-port: 7890
+redir-port: 5001
+log-level: error
+allow-lan: true
+unified-delay: true
+tcp-concurrent: false
+find-process-mode: off
+external-controller: 0.0.0.0:9090
+routing-mark: 2
+profile:
+  store-selected: true
+  store-fake-ip: true
+  tracing: true
+sniffer:
+  enable: true
+  force-dns-mapping: true
+  parse-pure-ip: true
+  sniff:
+    HTTP:
+      ports: [80]
+      override-destination: true
+    TLS:
+      ports: [443, 8443]
+    QUIC:
+      ports: [443, 8443]
+  skip-domain:
+    - Mijia Cloud
+    - +.lan
+    - +.local
+    - +.msftconnecttest.com
+    - +.msftncsi.com
+    - +.3gppnetwork.org
+    - +.openwrt.org
+    - +.vsean.net
+    - cudy.net
+
+dns:
+  enable: true
+  listen: 0.0.0.0:7880
+  ipv6: false
+  nameserver:
+    - https://8.8.8.8/dns-query
+    - https://8.8.4.4/dns-query
+    - https://1.1.1.1/dns-query
+    - https://1.0.0.1/dns-query
+    - https://9.9.9.9/dns-query
+    - https://149.112.112.112/dns-query
+    - https://94.140.14.140/dns-query
+    - https://94.140.14.141/dns-query
+    - https://77.88.8.8/dns-query
+    - https://77.88.8.1/dns-query
+
+proxies:
+  - name: Домашний интернет
+    type: direct
+
+proxy-groups:
+
+rule-providers:
+
+rules:
+  - MATCH,Домашний интернет

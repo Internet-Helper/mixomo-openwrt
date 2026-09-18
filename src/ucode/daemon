@@ -1,0 +1,282 @@
+#!/usr/bin/env ucode
+'use strict';
+
+/* Mixomo schedule daemon (ucode).
+ * Installed at /etc/mixomo/schedule/daemon; started by /etc/init.d/mixomo-schedule.
+ * Uses the shared module mixomo.uc from /usr/share/ucode/mixomo.uc.
+ */
+
+import {
+	STATE_FILE, ACTIVE_FILE, RULES_STATE, MAIN_CONFIG,
+	PROFILES_DIR, RULES_DIR, SCHED_DIR, TIME_FILE, TRIGGER_FILE, DEFAULT_FILE,
+	read_file, write_file, mkdir_p, current_active, clean_name,
+	read_table, lookup_row, state_update, state_touch,
+	download_to, normalize_config, test_config, apply_profile,
+	build_refresh_full_config, build_refresh_selected_config
+} from 'mixomo';
+
+function log(msg) {
+	system([ '/usr/bin/logger', '-t', 'mixomo-schedule', msg ]);
+}
+
+/* --- refresh one config profile ------------------------------------ */
+
+function refresh_config(name) {
+	let row = lookup_row(STATE_FILE, name);
+	if (row == null) return;
+	let url = (row[1] == null) ? '' : row[1];
+	if (url == '') return;
+	let secs = (row[4] == null) ? '' : row[4];
+	let prof = PROFILES_DIR + '/' + name + '.yaml';
+	if (read_file(prof) == null) return;
+	let tmp = '/tmp/mixomo-sched-refresh';
+	if (!download_to(url, tmp)) return;
+	if (read_file(tmp) == null) return;
+	let src = read_file(tmp);
+	system([ '/bin/rm', '-f', tmp ]);
+	let existing = read_file(prof);
+	let built = (secs != '') ? build_refresh_selected_config(src, existing, secs)
+	                          : build_refresh_full_config(src, existing);
+	if (built == null) { log('refresh config failed: ' + name); return; }
+	let b2 = '/tmp/mixomo-sched-build';
+	write_file(b2, built);
+	normalize_config(b2);
+	if (!test_config(b2).ok) { system([ '/bin/rm', '-f', b2 ]); log('refresh config invalid: ' + name); return; }
+	system([ '/bin/rm', '-f', prof ]);
+	system([ '/bin/mv', b2, prof ]);
+	if (current_active() == name) apply_profile(name);
+	state_update(STATE_FILE, name, url, (row[2] == null) ? '' : row[2], (row[4] == null) ? '' : row[4]);
+	log('refreshed config: ' + name);
+}
+
+/* --- refresh a rules file ------------------------------------------ */
+
+function refresh_rule(name) {
+	let row = lookup_row(RULES_STATE, name);
+	if (row == null) return;
+	let url = (row[1] == null) ? '' : row[1];
+	if (url == '') return;
+	let tmp = '/tmp/mixomo-sched-rule';
+	if (!download_to(url, tmp)) return;
+	if (read_file(tmp) == null) return;
+	system([ '/bin/rm', '-f', RULES_DIR + '/' + name ]);
+	system([ '/bin/mv', tmp, RULES_DIR + '/' + name ]);
+	state_update(RULES_STATE, name, url, (row[2] == null) ? '' : row[2], (row[4] == null) ? '' : row[4]);
+	log('refreshed rules: ' + name);
+}
+
+/* --- time-based scheduling ----------------------------------------- */
+
+function in_list(list1, v) {
+	if (list1 == '' || list1 == 'all' || list1 == '-') return true;
+	return index(',' + list1 + ',', ',' + v + ',') >= 0;
+}
+
+function now_hm() {
+	let d = localtime();
+	return sprintf('%02d%02d', d.hour, d.min);
+}
+
+function in_window(start, end, now) {
+	if (start == '' || end == '' || start == end) return true;
+	let s = replace(start, /:/g, '');
+	let e = replace(end, /:/g, '');
+	if (s < e)
+		return (now >= s && now < e);
+	return (now >= s || now < e);
+}
+
+function time_row_matches(r, lt, now) {
+	let enabled = (r[1] == null) ? '' : r[1];
+	let start = (r[3] == null) ? '' : r[3];
+	let end = (r[4] == null) ? '' : r[4];
+	let days = (r[5] == null) ? '' : r[5];
+	let dom = (r[6] == null) ? '' : r[6];
+	let months = (r[7] == null) ? '' : r[7];
+	if (enabled != '1') return false;
+	if (!in_list(months, '' + lt.mon)) return false;
+	if (!in_list(dom, '' + lt.mday)) return false;
+	if (!in_list(days, '' + lt.wday)) return false;
+	return in_window(start, end, now);
+}
+
+function trigger_in_time_window(name, lt, now) {
+	let rows = read_table(TIME_FILE);
+	let found = false;
+	for (let i = 0; i < length(rows); i++) {
+		if (rows[i][0] != name) continue;
+		found = true;
+		if (time_row_matches(rows[i], lt, now)) return true;
+	}
+	return !found ? true : false;
+}
+
+function eval_time() {
+	let rows = read_table(TIME_FILE);
+	let found = false;
+	let lt = localtime();
+	let today_dow = '' + lt.wday;
+	let today_dom = '' + lt.mday;
+	let today_mon = '' + lt.mon;
+	let now = now_hm();
+	let nowtime = time();
+
+	for (let i = 0; i < length(rows); i++) {
+		let r = rows[i];
+		let name = (r[0] == null) ? '' : r[0];
+		let enabled = (r[1] == null) ? '' : r[1];
+		let profile = (r[2] == null) ? '' : r[2];
+		let start = (r[3] == null) ? '' : r[3];
+		let end = (r[4] == null) ? '' : r[4];
+		let days = (r[5] == null) ? '' : r[5];
+		let dom = (r[6] == null) ? '' : r[6];
+		let months = (r[7] == null) ? '' : r[7];
+		if (enabled != '1') continue;
+		if (profile == '' || profile == '-') continue;
+		if (!in_list(months, today_mon)) continue;
+		if (!in_list(dom, today_dom)) continue;
+		if (!in_list(days, today_dow)) continue;
+		if (!in_window(start, end, now)) continue;
+		found = 1;
+		if (current_active() != profile) apply_profile(profile);
+		break;
+	}
+	if (found == 0) {
+		let changed = read_file('/var/run/mixomo-schedule/.schedule_changed');
+		if (changed != null && nowtime - int(trim(changed)) < 60) return;
+		let def = read_file(DEFAULT_FILE);
+		if (def != null) {
+			def = trim(def);
+			if (def != '' && def != '-' && current_active() != def)
+				apply_profile(def);
+		}
+	}
+}
+
+/* --- trigger-based scheduling --------------------------------------- */
+
+function eval_trigger() {
+	let rows = read_table(TRIGGER_FILE);
+	let nowtime = time();
+	let lt = localtime();
+	let now = sprintf('%02d%02d', lt.hour, lt.min);
+	for (let i = 0; i < length(rows); i++) {
+		let r = rows[i];
+		let name = (r[0] == null) ? '' : r[0];
+		let enabled = (r[1] == null) ? '' : r[1];
+		let urls = (r[2] == null) ? '' : r[2];
+		let interval = (r[3] == null || r[3] == '') ? '5' : r[3];
+		let fallback = (r[4] == null) ? '' : r[4];
+		let primary = (r[5] == null) ? '' : r[5];
+		let threshold = (r[6] == null || r[6] == '') ? '2' : r[6];
+		let mode = r[7] == 'direct' ? 'direct' : 'mihomo';
+		if (enabled != '1') continue;
+		if (urls == '') continue;
+		if (!trigger_in_time_window(name, lt, now)) continue;
+		let iv = int(interval);
+		let state_dir = '/var/run/mixomo-schedule';
+		let last = read_file(state_dir + '/.last_' + name);
+		last = (last == null) ? 0 : int(trim(last));
+		if (nowtime - last < iv * 60) continue;
+		write_file(state_dir + '/.last_' + name, nowtime + '\n');
+		let ok = 1;
+		let url_list = split(urls, ' ');
+		for (let j = 0; j < length(url_list); j++) {
+			let u = url_list[j];
+			if (u == '') continue;
+			if (match(u, /^[A-Za-z][A-Za-z0-9+.-]*:\/\//) == null) u = 'https://' + u;
+			let args = [ '/usr/bin/curl', '-sS', '-L', '--connect-timeout', '3', '--max-time', '10', '-o', '/dev/null' ];
+			if (mode == 'mihomo') push(args, '--proxy');
+			if (mode == 'mihomo') push(args, 'http://127.0.0.1:7890');
+			if (mode == 'direct') push(args, '--noproxy');
+			if (mode == 'direct') push(args, '*');
+			push(args, u);
+			if (system(args) != 0) { ok = 0; break; }
+		}
+		let fails = read_file(state_dir + '/.fails_' + name);
+		fails = (fails == null) ? 0 : int(trim(fails));
+		let successes = read_file(state_dir + '/.success_' + name);
+		successes = (successes == null) ? 0 : int(trim(successes));
+		if (ok) {
+			successes++;
+			system([ '/bin/rm', '-f', state_dir + '/.fails_' + name ]);
+			write_file(state_dir + '/.success_' + name, successes + '\n');
+			if (primary != '' && primary != '-' && current_active() != primary)
+				apply_profile(primary);
+		} else {
+			fails++;
+			successes = 0;
+			system([ '/bin/rm', '-f', state_dir + '/.success_' + name ]);
+			if (fails >= int(threshold)) {
+				write_file(state_dir + '/.fails_' + name, '0\n');
+				if (fallback != '' && fallback != '-' && current_active() != fallback)
+					apply_profile(fallback);
+			} else {
+				write_file(state_dir + '/.fails_' + name, fails + '\n');
+			}
+		}
+	}
+}
+
+/* --- periodic refresh ------------------------------------------------ */
+
+function eval_refresh() {
+	let nowtime = time();
+	let state_rows = read_table(STATE_FILE);
+	for (let i = 0; i < length(state_rows); i++) {
+		let r = state_rows[i];
+		let name = (r[0] == null) ? '' : r[0];
+		if (name == '') continue;
+		let url = (r[1] == null) ? '' : r[1];
+		let interval = (r[2] == null) ? '' : r[2];
+		let upd = (r[3] == null) ? '' : r[3];
+		if (interval == '' || interval == '0') continue;
+		if (url == '') continue;
+		if (upd == '') continue;
+		if (nowtime - int(upd) >= int(interval) * 3600)
+			refresh_config(name);
+	}
+	let rule_state_rows = read_table(RULES_STATE);
+	for (let i = 0; i < length(rule_state_rows); i++) {
+		let r = rule_state_rows[i];
+		if (r[0] == null || r[0] == '') continue;
+		let url = (r[1] == null) ? '' : r[1];
+		let interval = (r[2] == null) ? '' : r[2];
+		let upd = (r[3] == null) ? '' : r[3];
+		if (interval == '' || interval == '0') continue;
+		if (url == '') continue;
+		if (upd == '') continue;
+		if (nowtime - int(upd) >= int(interval) * 3600)
+			refresh_rule(r[0]);
+	}
+}
+
+function has_enabled_schedule() {
+	let time_rows = read_table(TIME_FILE);
+	for (let i = 0; i < length(time_rows); i++)
+		if (time_rows[i][1] == '1') return true;
+	let trigger_rows = read_table(TRIGGER_FILE);
+	for (let i = 0; i < length(trigger_rows); i++)
+		if (trigger_rows[i][1] == '1') return true;
+	return false;
+}
+
+function sleep_to_next_minute() {
+	let now = localtime();
+	let seconds = now.sec;
+	let wait = 60 - seconds;
+	if (wait <= 0 || wait > 60) wait = 60;
+	sleep(wait * 1000);
+}
+
+mkdir_p(SCHED_DIR);
+mkdir_p('/var/run/mixomo-schedule');
+log('daemon started');
+while (true) {
+	if (has_enabled_schedule()) {
+		eval_time();
+		eval_trigger();
+	}
+	eval_refresh();
+	sleep_to_next_minute();
+}
