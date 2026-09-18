@@ -33,11 +33,11 @@
 # Установка актуальной версии  
 #### Команда:
 ```
-curl -fsSL https://github.com/Internet-Helper/mixomo-openwrt/raw/v0.3.0/install.sh | sh
+curl -fsSL https://github.com/Internet-Helper/mixomo-openwrt/raw/v0.3.1/install.sh | sh
 ```
 #### Альтернативная команда:
 ```
-wget -qO- https://github.com/Internet-Helper/mixomo-openwrt/raw/v0.3.0/install.sh | sh
+wget -qO- https://github.com/Internet-Helper/mixomo-openwrt/raw/v0.3.1/install.sh | sh
 ```
 
 # Установка тестовой версии  
@@ -66,11 +66,11 @@ wget -qO- https://github.com/Internet-Helper/mixomo-openwrt/raw/main/test-instal
 # Удаление  
 #### Команда для удаления:
 ```
-curl -fsSL https://github.com/Internet-Helper/mixomo-openwrt/raw/v0.3.0/delete.sh | sh
+curl -fsSL https://github.com/Internet-Helper/mixomo-openwrt/raw/v0.3.1/delete.sh | sh
 ```
 #### Альтернативная команда для удаления:
 ```
-wget -qO- https://github.com/Internet-Helper/mixomo-openwrt/raw/v0.3.0/delete.sh | sh
+wget -qO- https://github.com/Internet-Helper/mixomo-openwrt/raw/v0.3.1/delete.sh | sh
 ```
 
 # Лицензия
