@@ -18,7 +18,7 @@ BUNDLE_FILE=
 fail() { printf '[ERROR] %s\n' "$*" >&2; exit 1; }
 download() {
     if command -v curl >/dev/null 2>&1; then
-        curl -fL --connect-timeout 10 --max-time 300 -o "$1" "$2"
+        curl -fsSL --connect-timeout 10 --max-time 300 -o "$1" "$2"
     elif command -v wget >/dev/null 2>&1; then
         wget -q -T 300 -O "$1" "$2"
     else
