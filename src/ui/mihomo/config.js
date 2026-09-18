@@ -934,7 +934,7 @@ E('option', { value: 'original' }, 'Original'),
         var apply = function(version, variant) {
             var display = version ? (String(version).indexOf('v') === 0 ? String(version) : 'v' + version) : _('Неизвестно');
             self.magitrickleVersion = display;
-            self.magitrickleVariant = /badigit/i.test(display) ? 'mod' : (variant === 'mod' ? 'mod' : 'original');
+            self.magitrickleVariant = variant === 'mod' ? 'mod' : 'original';
             if (self.overviewPanel && self.activeView === 'overview') return self.refreshOverview();
             return self.magitrickleVariant;
         };
@@ -2073,7 +2073,7 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
         this.isRunning = isRunning;
         this.magitrickleRunning = magitrickleStatus.code === 0;
          this.magitrickleVersion = magitrickleVersion ? (magitrickleVersion.indexOf('v') === 0 ? magitrickleVersion : 'v' + magitrickleVersion) : _('Неизвестно');
-         this.magitrickleVariant = /badigit/i.test(this.magitrickleVersion) ? 'mod' : (magitrickleVariant === 'mod' ? 'mod' : 'original');
+         this.magitrickleVariant = magitrickleVariant === 'mod' ? 'mod' : 'original';
         
          var latestVersionEl = E('span', { 'id': 'mihomo-latest-version', 'style': 'margin-left: 4px; font-size: 0.9em; opacity: 0.7; display: none;' }, '');
          this.latestVersionEl = latestVersionEl;
@@ -4355,10 +4355,10 @@ panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; fl
         var tagCmd = "if command -v curl >/dev/null 2>&1; then curl -fsSL --connect-timeout 10 --max-time 30 https://api.github.com/repos/badigit/MagiTrickle_mod_badigit/releases/latest 2>/dev/null | grep -m1 '\"tag_name\"' | sed 's/.*\"tag_name\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/'; else wget -qO- -T 30 https://api.github.com/repos/badigit/MagiTrickle_mod_badigit/releases/latest 2>/dev/null | grep -m1 '\"tag_name\"' | sed 's/.*\"tag_name\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/'; fi";
         var pkgCmd = "if command -v apk >/dev/null 2>&1; then apk info -v magitrickle 2>/dev/null | head -1 | sed -n 's/^magitrickle-//p' | cut -d' ' -f1 | tr -d ' \\r\\n'; else opkg list-installed 2>/dev/null | grep '^magitrickle ' | awk '{print $3}' | head -1 | tr -d ' \\r\\n'; fi";
         var resolve = variant === 'mod' ? "$(" + tagCmd + ")" : "$(" + pkgCmd + ")";
-        return "mkdir -p /etc/mixomo/versions; prev=$(sed -n '2p' /etc/mixomo/versions/magitrickle 2>/dev/null | tr -d ' \\r\\n'); " +
-            "ver=" + resolve + "; ver=$(printf '%s' \"$ver\" | tr -d ' \\r\\n'); " +
-            "[ -z \"$ver\" ] && ver=\"$prev\"; " +
-            "printf '%s\\n%s\\n' '" + variant + "' \"$ver\" > /etc/mixomo/versions/magitrickle";
+return "mkdir -p /etc/mixomo/versions; prev_variant=$(sed -n '1p' /etc/mixomo/versions/magitrickle 2>/dev/null | tr -d ' \\r\\n'); prev=$(sed -n '2p' /etc/mixomo/versions/magitrickle 2>/dev/null | tr -d ' \\r\\n'); " +
+             "ver=" + resolve + "; ver=$(printf '%s' \"$ver\" | tr -d ' \\r\\n'); " +
+             "[ -z \"$ver\" ] && [ \"$prev_variant\" = '" + variant + "' ] && ver=\"$prev\"; " +
+             "printf '%s\\n%s\\n' '" + variant + "' \"$ver\" > /etc/mixomo/versions/magitrickle";
     },
 
     magitrickleInstallSteps: function(variant) {
