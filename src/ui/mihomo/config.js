@@ -86,6 +86,9 @@ var MIXOMO_EN = {
      'Установка обновления...': 'Installing update...',
      'Установлена самая актуальная версия': 'The latest version is installed',
      'Доступно обновление MagiTrickle': 'MagiTrickle update available',
+     'Авто': 'Auto',
+     'Русский': 'Russian',
+     'English': 'English',
      'MagiTrickle обновлён': 'MagiTrickle updated',
      'Mixomo обновлён': 'Mixomo updated',
      'Доступно обновление Mixomo': 'Mixomo update available',
@@ -110,6 +113,7 @@ var MIXOMO_EN = {
     'Настройки': 'Settings',
     'Не удалось получить состояние DNS': 'Could not get DNS status',
     'Не удалось применить правило': 'Could not apply the rule',
+     'Не удалось применить профиль': 'Could not apply the profile',
     'Недопустимый путь': 'Invalid path',
     'Некорректное имя': 'Invalid name',
     'Некорректный DNS: укажите IPv4 с октетами не длиннее 3 цифр (например 8.8.8.8 или 127.0.0.1#7880)': 'Invalid DNS: provide an IPv4 with octets no longer than 3 digits (e.g. 8.8.8.8 or 127.0.0.1#7880)',
@@ -407,7 +411,12 @@ function detectLuciLang() {
     return (lang || 'ru').toLowerCase();
 }
 
-var MIXOMO_IS_EN = /^en/.test(detectLuciLang());
+var MIXOMO_LANGUAGE = 'auto';
+try {
+    var savedMixomoLanguage = localStorage.getItem('mixomo_language');
+    if (savedMixomoLanguage === 'ru' || savedMixomoLanguage === 'en') MIXOMO_LANGUAGE = savedMixomoLanguage;
+} catch (e) {}
+var MIXOMO_IS_EN = MIXOMO_LANGUAGE === 'en' || (MIXOMO_LANGUAGE === 'auto' && /^en/.test(detectLuciLang()));
 
 (function() {
     var orig = window._;
@@ -2121,7 +2130,18 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
           ]);
           mixomoChannelSelect.value = this.mixomoChannel;
           this.mixomoChannelSelect = mixomoChannelSelect;
-           var mixomoUpdateButton = E('button', { 'id': 'mixomo-update-btn', 'class': 'btn cbi-button-neutral', 'style': 'margin: 0; padding: 0 0.6em; font-size: 0.9em;', 'disabled': true }, _('Проверить обновление'));
+           var mixomoLanguageSelect = E('select', { class: 'cbi-input-select', style: 'width:6rem;', change: function(ev) {
+               ev.stopPropagation();
+               try { localStorage.setItem('mixomo_language', ev.target.value); } catch (e) {}
+               window.location.reload();
+           } }, [
+               E('option', { value: 'auto' }, _('Авто')),
+               E('option', { value: 'ru' }, _('Русский')),
+               E('option', { value: 'en' }, _('English'))
+           ]);
+           mixomoLanguageSelect.value = MIXOMO_LANGUAGE;
+           this.mixomoLanguageSelect = mixomoLanguageSelect;
+            var mixomoUpdateButton = E('button', { 'id': 'mixomo-update-btn', 'class': 'btn cbi-button-neutral', 'style': 'margin: 0; padding: 0 0.6em; font-size: 0.9em;', 'disabled': true }, _('Проверить обновление'));
            this.mixomoUpdateButton = mixomoUpdateButton;
            var mixomoTitleVersion = E('span', { style: 'margin-left: 4px; font-size: 0.8em;' }, '');
            this.mixomoTitleVersion = mixomoTitleVersion;
@@ -2131,7 +2151,7 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
                     E('span', { style: 'color:#5cb85c;' }, 'Mix'), E('span', {}, 'omo'), mixomoTitleVersion
                ]),
               E('div', { 'style': 'display:flex; align-items:center; gap:0.35rem; margin-left:0.75rem;' }, [
-                  mixomoUpdateButton, mixomoChannelSelect
+                  mixomoUpdateButton, mixomoChannelSelect, mixomoLanguageSelect
               ])
          ]);
 		
@@ -4258,6 +4278,18 @@ panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; fl
             return normalizeEditorConfig(configPath);
         }).then(function() {
             if (configPath === MAIN_CONFIG) {
+                return null;
+            }
+            var profilePrefix = '/etc/mihomo/profiles/';
+            if (configPath.indexOf(profilePrefix) !== 0) return null;
+            var profileName = configPath.slice(profilePrefix.length).replace(/\.ya?ml$/, '');
+            var active = self.profilesData && (self.profilesData.active || self.profilesData.activeProfile);
+            if (active !== profileName) return null;
+            return callProfilesApply(profileName).then(function(res) {
+                if (!res || !res.ok) throw new Error((res && res.error) || _('Не удалось применить профиль'));
+            });
+        }).then(function() {
+            if (configPath === MAIN_CONFIG) {
                 return fs.exec('/usr/bin/mihomo', ['-d', '/etc/mihomo', '-t', configPath]).then(function(res) {
                     if (res.code !== 0) throw new Error((res.stdout || '') + (res.stderr || ''));
                     if (wasRunning) return fs.exec('/etc/init.d/mihomo', ['restart']);
@@ -4438,13 +4470,13 @@ return "mkdir -p /etc/mixomo/versions; prev_variant=$(sed -n '1p' /etc/mixomo/ve
     mixomoManifestUrl: function() {
         return this.mixomoChannel === 'test'
             ? 'https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/main/manifest.test'
-            : 'https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/v0.3.0/manifest.stable';
+            : 'https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/v0.3.1/manifest.stable';
     },
 
     mixomoInstallerUrl: function() {
         return this.mixomoChannel === 'test'
             ? 'https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/main/test-install.sh'
-            : 'https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/v0.3.0/install.sh';
+            : 'https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/v0.3.1/install.sh';
     },
 
     checkMixomoUpdates: function(isManual) {

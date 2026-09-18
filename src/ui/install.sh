@@ -8,6 +8,7 @@ ui_install() {
     ensure_dir "$view_path" || return 1
     ensure_dir "$ace_path" || return 1
     ensure_dir "$magi_view" || return 1
+    rm -f "$view_path"/config-v*.js "$view_path/config.js"
     install_text_atomic "$MIXOMO_SOURCE_ROOT/src/ui/mihomo/config.js" "$view_path/config.js" 644 || return 1
     install_text_atomic "$MIXOMO_SOURCE_ROOT/src/ui/magitrickle.js" "$magi_view/magitrickle.js" 644 || return 1
     for file in ace.js theme-merbivore_soft.js theme-tomorrow.js mode-yaml.js worker-yaml.js; do

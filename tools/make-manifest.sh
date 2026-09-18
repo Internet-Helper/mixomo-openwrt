@@ -2,7 +2,7 @@
 set -eu
 
 ROOT=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
-VERSION=v0.3.0
+VERSION=v0.3.1
 CHANNEL=${1:-test}
 REF=${2:-local}
 BUNDLE="$ROOT/dist/mixomo-${VERSION}.tar.gz"
