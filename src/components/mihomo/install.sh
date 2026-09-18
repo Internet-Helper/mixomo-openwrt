@@ -7,9 +7,16 @@ mihomo_asset() { asset_path "config/mihomo.yaml"; }
 mihomo_init_asset() { asset_path "init/mihomo"; }
 
 mihomo_get_release() {
-    curl -Ls -o /dev/null -w '%{url_effective}' https://github.com/MetaCubeX/mihomo/releases/latest \
+    local ver
+    ver=$(curl -Ls --connect-timeout 10 --max-time 30 -o /dev/null -w '%{url_effective}' https://github.com/MetaCubeX/mihomo/releases/latest 2>/dev/null \
         | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' \
-        | head -1
+        | head -1)
+    if [ -n "$ver" ]; then
+        mixomo_github_api_ok
+        printf '%s\n' "$ver"
+    else
+        mixomo_github_api_fail
+    fi
 }
 
 mihomo_install_config() {
@@ -20,7 +27,7 @@ mihomo_install_config() {
         step_done "$(T "Конфигурация Mihomo сохранена" "Mihomo configuration preserved")"
     else
         if [ -f "$MIHOMO_CONFIG" ]; then
-            cp -p "$MIHOMO_CONFIG" "${MIHOMO_CONFIG}.pre-v0.3.1.bak" 2>/dev/null || true
+            cp -p "$MIHOMO_CONFIG" "${MIHOMO_CONFIG}.pre-v0.3.2.bak" 2>/dev/null || true
         fi
         install_text_atomic "$(mihomo_asset)" "$MIHOMO_CONFIG" 644 || return 1
             step_done "$(T "Создана новая конфигурация Mihomo" "Created a new Mihomo configuration")"

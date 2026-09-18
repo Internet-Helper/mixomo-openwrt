@@ -2,8 +2,8 @@
 set -eu
 
 SCRIPT_DIR=$(CDPATH= cd "$(dirname "$0")" && pwd)
-MIXOMO_VERSION=v0.3.1
-MIXOMO_DEFAULT_MANIFEST=https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/v0.3.1/manifest.stable
+MIXOMO_VERSION=v0.3.2
+MIXOMO_DEFAULT_MANIFEST=https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/v0.3.2/manifest.stable
 MIXOMO_SOURCE_URL=https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt
 MIXOMO_MANIFEST_PATH=${MIXOMO_MANIFEST_PATH:-$MIXOMO_DEFAULT_MANIFEST}
 MIXOMO_SOURCE_ROOT=${MIXOMO_SOURCE_ROOT:-$SCRIPT_DIR}

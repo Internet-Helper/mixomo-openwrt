@@ -19,6 +19,35 @@ start() {
     [ -x /etc/init.d/magitrickle ] && /etc/init.d/magitrickle restart >/dev/null 2>&1 || true
 }
 
-stop() {
+service_triggers() {
+    procd_add_reload_trigger firewall
+    procd_add_reload_trigger network
+}
+
+reload() {
     [ -x /etc/mixomo/routing/redir ] && /etc/mixomo/routing/redir 2>/dev/null || true
+}
+
+stop() {
+    local ipt table mark
+    mark=$(tr -d ' \r\n' < /etc/mixomo/routing/redir-mark 2>/dev/null)
+    [ -n "$mark" ] || mark="1298229097"
+    for ipt in iptables-nft iptables; do
+        if command -v "$ipt" >/dev/null 2>&1; then
+            for table in nat mangle; do
+                "$ipt" -t "$table" -F MIXOMO_CLASSIFY 2>/dev/null || true
+                "$ipt" -t "$table" -D PREROUTING -i lo -j MIXOMO_CLASSIFY 2>/dev/null || true
+                "$ipt" -t "$table" -D PREROUTING ! -i lo -j MIXOMO_CLASSIFY 2>/dev/null || true
+                "$ipt" -t "$table" -X MIXOMO_CLASSIFY 2>/dev/null || true
+            done
+        fi
+    done
+    nft delete table inet mixomo_redir 2>/dev/null || true
+    ip rule del fwmark "$mark" lookup "$mark" 2>/dev/null || true
+    ip route del local default dev lo table "$mark" 2>/dev/null || true
+    table=$(uci -q get network.mihomo_routing_table.table)
+    if [ -n "$table" ]; then
+        ip route del default dev Mihomo table "$table" 2>/dev/null || true
+        ip rule del priority 19000 fwmark 0x233 lookup "$table" 2>/dev/null || true
+    fi
 }

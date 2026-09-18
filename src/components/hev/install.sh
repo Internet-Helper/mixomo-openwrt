@@ -13,9 +13,9 @@ hev_get_version() {
 
 hev_install_package() {
     if [ "$USE_APK" -eq 1 ]; then
-        apk add -u hev-socks5-tunnel >/dev/null 2>&1 || apk add hev-socks5-tunnel >/dev/null 2>&1
+        mixomo_timeout 30 apk add -u hev-socks5-tunnel >/dev/null 2>&1 || mixomo_timeout 30 apk add hev-socks5-tunnel >/dev/null 2>&1
     else
-        opkg upgrade hev-socks5-tunnel >/dev/null 2>&1 || opkg install hev-socks5-tunnel >/dev/null 2>&1
+        mixomo_timeout 30 opkg upgrade hev-socks5-tunnel >/dev/null 2>&1 || mixomo_timeout 30 opkg install hev-socks5-tunnel >/dev/null 2>&1
     fi
 }
 
@@ -55,8 +55,28 @@ hev_configure_network() {
     /etc/init.d/network reload >/dev/null 2>&1 || true
 }
 
+hev_dedup_forwardings() {
+    local sec first dup
+    first=""
+    dup=0
+    for sec in $(uci show firewall 2>/dev/null | sed -n "s/^firewall\.\([^.=]*\)=forwarding$/\1/p"); do
+        [ "$(uci -q get "firewall.$sec.src" 2>/dev/null)" = "lan" ] || continue
+        [ "$(uci -q get "firewall.$sec.dest" 2>/dev/null)" = "Mihomo" ] || continue
+        if [ -z "$first" ]; then
+            first="$sec"
+        else
+            uci -q delete "firewall.$sec" 2>/dev/null && dup=1
+        fi
+    done
+    if [ "$dup" = 1 ]; then
+        uci commit firewall || return 1
+        /etc/init.d/firewall reload >/dev/null 2>&1 || true
+    fi
+}
+
 hev_configure_firewall() {
     local zone forward
+    hev_dedup_forwardings || return 1
     zone=$(uci show firewall 2>/dev/null | sed -n "s/^firewall\.\([^.]*\)\.name='Mihomo'$/\1/p" | head -1)
     if [ -z "$zone" ]; then
         zone=$(uci add firewall zone)
@@ -68,7 +88,7 @@ hev_configure_firewall() {
         uci set "firewall.${zone}.mtu_fix=1"
         uci add_list "firewall.${zone}.network=Mihomo"
     fi
-    forward=$(uci show firewall 2>/dev/null | sed -n "s/^firewall\.\([^.]*\)\.src='lan'$/&/p" | while read -r line; do uci -q get "firewall.${line#firewall.}.dest" 2>/dev/null | grep -q '^Mihomo$' && { echo "${line#firewall.}"; break; }; done)
+    forward=$(uci show firewall 2>/dev/null | sed -n "s/^firewall\.\([^.]*\)\.src='lan'$/\1/p" | while read -r sec; do [ "$(uci -q get "firewall.$sec.dest" 2>/dev/null)" = "Mihomo" ] && { echo "$sec"; break; }; done)
     if [ -z "$forward" ]; then
         forward=$(uci add firewall forwarding)
         uci set "firewall.${forward}.src=lan"

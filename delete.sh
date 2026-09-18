@@ -1,6 +1,6 @@
 #!/bin/sh
 
-SCRIPT_VERSION="v0.3.1"
+SCRIPT_VERSION="v0.3.2"
 
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -222,6 +222,7 @@ cleanup_mixomo_routing() {
     rm -f /etc/mihomo/mihomo-router-routing.nft
     nft delete chain inet fw4 mihomo_router_routing 2>/dev/null || true
     nft delete table inet mihomo_router_routing 2>/dev/null || true
+    nft delete table inet mixomo_redir 2>/dev/null || true
 
     /etc/init.d/mixomo-local-routing stop 2>/dev/null || true
     /etc/init.d/mixomo-routing stop 2>/dev/null || true

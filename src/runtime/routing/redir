@@ -4,18 +4,19 @@ CHAIN="MIXOMO_CLASSIFY"
 MARK_DEFAULT="1298229097"
 EXCL_PRIO_BASE=18000
 IPT=""
-if command -v iptables >/dev/null 2>&1; then
-    IPT=iptables
-elif command -v iptables-nft >/dev/null 2>&1; then
-    IPT=iptables-nft
-fi
+for cand in iptables-nft iptables; do
+    if command -v "$cand" >/dev/null 2>&1 && "$cand" -t nat -L -n >/dev/null 2>&1; then
+        IPT="$cand"
+        break
+    fi
+done
 REDIR_PORT=$(tr -d ' \r\n' < /etc/mixomo/routing/redir-port 2>/dev/null)
 MARK=$(tr -d ' \r\n' < /etc/mixomo/routing/redir-mark 2>/dev/null)
 [ -n "$MARK" ] || MARK="$MARK_DEFAULT"
 : > /tmp/mixomo-user-excl
-for section in $(uci show network 2>/dev/null | sed -n "s/^network\\.${PREFIX}excl_[^.=]*=mihomo_excl$/&/p"); do
-    [ "$(uci -q get "network.${section#network.}.disabled")" = 1 ] && continue
-    destination=$(uci -q get "network.${section#network.}.dest")
+for section in $(uci show network 2>/dev/null | sed -n "s/^network\.\(${PREFIX}excl_[^.=]*\)=mihomo_excl$/\1/p"); do
+    [ "$(uci -q get "network.$section.disabled")" = 1 ] && continue
+    destination=$(uci -q get "network.$section.dest")
     [ -n "$destination" ] && printf '%s\n' "$destination" >> /tmp/mixomo-user-excl
 done
 sort -u /tmp/mixomo-user-excl > /tmp/mixomo-user-excl-u
@@ -30,15 +31,20 @@ while read -r exclusion; do
     n=$((n + 1))
 done < /tmp/mixomo-user-excl-u
 : > /tmp/mixomo-redir-rules
-for section in $(uci show network 2>/dev/null | sed -n "s/^network\\.${PREFIX}client_[^.=]*=mihomo_rule$/&/p"); do
-    [ "$(uci -q get "network.${section#network.}.disabled")" = 1 ] && continue
-    source=$(uci -q get "network.${section#network.}.src")
+for section in $(uci show network 2>/dev/null | sed -n "s/^network\.\(${PREFIX}client_[^.=]*\)=mihomo_rule$/\1/p"); do
+    [ "$(uci -q get "network.$section.disabled")" = 1 ] && continue
+    source=$(uci -q get "network.$section.src")
     [ -n "$source" ] || continue
-    priority=$(uci -q get "network.${section#network.}.priority")
+    priority=$(uci -q get "network.$section.priority")
     [ -n "$priority" ] || priority=0
     printf '%s|%s\n' "$priority" "$source" >> /tmp/mixomo-redir-rules
 done
 sort -n -t'|' -k1 /tmp/mixomo-redir-rules > /tmp/mixomo-redir-rules.sorted
+NFT_TABLE="mixomo_redir"
+HAVE_NFT=0
+if command -v nft >/dev/null 2>&1 && nft list tables >/dev/null 2>&1; then
+    HAVE_NFT=1
+fi
 if [ -n "$IPT" ]; then
     for table in nat mangle; do
         "$IPT" -t "$table" -F "$CHAIN" 2>/dev/null || true
@@ -47,11 +53,11 @@ if [ -n "$IPT" ]; then
         "$IPT" -t "$table" -X "$CHAIN" 2>/dev/null || true
     done
 fi
-[ -n "$IPT" ] || exit 0
-[ -n "$REDIR_PORT" ] || exit 0
-[ -s /tmp/mixomo-redir-rules.sorted ] || exit 0
-"$IPT" -t nat -N "$CHAIN" 2>/dev/null || exit 1
-"$IPT" -t mangle -N "$CHAIN" 2>/dev/null || exit 1
+if [ "$HAVE_NFT" -eq 1 ]; then
+    nft delete table inet "$NFT_TABLE" 2>/dev/null || true
+fi
+[ -n "$REDIR_PORT" ] || { ip rule add fwmark "$MARK" lookup "$MARK" 2>/dev/null || true; ip route replace local default dev lo table "$MARK" 2>/dev/null || true; exit 0; }
+[ -s /tmp/mixomo-redir-rules.sorted ] || { ip rule add fwmark "$MARK" lookup "$MARK" 2>/dev/null || true; ip route replace local default dev lo table "$MARK" 2>/dev/null || true; exit 0; }
 LOCAL="127.0.0.0/8 192.168.0.0/16 10.0.0.0/8 172.16.0.0/12 100.64.0.0/10 169.254.0.0/16 224.0.0.0/4 255.255.255.255/32"
 ip -4 route show table main proto kernel scope link 2>/dev/null > /tmp/mixomo-local-routes
 while read -r subnet rest; do
@@ -62,16 +68,37 @@ done < /tmp/mixomo-local-routes
 while read -r exclusion; do
     LOCAL="$LOCAL $exclusion"
 done < /tmp/mixomo-user-excl-u
-for network in $LOCAL; do
-    "$IPT" -t nat -A "$CHAIN" -d "$network" -j RETURN
-    "$IPT" -t mangle -A "$CHAIN" -d "$network" -j RETURN
-done
-"$IPT" -t nat -I PREROUTING 1 ! -i lo -j "$CHAIN"
-"$IPT" -t mangle -I PREROUTING 1 ! -i lo -j "$CHAIN"
-while IFS='|' read -r priority source; do
-    "$IPT" -t nat -A "$CHAIN" -s "$source" -p tcp -j REDIRECT --to-ports "$REDIR_PORT"
-    "$IPT" -t mangle -A "$CHAIN" -s "$source" -p udp -j TPROXY --on-port "$REDIR_PORT" --tproxy-mark "$MARK/$MARK" 2>/dev/null || true
-done < /tmp/mixomo-redir-rules.sorted
+if [ -n "$IPT" ]; then
+    "$IPT" -t nat -N "$CHAIN" 2>/dev/null || exit 1
+    "$IPT" -t mangle -N "$CHAIN" 2>/dev/null || exit 1
+    for network in $LOCAL; do
+        "$IPT" -t nat -A "$CHAIN" -d "$network" -j RETURN
+        "$IPT" -t mangle -A "$CHAIN" -d "$network" -j RETURN
+    done
+    "$IPT" -t nat -I PREROUTING 1 ! -i lo -j "$CHAIN"
+    "$IPT" -t mangle -I PREROUTING 1 ! -i lo -j "$CHAIN"
+    while IFS='|' read -r priority source; do
+        "$IPT" -t nat -A "$CHAIN" -s "$source" -p tcp -j REDIRECT --to-ports "$REDIR_PORT"
+        "$IPT" -t mangle -A "$CHAIN" -s "$source" -p udp -j TPROXY --on-port "$REDIR_PORT" --tproxy-mark "$MARK/$MARK" 2>/dev/null || true
+    done < /tmp/mixomo-redir-rules.sorted
+elif [ "$HAVE_NFT" -eq 1 ]; then
+    nft add table inet "$NFT_TABLE" || exit 1
+    nft add set inet "$NFT_TABLE" local_nets '{ type ipv4_addr; flags interval; }' || exit 1
+    nft add set inet "$NFT_TABLE" redir_srcs '{ type ipv4_addr; flags interval; }' || exit 1
+    for network in $LOCAL; do
+        nft add element inet "$NFT_TABLE" local_nets "{ $network }" 2>/dev/null || true
+    done
+    while IFS='|' read -r priority source; do
+        [ -n "$source" ] || continue
+        nft add element inet "$NFT_TABLE" redir_srcs "{ $source }" 2>/dev/null || true
+    done < /tmp/mixomo-redir-rules.sorted
+    nft add chain inet "$NFT_TABLE" prerouting_nat '{ type nat hook prerouting priority dstnat; policy accept; }' || exit 1
+    nft add chain inet "$NFT_TABLE" prerouting_mangle '{ type filter hook prerouting priority mangle; policy accept; }' || exit 1
+    nft add rule inet "$NFT_TABLE" prerouting_nat 'iif != "lo" ip daddr @local_nets return' || exit 1
+    nft add rule inet "$NFT_TABLE" prerouting_nat "iif != \"lo\" ip saddr @redir_srcs tcp redirect to :$REDIR_PORT" || exit 1
+    nft add rule inet "$NFT_TABLE" prerouting_mangle 'iif != "lo" ip daddr @local_nets return' || exit 1
+    nft add rule inet "$NFT_TABLE" prerouting_mangle "iif != \"lo\" ip saddr @redir_srcs udp tproxy to :$REDIR_PORT meta mark set $MARK" || exit 1
+fi
 ip rule add fwmark "$MARK" lookup "$MARK" 2>/dev/null || true
 ip route replace local default dev lo table "$MARK" 2>/dev/null || true
 exit 0

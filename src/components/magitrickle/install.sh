@@ -38,21 +38,27 @@ magitrickle_save_variant() {
 
 magitrickle_latest_version() {
     local variant="$1"
-    local json
+    local json tag
     if [ "$variant" = mod ]; then
         if command -v curl >/dev/null 2>&1; then
-            json=$(curl -fsSL --connect-timeout 10 --max-time 30 https://api.github.com/repos/badigit/MagiTrickle_mod_badigit/releases/latest)
+            json=$(curl -fsSL --connect-timeout 10 --max-time 30 https://api.github.com/repos/badigit/MagiTrickle_mod_badigit/releases/latest 2>/dev/null)
         else
-            json=$(wget -qO- -T 30 https://api.github.com/repos/badigit/MagiTrickle_mod_badigit/releases/latest)
+            json=$(wget -qO- -T 30 https://api.github.com/repos/badigit/MagiTrickle_mod_badigit/releases/latest 2>/dev/null)
         fi
     else
         if command -v curl >/dev/null 2>&1; then
-            json=$(curl -fsSL --connect-timeout 10 --max-time 30 https://gitlab.com/api/v4/projects/magitrickle%2Fmagitrickle/releases/permalink/latest)
+            json=$(curl -fsSL --connect-timeout 10 --max-time 30 https://gitlab.com/api/v4/projects/magitrickle%2Fmagitrickle/releases/permalink/latest 2>/dev/null)
         else
-            json=$(wget -qO- -T 30 https://gitlab.com/api/v4/projects/magitrickle%2Fmagitrickle/releases/permalink/latest)
+            json=$(wget -qO- -T 30 https://gitlab.com/api/v4/projects/magitrickle%2Fmagitrickle/releases/permalink/latest 2>/dev/null)
         fi
     fi
-    printf '%s\n' "$json" | grep -m1 '"tag_name"' | sed 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/'
+    tag=$(printf '%s\n' "$json" | grep -m1 '"tag_name"' | sed 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
+    if [ -n "$tag" ]; then
+        mixomo_github_api_ok
+        printf '%s\n' "$tag"
+    else
+        mixomo_github_api_fail
+    fi
 }
 
 magitrickle_label() {
@@ -76,7 +82,7 @@ magitrickle_select() {
     if [ -n "$installed" ]; then
         label=$(magitrickle_label "$installed")
         printf '%s\n' "$(T "Установленная версия: $label" "Installed version: $label")"
-        printf '%s\n' "1) $(T "Обновить $label" "Update $label")"
+        printf '%s\n' "1) $(T "Обновить $label (нажмите Enter для выбора)" "Update $label (press Enter to select)")"
         if [ "$installed" = mod ]; then other=original; else other=mod; fi
         other_label=$(magitrickle_label "$other")
         printf '%s\n' "2) $(T "Изменить версию на $other_label" "Switch version to $other_label")"
@@ -89,7 +95,7 @@ magitrickle_select() {
         esac
     else
         printf '%s\n' "$(T "Какую версию установить?" "Which version to install?")"
-        printf '%s\n' "1. Original"
+        printf '%s\n' "1. Original $(T "(нажмите Enter для выбора)" "(press Enter to select)")"
         printf '%s\n' "2. Mod"
         printf '%s' "$(T "Ваш выбор: " "Your choice: ")"
         choice=$(read_user_input) || return 1
@@ -107,11 +113,11 @@ magitrickle_install_package() {
     if [ "$MAGITRICKLE_VARIANT" = mod ]; then
         log=$temp_dir/install.log
         script=$temp_dir/install.sh
-        if ! download_to https://raw.githubusercontent.com/badigit/MagiTrickle_mod_badigit/mod_badigit/scripts/install.sh "$script"; then
+        if ! download_to https://raw.githubusercontent.com/badigit/MagiTrickle_mod_badigit/mod_badigit/scripts/install.sh "$script" 60; then
             rm -rf "$temp_dir"
             return 1
         fi
-        sh "$script" >"$log" 2>&1
+        mixomo_timeout 180 sh "$script" >"$log" 2>&1
         rc=$?
         if [ "$rc" -ne 0 ] || { [ ! -x /etc/init.d/magitrickle ] && [ ! -f /etc/magitrickle/state/config.yaml ] && ! package_is_installed magitrickle && ! package_is_installed magitrickle_mod; }; then
             log_error "$(T "Ошибка установки MagiTrickle Mod; лог: $log (rc=$rc)" "MagiTrickle Mod install failed; log: $log (rc=$rc)")"
@@ -135,15 +141,15 @@ magitrickle_install_package() {
             wget -qO- -T 60 http://bin.magitrickle.dev/packages/add_repo.sh | sh >/dev/null 2>&1 || { rm -rf "$temp_dir"; return 1; }
         fi
         package_update >/dev/null 2>&1 || true
-        if ! package_install magitrickle >/dev/null 2>&1; then
+        if ! package_install_timeout 180 magitrickle >/dev/null 2>&1; then
             rm -rf "$temp_dir"
             return 1
         fi
         if [ "$USE_APK" -eq 1 ]; then
-            apk fix magitrickle >/dev/null 2>&1 || true
+            mixomo_timeout 30 apk fix magitrickle >/dev/null 2>&1 || true
             if [ ! -f /etc/config/magitrickle ] || [ ! -f /etc/magitrickle/state/config.yaml ]; then
-                apk del magitrickle >/dev/null 2>&1 || true
-                apk add --no-progress magitrickle >/dev/null 2>&1 || apk add magitrickle >/dev/null 2>&1 || { rm -rf "$temp_dir"; return 1; }
+                mixomo_timeout 30 apk del magitrickle >/dev/null 2>&1 || true
+                package_install_timeout 180 magitrickle >/dev/null 2>&1 || { rm -rf "$temp_dir"; return 1; }
             fi
         fi
         [ -x /etc/init.d/magitrickle ] || { rm -rf "$temp_dir"; return 1; }
@@ -199,7 +205,7 @@ magitrickle_install() {
         fi
     }
     if [ -x /etc/init.d/magitrickle ] && [ "$installed" = "$MAGITRICKLE_VARIANT" ] && magitrickle_is_running && { [ -z "$now_version" ] || [ -z "$latest" ] || [ "$now_version" = "$latest" ]; }; then
-        step_done "$(T "Актуальный MagiTrickle уже установлен" "MagiTrickle is already up to date")"
+        step_done "$(T "Установлена актуальная версия" "Up-to-date version installed")"
         return 0
     else
         [ -f "$config" ] && cp "$config" /tmp/magitrickle_config_backup.yaml 2>/dev/null || true
@@ -207,10 +213,10 @@ magitrickle_install() {
         service magitrickle disable >/dev/null 2>&1 || true
         [ -f "$config" ] && rm -f "$config" || true
         if [ "$USE_APK" -eq 1 ]; then
-            apk del magitrickle_mod magitrickle >/dev/null 2>&1 || true
+            mixomo_timeout 30 apk del magitrickle_mod magitrickle >/dev/null 2>&1 || true
         else
-            opkg remove magitrickle_mod >/dev/null 2>&1 || true
-            opkg remove magitrickle >/dev/null 2>&1 || true
+            mixomo_timeout 30 opkg remove magitrickle_mod >/dev/null 2>&1 || true
+            mixomo_timeout 30 opkg remove magitrickle >/dev/null 2>&1 || true
         fi
         rm -f /etc/init.d/magitrickle
         magitrickle_install_package || { [ -f /tmp/magitrickle_config_backup.yaml ] && cp /tmp/magitrickle_config_backup.yaml "$config" 2>/dev/null || true; return 1; }
