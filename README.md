@@ -52,9 +52,9 @@ wget -qO- https://github.com/Internet-Helper/mixomo-openwrt/raw/main/test-instal
 
 #### Что сделать после установки?  
 - **Крайне желательно** изменить DNS-серверы на публичные
-- Зайти в LuCI -> Службы или Services -> Mihomo -> Создать свою конфигурацию<br>
+- Зайдите в OpenWrt — Службы — Mixomo — Нажмите на «Конфигурация» в Mihomo и отредактируйте или создайте свою<br>
   Для этого можно использовать [оригинальную документацию](https://mihomo-docs.netlify.app/ru/config/) или [онлайн генератор web4core](https://spatiumstas.github.io/web4core)  
-- Зайти в LuCI -> Службы или Services -> MagiTrickle -> Указать сайты в «Группы» или ссылки в «Подписки»<br> 
+- Нажмите на «MagiTrickle» — Добавьте сайты в «Группы» или ссылки в «Подписки»<br> 
 
 **Некоторые пояснения:**  
 - Повторный запуск установки обновит Mihomo, hev-socks5-tunnel и MagiTrickle если вышли новые версии  
