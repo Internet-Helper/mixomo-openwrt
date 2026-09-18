@@ -4470,13 +4470,13 @@ return "mkdir -p /etc/mixomo/versions; prev_variant=$(sed -n '1p' /etc/mixomo/ve
     mixomoManifestUrl: function() {
         return this.mixomoChannel === 'test'
             ? 'https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/main/manifest.test'
-            : 'https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/v0.3.1/manifest.stable';
+            : 'https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/main/manifest.stable';
     },
 
     mixomoInstallerUrl: function() {
         return this.mixomoChannel === 'test'
             ? 'https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/main/test-install.sh'
-            : 'https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/v0.3.1/install.sh';
+            : 'https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/main/install.sh';
     },
 
     checkMixomoUpdates: function(isManual) {
