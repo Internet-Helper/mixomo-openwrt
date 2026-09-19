@@ -23,7 +23,7 @@
 - Всё остальное идёт через Вашего домашнего провайдера на его полной скорости, минуя прокси‑ядро
 - При необходимости можно использовать локальную маршрутизацию, чтобы отправлять весь трафик выбранных IP/CIDR в ядро Mihomo
 
-<img width="1210" height="756" alt="2" src="https://github.com/user-attachments/assets/b9f64bce-4404-4328-9d08-d2c7bce026b6" />
+<img width="963" height="746" alt="2" src="https://github.com/user-attachments/assets/d86d1922-1683-436d-acf9-1ab7012b09cc" />
 
 # Требования
 - OpenWrt 24.10+ и 25.12+
