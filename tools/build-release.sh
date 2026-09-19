@@ -2,7 +2,7 @@
 set -eu
 
 ROOT=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
-VERSION=v0.3.2
+VERSION=v0.3.3
 OUTPUT="$ROOT/dist"
 BUNDLE="$OUTPUT/mixomo-${VERSION}.tar.gz"
 mkdir -p "$OUTPUT"

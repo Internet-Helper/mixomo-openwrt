@@ -158,7 +158,7 @@ magitrickle_install_package() {
 }
 
 magitrickle_is_running() {
-    service magitrickle status >/dev/null 2>&1 && return 0
+    service magitrickle status 2>/dev/null | grep -qi running && return 0
     [ -S /var/run/magitrickle.sock ] && return 0
     ps 2>/dev/null | grep -q '[m]agitrickled'
 }

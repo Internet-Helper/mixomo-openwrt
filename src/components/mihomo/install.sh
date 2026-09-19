@@ -27,7 +27,7 @@ mihomo_install_config() {
         step_done "$(T "Конфигурация Mihomo сохранена" "Mihomo configuration preserved")"
     else
         if [ -f "$MIHOMO_CONFIG" ]; then
-            cp -p "$MIHOMO_CONFIG" "${MIHOMO_CONFIG}.pre-v0.3.2.bak" 2>/dev/null || true
+             cp -p "$MIHOMO_CONFIG" "${MIHOMO_CONFIG}.pre-v0.3.3.bak" 2>/dev/null || true
         fi
         install_text_atomic "$(mihomo_asset)" "$MIHOMO_CONFIG" 644 || return 1
             step_done "$(T "Создана новая конфигурация Mihomo" "Created a new Mihomo configuration")"

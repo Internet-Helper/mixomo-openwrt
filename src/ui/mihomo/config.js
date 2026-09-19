@@ -159,8 +159,8 @@ var MIXOMO_EN = {
     'Стандартный': 'Standard',
     'Статических арендах DHCP': 'DHCP static leases',
     'Статус': 'Status',
-    'Строгий порядок': 'Strict order',
-    'Работает строго по порядку: всегда первый, если он не работает — второй, и так далее.<br>Этот режим обязателен для DNS через Mihomo или любой другой пакет с шифрованием DNS.': 'Works strictly in order: always first, if it fails, second, and so on.<br>This is mandatory for DNS via Mihomo or any other DNS encryption package.',
+    'По порядку': 'In order',
+    'Обязательный режим для использования секции DNS в Mihomo': 'Required mode for using the DNS section in Mihomo',
     'Автоматический выбор самого быстрого сервера.': 'Automatically picks the fastest server.',
     'Запрос ко всем серверам сразу, ответ от самого первого.': 'Queries all servers at once, using the very first response.',
     'Заменит правила из «Простого режима», если они там есть, на указанные вами ниже.': "Will replace the rules from “Simple Mode”, if they exist there, with the ones you specify below.",
@@ -178,7 +178,7 @@ var MIXOMO_EN = {
     'Создать конфигурацию': 'Create configuration',
      'Создать список правил': 'Create rules list',
      'Все компоненты': 'All components',
-     'Все компоненты будут копироваться перед обновлением': 'All components will be backed up before updating',
+     'Автоматическое копирование перед обновлением': 'Automatic backup before update',
      'Максимальное количество копий для каждого компонента: ': 'Number of copies for each component: ',
      'Импортировать': 'Import',
     'Источник': 'Source',
@@ -380,8 +380,9 @@ var MIXOMO_EN = {
     'Прикрепить IP к устройству можно в ': 'You can pin an IP to a device in ',
     'Работает': 'Running',
     'Редактирование файла /etc/dnsmasq.conf': 'Editing /etc/dnsmasq.conf',
-    'Резервное копирование': 'Backup',
-    'Резервных копий пока нет.': 'No backups yet.',
+'Резервное копирование': 'Backup',
+     'Ручное копирование': 'Manual backup',
+     'Резервных копий пока нет.': 'No backups yet.',
     'Создать копию': 'Create backup',
     'Сохранённые копии': 'Saved backups',
     'Тип конфигурации': 'Configuration type',
@@ -509,8 +510,8 @@ var makeScheduleCheckMode = function(value) {
 var makeRoutingBackend = function(value, redirAvail) {
     var mode = value === 'redir-tproxy' && redirAvail ? 'redir-tproxy' : 'tun-socks5';
     var box = E('div', { class: 'mihomo-seg' });
-    var redir = E('button', { type: 'button', class: 'btn cbi-button-neutral' + (mode === 'redir-tproxy' ? ' active' : ''), click: function() { box.value = 'redir-tproxy'; redir.classList.add('active'); tun.classList.remove('active'); } }, 'Redir-TProxy');
-    var tun = E('button', { type: 'button', class: 'btn cbi-button-neutral' + (mode === 'tun-socks5' ? ' active' : ''), click: function() { box.value = 'tun-socks5'; tun.classList.add('active'); redir.classList.remove('active'); } }, 'Tun-Socks5');
+    var redir = E('button', { type: 'button', class: 'btn ' + (mode === 'redir-tproxy' ? 'cbi-button-positive' : 'cbi-button-neutral') + ' mihomo-route-choice' + (mode === 'redir-tproxy' ? ' active' : ''), click: function() { box.value = 'redir-tproxy'; redir.classList.add('active', 'cbi-button-positive'); redir.classList.remove('cbi-button-neutral'); tun.classList.remove('active', 'cbi-button-positive'); tun.classList.add('cbi-button-neutral'); } }, 'Redir-TProxy');
+    var tun = E('button', { type: 'button', class: 'btn ' + (mode === 'tun-socks5' ? 'cbi-button-positive' : 'cbi-button-neutral') + ' mihomo-route-choice' + (mode === 'tun-socks5' ? ' active' : ''), click: function() { box.value = 'tun-socks5'; tun.classList.add('active', 'cbi-button-positive'); tun.classList.remove('cbi-button-neutral'); redir.classList.remove('active', 'cbi-button-positive'); redir.classList.add('cbi-button-neutral'); } }, 'Tun-Socks5');
     box.value = mode;
     if (redirAvail) box.appendChild(redir);
     box.appendChild(tun);
@@ -633,6 +634,25 @@ function generateProviderSnippet(filename) {
     return `${nameNoExt}-list:\n  type: file\n  behavior: ${behavior}\n  format: ${format}\n  path: ./rule-files/${baseName}`;
 }
 
+function makeLuciTab(label, active, onclick) {
+    return E('li', { class: active ? '' : 'cbi-tab-disabled' }, E('a', { href: '#', click: function(ev) { ev.preventDefault(); onclick(); } }, label));
+}
+
+function isMagiRunningOutput(res) {
+    var out = ((res && res.stdout) || '') + '\n' + ((res && res.stderr) || '');
+    if (/not\s+running/i.test(out)) return false;
+    if (/\binactive\b/i.test(out)) return false;
+    if (/\bstopped\b/i.test(out)) return false;
+    if (/running/i.test(out)) return true;
+    var lines = out.split(/\r?\n/);
+    for (var i = 0; i < lines.length; i++) {
+        if (/^\s*\d[\d\s]*$/.test(lines[i]) && /\d/.test(lines[i])) return true;
+    }
+    return false;
+}
+
+var MAGI_STATUS_CMD = 'service magitrickle status 2>&1; pidof magitrickled 2>/dev/null; true';
+
 function isLuciDarkMode() {
     try {
         var rgb = window.getComputedStyle(document.body).backgroundColor.match(/\d+/g);
@@ -711,7 +731,7 @@ return view.extend({
             E('p', {}, text),
             E('div', { class: 'right', style: 'margin-top:1rem;' }, [
                 E('button', { class: 'btn cbi-button-neutral', click: ui.hideModal }, _('Отменить')), ' ',
-                E('button', { class: 'btn cbi-button-positive btn-save-custom', click: function() {
+                E('button', { class: 'btn cbi-button-positive', click: function() {
                     ui.hideModal();
                     callRoutingRouter(enable).then(function(res) { if (self.showRoutingError(res)) self.refreshRouting(); });
                 }}, _('Продолжить'))
@@ -750,15 +770,15 @@ return view.extend({
         autoBox.style.display = isDevice ? 'flex' : 'none';
         manualBox.style.display = isDevice ? 'none' : 'flex';
         var autoBtn, manualBtn;
-        autoBtn = E('button', { class: 'btn cbi-button-neutral' + (isDevice ? ' active' : ''), click: function() { routeMode = 'auto'; autoBtn.classList.add('active'); manualBtn.classList.remove('active'); autoBox.style.display = 'flex'; manualBox.style.display = 'none'; } }, _('Системный'));
-        manualBtn = E('button', { class: 'btn cbi-button-neutral' + (isDevice ? '' : ' active'), click: function() { routeMode = 'manual'; manualBtn.classList.add('active'); autoBtn.classList.remove('active'); manualBox.style.display = 'flex'; autoBox.style.display = 'none'; } }, _('Ручной'));
+        autoBtn = E('button', { class: 'btn ' + (isDevice ? 'cbi-button-positive' : 'cbi-button-neutral') + ' mihomo-route-choice' + (isDevice ? ' active' : ''), click: function() { routeMode = 'auto'; autoBtn.classList.add('active', 'cbi-button-positive'); autoBtn.classList.remove('cbi-button-neutral'); manualBtn.classList.remove('active', 'cbi-button-positive'); manualBtn.classList.add('cbi-button-neutral'); autoBox.style.display = 'flex'; manualBox.style.display = 'none'; } }, _('Системный'));
+        manualBtn = E('button', { class: 'btn ' + (!isDevice ? 'cbi-button-positive' : 'cbi-button-neutral') + ' mihomo-route-choice' + (isDevice ? '' : ' active'), click: function() { routeMode = 'manual'; manualBtn.classList.add('active', 'cbi-button-positive'); manualBtn.classList.remove('cbi-button-neutral'); autoBtn.classList.remove('active', 'cbi-button-positive'); autoBtn.classList.add('cbi-button-neutral'); manualBox.style.display = 'flex'; autoBox.style.display = 'none'; } }, _('Ручной'));
          var backend = makeRoutingBackend(rule.backend, redirAvail);
         var edit = E('div', { class: 'mihomo-config-card-edit', style: 'margin-top:.8rem;' }, [
              field(_('Название (необязательно)'), nameInput),
              field(_('Тип подключения'), backend),
              field(_('IP или CIDR'), E('div', {}, [E('div', { class: 'mihomo-seg', style: 'margin:.4rem 0;' }, [autoBtn, manualBtn]), autoBox, manualBox])),
             E('div', { style: 'display:flex; gap:.5rem; margin-top:.6rem;' }, [
-                E('button', { class: 'btn cbi-button-positive btn-save-custom mihomo-overview-card-action', click: function() {
+                E('button', { class: 'btn cbi-button-positive mihomo-overview-card-action', click: function() {
                     var source, label;
                     if (routeMode === 'manual') {
                         source = manual.value.trim();
@@ -794,7 +814,7 @@ return view.extend({
             field(_('Название (необязательно)'), nameInput),
             field(_('IP или CIDR'), dest),
             E('div', { style: 'display:flex; gap:.5rem; margin-top:.6rem;' }, [
-                E('button', { class: 'btn cbi-button-positive btn-save-custom mihomo-overview-card-action', click: function() {
+                E('button', { class: 'btn cbi-button-positive mihomo-overview-card-action', click: function() {
                     if (!dest.value.trim()) { ui.addNotification(null, E('p', _('Укажите IP или CIDR')), 'error'); return; }
                     callRoutingExcludeUpdate(ex.id, dest.value.trim(), nameInput.value.trim()).then(function(res) { if (self.showRoutingError(res)) self.refreshRouting(); }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
                 } }, _('Сохранить')),
@@ -894,25 +914,25 @@ return view.extend({
                 return cardEl;
             };
              var serviceButton = self.isRunning
-                 ? E('button', { class: 'btn cbi-button-reset mihomo-overview-card-action', click: function(ev) { ev.stopPropagation(); self.handleServiceAction('stop'); } }, _('Остановить'))
-                 : E('button', { class: 'btn cbi-button-positive btn-save-custom mihomo-overview-card-action', click: function(ev) { ev.stopPropagation(); self.handleServiceAction('start'); } }, _('Запустить'));
+                 ? E('button', { class: 'btn cbi-button-reset mihomo-overview-card-action mihomo-card-stop', click: function(ev) { ev.stopPropagation(); self.handleServiceAction('stop'); } }, _('Остановить'))
+                 : E('button', { class: 'btn cbi-button-positive mihomo-overview-card-action mihomo-card-stop', click: function(ev) { ev.stopPropagation(); self.handleServiceAction('start'); } }, _('Запустить'));
               var mihomoDashboard = E('button', { class: 'btn cbi-button-neutral mihomo-overview-card-action', click: function(ev) { ev.stopPropagation(); self.handleOpenDashboard(mainConfigContent); } }, _('Панель управления'));
               var mihomoConfig = E('button', { class: 'btn cbi-button-neutral mihomo-overview-card-action', click: function(ev) { ev.stopPropagation(); self.switchView('configs'); } }, _('Конфигурация'));
-              var mihomoServiceActions = E('div', { style: 'display:flex; align-items:center; gap:.4rem; margin-left:auto;' }, [self.updateButton, self.mihomoChannelSelect, serviceButton]);
+               var mihomoServiceActions = E('div', { style: 'display:flex; align-items:center; gap:.4rem; margin-left:auto;' }, [self.updateButton, self.mihomoChannelSelect]);
                  var magiServiceButton = self.magitrickleRunning
  ? E('button', { class: 'btn cbi-button-reset mihomo-overview-card-action mihomo-card-stop', click: function(ev) { ev.stopPropagation(); self.handleMagiTrickleAction('stop'); } }, _('Остановить'))
-                    : E('button', { class: 'btn cbi-button-positive btn-save-custom mihomo-overview-card-action mihomo-card-stop', click: function(ev) { ev.stopPropagation(); self.handleMagiTrickleAction('start'); } }, _('Запустить'));
-                 var magiVariantSelect = E('select', { class: 'cbi-input-select', style: 'width:6rem;', change: function(ev) { ev.stopPropagation(); self.switchMagiTrickleVariant(ev.target.value, ev.target); } }, [
+                    : E('button', { class: 'btn cbi-button-positive mihomo-overview-card-action mihomo-card-stop', click: function(ev) { ev.stopPropagation(); self.handleMagiTrickleAction('start'); } }, _('Запустить'));
+                 var magiVariantSelect = E('select', { class: 'cbi-input-select', style: 'width:6rem; height:28px;', change: function(ev) { ev.stopPropagation(); self.switchMagiTrickleVariant(ev.target.value, ev.target); } }, [
 E('option', { value: 'original' }, 'Original'),
                       E('option', { value: 'mod' }, 'Mod')
                  ]);
                  magiVariantSelect.value = self.magitrickleVariant;
                  self.magitrickleVariantSelect = magiVariantSelect;
-                 var magiServiceActions = E('div', { style: 'display:flex; align-items:center; gap:.4rem; margin-left:auto;' }, [self.magitrickleUpdateButton, magiVariantSelect, magiServiceButton]);
+                  var magiServiceActions = E('div', { style: 'display:flex; align-items:center; gap:.4rem; margin-left:auto;' }, [self.magitrickleUpdateButton, magiVariantSelect]);
                  var magiAction = E('button', { class: 'btn cbi-button-neutral mihomo-overview-card-action', click: function(ev) { ev.stopPropagation(); self.switchView('magitrickle'); } }, _('Конфигурация'));
-                var cards = {
-                   mihomo: card('mihomo', _('Mihomo') + ' ' + (self.currentVersion || _('Загрузка...')), self.isRunning ? _('Работает') : _('Остановлен'), '', self.isRunning ? 'is-ok' : 'is-muted', [mihomoConfig, mihomoDashboard], mihomoServiceActions),
-                   magitrickle: card('magitrickle', _('MagiTrickle') + ' ' + magiVersion, magiStatus ? _('Работает') : _('Остановлен'), '', magiStatus ? 'is-ok' : 'is-muted', [magiAction], magiServiceActions),
+                 var cards = {
+                    mihomo: card('mihomo', _('Mihomo') + ' ' + (self.currentVersion || _('Загрузка...')), self.isRunning ? _('Работает') : _('Остановлен'), '', self.isRunning ? 'is-ok' : 'is-muted', [mihomoConfig, mihomoDashboard, serviceButton], mihomoServiceActions),
+                    magitrickle: card('magitrickle', _('MagiTrickle') + ' ' + magiVersion, magiStatus ? _('Работает') : _('Остановлен'), '', magiStatus ? 'is-ok' : 'is-muted', [magiAction, magiServiceButton], magiServiceActions),
                   profile: card('profile', _('Активная конфигурация Mihomo'), active, '', 'is-muted', action('configs')),
                  schedule: card('schedule', _('Расписание'), plural(scheduleActiveCount, [_('активное расписание'), _('активных расписания'), _('активных расписаний')]), '', 'is-muted', E('button', { class: 'btn cbi-button-neutral mihomo-overview-card-action', click: function(ev) { ev.stopPropagation(); self.activeView = 'configs'; self.activeSub = 'schedule'; self.activeThird = 'list'; self.renderSettingsRow(); self.showViewContent(); } }, _('Открыть'))),
                  rules: card('rules', _('Списки правил'), plural(ruleCount, [_('список'), _('списка'), _('списков')]), '', 'is-muted', E('button', { class: 'btn cbi-button-neutral mihomo-overview-card-action', click: function(ev) { ev.stopPropagation(); self.activeView = 'configs'; self.activeSub = 'rules'; self.activeThird = 'list'; self.renderSettingsRow(); self.showViewContent(); } }, _('Открыть'))),
@@ -941,6 +961,7 @@ E('option', { value: 'original' }, 'Original'),
             });
         };
         var apply = function(version, variant) {
+            version = String(version || '').replace(/[-_]r\d+$/i, '').replace(/-\d+$/, '');
             var display = version ? (String(version).indexOf('v') === 0 ? String(version) : 'v' + version) : _('Неизвестно');
             self.magitrickleVersion = display;
             self.magitrickleVariant = variant === 'mod' ? 'mod' : 'original';
@@ -948,13 +969,13 @@ E('option', { value: 'original' }, 'Original'),
             return self.magitrickleVariant;
         };
         var stateP = settle(fs.read('/etc/mixomo/versions/magitrickle'), '');
-        var statusP = settle(fs.exec('/bin/sh', ['-c', 'service magitrickle status >/dev/null 2>&1 || pidof magitrickled >/dev/null 2>&1']), { code: 1 });
+        var statusP = settle(fs.exec('/bin/sh', ['-c', 'service magitrickle status 2>&1; pidof magitrickled 2>/dev/null; true']), { code: 1 });
         return Promise.all([statusP, stateP]).then(function(data) {
             var status = data[0] || {};
             var state = data[1] || '';
             var stateVariant = (state.match(/^([^\n\r]+)/) || ['', ''])[1].trim();
             var stored = state.replace(/^[^\n]*\n/, '').trim();
-            self.magitrickleRunning = status.code === 0;
+            self.magitrickleRunning = isMagiRunningOutput(status);
             var storedMatch = stored.match(/v?[0-9]+\.[0-9]+\.[0-9]+[0-9A-Za-z.\-]*/);
             if (storedMatch) return apply(storedMatch[0], stateVariant);
             return settle(fs.exec('/bin/sh', ['-c', 'if command -v timeout >/dev/null 2>&1; then timeout 5 magitrickled --version 2>&1; else magitrickled --version 2>&1; fi']), { stdout: '' }).then(function(res) {
@@ -978,7 +999,7 @@ E('option', { value: 'original' }, 'Original'),
               { view: 'backup', label: _('Резервное копирование') }
         ];
         items.forEach(function(it) {
-            self.settingsRow.appendChild(E('button', { 'class': 'btn cbi-button-neutral' + (self.activeView === it.view ? ' active' : ''), 'click': function() { self.switchView(it.view); } }, it.label));
+             self.settingsRow.appendChild(makeLuciTab(it.label, self.activeView === it.view, function() { self.switchView(it.view); }));
         });
     },
 
@@ -1027,7 +1048,7 @@ E('option', { value: 'original' }, 'Original'),
         }
         this.subRow.style.display = 'flex';
         items.forEach(function(it) {
-            self.subRow.appendChild(E('button', { 'class': 'btn cbi-button-neutral' + (self.activeSub === it.s ? ' active' : ''), 'click': function() { self.switchSub(it.s); } }, it.label));
+             self.subRow.appendChild(makeLuciTab(it.label, self.activeSub === it.s, function() { self.switchSub(it.s); }));
         });
     },
 
@@ -1042,7 +1063,7 @@ E('option', { value: 'original' }, 'Original'),
          this.thirdRow.style.display = 'flex';
          var items = this.activeSub === 'list' ? [ { s: 'list', label: _('Все конфигурации') }, { s: 'add', label: _('Создать конфигурацию') } ] : (this.activeSub === 'rules' ? [ { s: 'list', label: _('Все списки правил') }, { s: 'add', label: _('Создать список правил') } ] : [ { s: 'list', label: _('Все расписание') }, { s: 'add', label: _('Создать расписание') } ]);
         items.forEach(function(it) {
-            self.thirdRow.appendChild(E('button', { 'class': 'btn cbi-button-neutral' + (self.activeThird === it.s ? ' active' : ''), 'click': function() { self.switchThird(it.s); } }, it.label));
+             self.thirdRow.appendChild(makeLuciTab(it.label, self.activeThird === it.s, function() { self.switchThird(it.s); }));
         });
     },
 
@@ -1072,7 +1093,7 @@ E('option', { value: 'original' }, 'Original'),
          }
          this.fourthRow.style.display = 'flex';
          [ { s: 'time', label: _('По времени') }, { s: 'trigger', label: _('По триггеру') }, { s: 'combined', label: _('По триггеру и времени') } ].forEach(function(it) {
-             self.fourthRow.appendChild(E('button', { class: 'btn cbi-button-neutral' + (self.activeFourth === it.s ? ' active' : ''), click: function() { self.switchFourth(it.s); } }, it.label));
+              self.fourthRow.appendChild(makeLuciTab(it.label, self.activeFourth === it.s, function() { self.switchFourth(it.s); }));
          });
      },
 
@@ -1214,7 +1235,7 @@ E('option', { value: 'original' }, 'Original'),
              allCheck.addEventListener('change', function() {
                  componentChecks.forEach(function(item) { item.check.checked = allCheck.checked; });
              });
-             var create = E('button', { class: 'btn cbi-button-positive btn-save-custom', click: function() {
+             var create = E('button', { class: 'btn cbi-button-positive', click: function() {
                  var selected = componentChecks.filter(function(item) { return item.check.checked; }).map(function(item) { return item.value; });
                  if (allCheck.checked) selected = ['all'];
                  if (!selected.length) {
@@ -1240,15 +1261,14 @@ E('option', { value: 'original' }, 'Original'),
               autoMagi.addEventListener('change', saveAutoSettings);
               retention.addEventListener('change', saveAutoSettings);
              var rows = [
-                 E('h3', {}, _('Резервное копирование')),
-                 E('div', { style: 'margin-bottom:0;' }, componentRows.concat([retentionRow, create])),
-                E('fieldset', { style: 'margin-bottom:1rem;' }, [
-                     E('legend', {}, _('Автоматическое копирование')),
-                     E('p', { style: 'opacity:.75; margin:.4rem 0;' }, _('Все компоненты будут копироваться перед обновлением')),
-                     E('label', { style: 'display:block; margin:.4rem 0;' }, [autoMihomo, ' ', _('Mihomo')]),
-                     E('label', { style: 'display:block; margin:.4rem 0;' }, [autoMagi, ' ', _('MagiTrickle')])
+                 E('h3', {}, _('Автоматическое копирование перед обновлением')),
+                 E('div', { style: 'margin-bottom:0;' }, [
+                     E('label', { style: 'display:block; margin:.35rem 0;' }, [autoMihomo, ' ', _('Mihomo')]),
+                     E('label', { style: 'display:block; margin:.35rem 0 0;' }, [autoMagi, ' ', _('MagiTrickle')])
                  ]),
-                E('h3', {}, _('Сохранённые копии'))
+                  E('h3', {}, _('Ручное копирование')),
+                  E('div', { style: 'margin-bottom:0;' }, componentRows.concat([retentionRow, create])),
+                E('h3', { style: 'margin:.8rem 0 .5rem;' }, _('Сохранённые копии'))
             ];
             var backups = self.backupData.backups || [];
             if (!backups.length) rows.push(E('p', {}, _('Резервных копий пока нет.')));
@@ -1306,7 +1326,7 @@ E('option', { value: 'original' }, 'Original'),
             E('p', {}, _('Восстановить выбранную резервную копию?')),
             E('div', { class: 'right' }, [
                 E('button', { class: 'btn cbi-button-neutral', click: ui.hideModal }, _('Отмена')), ' ',
-                E('button', { class: 'btn cbi-button-positive btn-save-custom', click: function() {
+                E('button', { class: 'btn cbi-button-positive', click: function() {
                     callBackupRestore(file).then(function(res) {
                         if (!res || !res.ok) throw new Error((res && res.error) || _('Не удалось восстановить копию'));
                         ui.hideModal();
@@ -1362,8 +1382,8 @@ E('option', { value: 'original' }, 'Original'),
         if (!this.dnsModeRow) return;
         var self = this;
         L.dom.content(this.dnsModeRow, []);
-        this.dnsModeRow.appendChild(E('button', { 'class': 'btn cbi-button-neutral' + (this.dnsMode === 'simple' ? ' active' : ''), 'click': function() { self.switchDnsMode('simple'); } }, _('Простое добавление')));
-        this.dnsModeRow.appendChild(E('button', { 'class': 'btn cbi-button-neutral' + (this.dnsMode === 'manual' ? ' active' : ''), 'click': function() { self.switchDnsMode('manual'); } }, _('Ручное добавление')));
+         this.dnsModeRow.appendChild(makeLuciTab(_('Простое добавление'), this.dnsMode === 'simple', function() { self.switchDnsMode('simple'); }));
+         this.dnsModeRow.appendChild(makeLuciTab(_('Ручное добавление'), this.dnsMode === 'manual', function() { self.switchDnsMode('manual'); }));
     },
 
      switchDnsMode: function(v) {
@@ -1387,7 +1407,7 @@ E('option', { value: 'original' }, 'Original'),
         var order = this.dnsOrder || [];
         var custom = (this.dnsData && this.dnsData.custom) || [];
         var dnsModes = [
-            { value: 'strict', label: _('Строгий порядок'), desc: _('Работает строго по порядку: всегда первый, если он не работает — второй, и так далее.<br>Этот режим обязателен для DNS через Mihomo или любой другой пакет с шифрованием DNS.') },
+            { value: 'strict', label: _('По порядку'), desc: _('Обязательный режим для использования секции DNS в Mihomo') },
             { value: 'standard', label: _('Стандартный'), desc: _('Автоматический выбор самого быстрого сервера.') },
             { value: 'parallel', label: _('Параллельный'), desc: _('Запрос ко всем серверам сразу, ответ от самого первого.') }
         ];
@@ -1443,7 +1463,7 @@ E('option', { value: 'original' }, 'Original'),
         cleanCb.checked = !!this.dnsClean;
         panel.appendChild(E('label', { style: 'display:flex; align-items:center; gap:.6rem; margin:.8rem 0 .4rem;' }, [cleanCb, E('span', {}, _('Очистить /etc/dnsmasq.conf перед применением'))]));
         panel.appendChild(E('div', { style: 'margin-top:.8rem;' }, [
-            E('button', { 'class': 'btn cbi-button-positive btn-save-custom', click: function() { self.applySimpleDns(); } }, _('Применить'))
+            E('button', { 'class': 'btn cbi-button-positive', click: function() { self.applySimpleDns(); } }, _('Применить'))
         ]));
     },
 
@@ -1455,7 +1475,7 @@ E('option', { value: 'original' }, 'Original'),
         panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; flex-direction:column; align-items:flex-start; gap:.4rem; margin:.4rem 0;' }, [
             E('span', {}, _('Название (необязательно)')), nameIn,
             E('span', {}, _('IP (можно указать несколько через пробел)')), valIn,
-            E('button', { 'class': 'btn cbi-button-positive btn-save-custom', click: function() {
+            E('button', { 'class': 'btn cbi-button-positive', click: function() {
                 var nm = nameIn.value.trim();
                  if (!nm) {
                      nm = valIn.value.trim();
@@ -1503,7 +1523,7 @@ E('option', { value: 'original' }, 'Original'),
             field(_('Название (необязательно)'), nameInput),
             field(_('IP (можно указать несколько через пробел)'), valueInput),
             E('div', { style: 'display:flex; gap:.5rem; margin-top:.6rem;' }, [
-                E('button', { class: 'btn cbi-button-positive btn-save-custom mihomo-overview-card-action', click: function() {
+                E('button', { class: 'btn cbi-button-positive mihomo-overview-card-action', click: function() {
                     var nm = nameInput.value.trim();
                     if (!nm) { ui.addNotification(null, E('p', _('Введите название')), 'error'); return; }
                     var val = valueInput.value.trim();
@@ -1579,7 +1599,7 @@ E('option', { value: 'original' }, 'Original'),
                 E('p', {}, _('Файл /etc/dnsmasq.conf будет полностью очищен, останутся только ваши правила.')),
                 E('div', { class: 'right', style: 'margin-top:1rem;' }, [
                     E('button', { class: 'btn cbi-button-neutral', click: ui.hideModal }, _('Выйти')), ' ',
-                    E('button', { class: 'btn cbi-button-positive btn-save-custom', click: function() { ui.hideModal(); doApply(true); } }, _('Очистить и применить'))
+                    E('button', { class: 'btn cbi-button-positive', click: function() { ui.hideModal(); doApply(true); } }, _('Очистить и применить'))
                 ])
             ]);
         } else {
@@ -1594,7 +1614,7 @@ E('option', { value: 'original' }, 'Original'),
         ta.value = this.dnsManualText || '';
         panel.appendChild(ta);
         panel.appendChild(E('div', { style: 'margin-top:.8rem; display:flex; gap:.5rem;' }, [
-            E('button', { 'class': 'btn cbi-button-positive btn-save-custom', click: function() {
+            E('button', { 'class': 'btn cbi-button-positive', click: function() {
                 ui.showModal(null, [E('p', { 'class': 'spinning' }, _('Применение...'))]);
                 callDnsApplyFull(ta.value).then(function(res) {
                     ui.hideModal();
@@ -1645,17 +1665,21 @@ E('option', { value: 'original' }, 'Original'),
             source
         ]);
         var modeRow = E('div', { class: 'mihomo-seg', style: 'margin:0;' });
-        var autoBtn = E('button', { class: 'btn cbi-button-neutral active', click: function() {
+        var autoBtn = E('button', { class: 'btn cbi-button-positive mihomo-route-choice active', click: function() {
             routeMode = 'auto';
-            autoBtn.classList.add('active');
-            manualBtn.classList.remove('active');
+            autoBtn.classList.add('active', 'cbi-button-positive');
+            autoBtn.classList.remove('cbi-button-neutral');
+            manualBtn.classList.remove('active', 'cbi-button-positive');
+            manualBtn.classList.add('cbi-button-neutral');
             autoBox.style.display = 'flex';
             manualBox.style.display = 'none';
         } }, _('Системный'));
-        var manualBtn = E('button', { class: 'btn cbi-button-neutral', click: function() {
+        var manualBtn = E('button', { class: 'btn cbi-button-neutral mihomo-route-choice', click: function() {
             routeMode = 'manual';
-            manualBtn.classList.add('active');
-            autoBtn.classList.remove('active');
+            manualBtn.classList.add('active', 'cbi-button-positive');
+            manualBtn.classList.remove('cbi-button-neutral');
+            autoBtn.classList.remove('active', 'cbi-button-positive');
+            autoBtn.classList.add('cbi-button-neutral');
             manualBox.style.display = 'flex';
             autoBox.style.display = 'none';
         } }, _('Ручной'));
@@ -1665,7 +1689,7 @@ E('option', { value: 'original' }, 'Original'),
              E('span', {}, _('Название (необязательно)')), routeLabel,
              E('span', {}, _('Тип подключения')), backendSel,
              E('span', {}, _('IP или CIDR')), modeRow, autoBox, manualBox,
-             E('button', { class: 'btn cbi-button-positive btn-save-custom', style: 'margin-top:.8rem;', click: function() {
+             E('button', { class: 'btn cbi-button-positive', style: 'margin-top:.8rem;', click: function() {
                  var name = routeLabel.value.trim();
                 if (routeMode === 'manual') {
                     var manual = source.value.trim();
@@ -1747,7 +1771,7 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
           panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; flex-direction:column; align-items:flex-start; gap:.4rem; margin:.4rem 0;' }, [
               E('span', {}, _('Название (необязательно)')), exLabel,
              E('span', {}, _('IP или CIDR')), exDest,
-             E('button', { class: 'btn cbi-button-positive btn-save-custom', style: 'margin-top:.8rem;', click: function() {
+             E('button', { class: 'btn cbi-button-positive', style: 'margin-top:.8rem;', click: function() {
                 callRoutingExcludeAdd(exDest.value.trim(), exLabel.value.trim()).then(function(res) { if (self.showRoutingError(res)) { exDest.value = ''; exLabel.value = ''; self.refreshRouting(); } }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
             }}, _('Добавить'))]));
          panel.appendChild(E('h4', { style: 'margin-top:1rem;' }, _('Адреса')));
@@ -2059,7 +2083,7 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
             fs.read(MAIN_CONFIG).catch(function() { return ''; }),
             callServiceList('mihomo').catch(function() { return {}; }),
              fs.list(RULE_DIR).catch(function() { return []; }),
-              fs.exec('/bin/sh', ['-c', 'service magitrickle status >/dev/null 2>&1 || pidof magitrickled >/dev/null 2>&1']).catch(function() { return { code: 1 }; }),
+              fs.exec('/bin/sh', ['-c', 'service magitrickle status 2>&1; pidof magitrickled 2>/dev/null; true']).catch(function() { return { code: 1 }; }),
              fs.exec('/bin/sh', ['-c', 'if command -v timeout >/dev/null 2>&1; then timeout 5 magitrickled --version 2>&1; else magitrickled --version 2>&1; fi']).catch(function() { return { stdout: '' }; }),
              fs.read('/etc/mixomo/versions/magitrickle').catch(function() { return ''; })
 		]);
@@ -2080,14 +2104,14 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
         var magitrickleVersion = magitrickleStoredMatch ? magitrickleStoredMatch[0] : (magitrickleMatch ? 'v' + magitrickleMatch[1] : '');
         var isRunning = !!(serviceInfo.mihomo && serviceInfo.mihomo.instances.main.running);
         this.isRunning = isRunning;
-        this.magitrickleRunning = magitrickleStatus.code === 0;
+        this.magitrickleRunning = isMagiRunningOutput(magitrickleStatus);
          this.magitrickleVersion = magitrickleVersion ? (magitrickleVersion.indexOf('v') === 0 ? magitrickleVersion : 'v' + magitrickleVersion) : _('Неизвестно');
          this.magitrickleVariant = magitrickleVariant === 'mod' ? 'mod' : 'original';
         
          var latestVersionEl = E('span', { 'id': 'mihomo-latest-version', 'style': 'margin-left: 4px; font-size: 0.9em; opacity: 0.7; display: none;' }, '');
          this.latestVersionEl = latestVersionEl;
          try { this.mihomoChannel = localStorage.getItem('mihomo_channel') === 'alpha' ? 'alpha' : 'release'; } catch (e) { this.mihomoChannel = 'release'; }
-         var mihomoChannelSelect = E('select', { class: 'cbi-input-select', style: 'width:6rem;', change: function(ev) {
+         var mihomoChannelSelect = E('select', { class: 'cbi-input-select', style: 'width:6rem; height:28px;', change: function(ev) {
              ev.stopPropagation();
              var previousChannel = self.mihomoChannel;
              var nextChannel = ev.target.value;
@@ -2105,7 +2129,7 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
          ]);
          mihomoChannelSelect.value = this.mihomoChannel;
          this.mihomoChannelSelect = mihomoChannelSelect;
-          var updateButton = E('button', { 'id': 'mihomo-update-btn', 'class': 'btn cbi-button-neutral', 'style': 'margin: 0; padding: 0 0.6em; font-size: 0.9em;', 'disabled': true }, _('Проверить обновление'));
+          var updateButton = E('button', { 'id': 'mihomo-update-btn', 'class': 'btn cbi-button-neutral', 'style': 'margin: 0;', 'disabled': true }, _('Проверить обновление'));
          this.updateButton = updateButton;
           var magitrickleUpdateButton = E('button', { 'id': 'magitrickle-update-btn', 'class': 'btn cbi-button-neutral mihomo-overview-card-action', 'disabled': true }, _('Проверить обновление'));
           this.magitrickleUpdateButton = magitrickleUpdateButton;
@@ -2113,7 +2137,7 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
           this.mixomoVersion = null;
           this.mixomoAvailableSha = null;
           try { this.mixomoChannel = localStorage.getItem('mixomo_channel') === 'test' ? 'test' : 'stable'; } catch (e) { this.mixomoChannel = 'stable'; }
-          var mixomoChannelSelect = E('select', { class: 'cbi-input-select', style: 'width:6rem;', change: function(ev) {
+          var mixomoChannelSelect = E('select', { class: 'cbi-input-select', style: 'width:6rem; height:28px;', change: function(ev) {
               ev.stopPropagation();
               var previousChannel = self.mixomoChannel;
               var nextChannel = ev.target.value;
@@ -2130,7 +2154,7 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
           ]);
           mixomoChannelSelect.value = this.mixomoChannel;
           this.mixomoChannelSelect = mixomoChannelSelect;
-           var mixomoLanguageSelect = E('select', { class: 'cbi-input-select', style: 'width:6rem;', change: function(ev) {
+           var mixomoLanguageSelect = E('select', { class: 'cbi-input-select', style: 'width:6rem; height:28px;', change: function(ev) {
                ev.stopPropagation();
                try { localStorage.setItem('mixomo_language', ev.target.value); } catch (e) {}
                window.location.reload();
@@ -2141,14 +2165,14 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
            ]);
            mixomoLanguageSelect.value = MIXOMO_LANGUAGE;
            this.mixomoLanguageSelect = mixomoLanguageSelect;
-            var mixomoUpdateButton = E('button', { 'id': 'mixomo-update-btn', 'class': 'btn cbi-button-neutral', 'style': 'margin: 0; padding: 0 0.6em; font-size: 0.9em;', 'disabled': true }, _('Проверить обновление'));
+            var mixomoUpdateButton = E('button', { 'id': 'mixomo-update-btn', 'class': 'btn cbi-button-neutral', 'style': 'margin: 0;', 'disabled': true }, _('Проверить обновление'));
            this.mixomoUpdateButton = mixomoUpdateButton;
            var mixomoTitleVersion = E('span', { style: 'margin-left: 4px; font-size: 0.8em;' }, '');
            this.mixomoTitleVersion = mixomoTitleVersion;
           
           var header = E('div', { 'style': 'display: flex; align-items: center; margin-bottom: 1rem; flex-wrap: wrap;' }, [
                E('h2', { 'style': 'margin: 0;' }, [
-                    E('span', { style: 'color:#5cb85c;' }, 'Mix'), E('span', {}, 'omo'), mixomoTitleVersion
+                    E('span', { style: 'color:#00A66C;' }, 'Mix'), E('span', {}, 'omo'), mixomoTitleVersion
                ]),
               E('div', { 'style': 'display:flex; align-items:center; gap:0.35rem; margin-left:0.75rem;' }, [
                   mixomoUpdateButton, mixomoChannelSelect, mixomoLanguageSelect
@@ -2204,18 +2228,10 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
             }
         `;
 
-        var style = E('style', {}, cssVariables + `
-            .btn, .cbi-button {
-                min-height: 1.8rem !important; 
-                display: inline-flex !important;
-                align-items: center;
-                justify-content: center;
-                vertical-align: middle;
-                box-sizing: border-box !important;
-                padding: 0 1rem !important;
-                line-height: 1 !important;
-            }
-            #output-text {
+         var style = E('style', {}, cssVariables + `
+             .btn, .cbi-button { height: 28px !important; min-height: 28px !important; display: inline-flex !important; align-items: center; justify-content: center; vertical-align: middle; }
+
+             #output-text {
                 font-size: 0.8rem !important;
             }
             .cbi-page-actions { display: none !important; }
@@ -2233,22 +2249,16 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
             .toolbar textarea { width: 100%; height: 6em; background: var(--bg-input); color: var(--text-main); border: 1px solid var(--border-color); font-family: monospace; font-size: 0.9em; padding: 0.4em; }
             .toolbar select { background: var(--bg-input); color: var(--text-main); border: 1px solid var(--border-color); padding: 0.4em; }
             .toolbar-col { display: flex; flex-direction: column; }
-            .btn-save-custom { border-color: #5cb85c !important; color: #5cb85c !important; }
-            .btn-save-custom:hover { border-color: #5cb85c !important; }
-            .btn.cbi-button-action:hover { border-color: #5cb85c !important; }
-            #mihomo-update-btn[disabled], #magitrickle-update-btn[disabled] { opacity: 1 !important; filter: none !important; cursor: default !important; }
-            .btn.cbi-button-reset:hover { border-color: #F62B12 !important; color: #F62B12 !important; }
-            .btn-generate { border-color: #5cb85c !important; color: #5cb85c !important; margin: auto 0; display: block; background: var(--bg-input); }
-            .btn-generate:hover { border-color: #5cb85c !important; }
+
             .snippet-container { margin-top: 0; border: 0 !important; background: transparent !important; padding: 0 !important; display: none; }
              .mihomo-routing-panel { border: 0 !important; background: transparent !important; padding: 0 !important; margin: 0 0 1rem; }
              .mihomo-overview-panel, .mihomo-backup-panel { border: 0; background: transparent !important; padding: 0; margin: 0 0 1rem; }
              .mihomo-overview-intro { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: .7rem; margin-bottom: .7rem; }
              .mihomo-overview-row { display: block; margin-bottom: .7rem; }
              .mihomo-overview-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; }
-             .mihomo-overview-card { display: flex; flex-direction: column; padding: 1rem; border: 1px solid var(--border-color); border-left: 0; background: var(--bg-input); box-sizing: border-box; cursor: grab; }
-             .mihomo-overview-card.is-ok { border-left: 3px solid #5cb85c; }
-             .mihomo-overview-card.is-muted { border-left: 1px solid var(--border-color); }
+.mihomo-overview-card { display: flex; flex-direction: column; padding: 1rem; border: 1px solid var(--border-color); border-left: 0; background: var(--bg-input); box-sizing: border-box; cursor: grab; }
+              .mihomo-overview-card.is-ok { border-left: 3px solid #00A66C; }
+              .mihomo-overview-card.is-muted { border-left: 1px solid var(--border-color); }
               .mihomo-overview-card-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; min-height: 1.65rem; }
              .mihomo-overview-card-title { color: inherit !important; font-size: 1.05em; font-weight: 600; }
              .mihomo-overview-card-head .btn { margin-left: 0 !important; }
@@ -2256,22 +2266,28 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
               .mihomo-overview-card-detail > div { min-height: 1.65rem; display: flex; align-items: center; }
                .mihomo-overview-card-detail > div + div { padding-top: 0; }
              .mihomo-overview-card-value { color: inherit !important; font-size: 1.55em; font-weight: 600; margin: .8rem 0 .45rem; overflow-wrap: anywhere; }
-             .mihomo-overview-card-actions { display: flex; justify-content: flex-start; gap: .5rem; margin-top: .8rem; }
+              .mihomo-overview-card-actions { display: flex; justify-content: flex-start; gap: .5rem; margin-top: auto; padding-top: .8rem; }
+
               .mihomo-overview-card-actions .btn { margin-left: 0 !important; }
               .mihomo-overview-card-actions .mihomo-card-stop { margin-left: auto !important; }
-             .mihomo-overview-card-action { padding: 0 .6rem !important; min-height: 1.8rem !important; font-size: .9em; white-space: nowrap; cursor: pointer; }
+                .mihomo-overview-card-action { height: 28px !important; font-size: .9em; white-space: nowrap; cursor: pointer; }
+
+
+
              .mihomo-overview-dragging { opacity: .55; }
              .mihomo-overview-drag-over { outline: 2px dashed var(--border-color); background-color: rgba(125,125,125,0.12); }
              @media (max-width: 700px) { .mihomo-overview-cards { grid-template-columns: 1fr; } }
-             .mihomo-settings-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
-             .mihomo-settings-row .btn, .mihomo-sub-row .btn, .mihomo-routing-panel .btn, .mihomo-dns-panel .btn, .mihomo-files-panel .btn, .mihomo-edit-panel .btn, .mihomo-backup-panel .btn, .toolbar .btn { background: transparent !important; }
-            .mihomo-sub-row { padding: 0.1rem 0 0; }
+              .mihomo-settings-row { display: flex; flex-wrap: wrap; }
+
+
+             .mihomo-sub-row { padding: 0.1rem 0 0; background: transparent; background-image: none; }
+
             .mihomo-files-panel { border: 0 !important; background: transparent !important; padding: 0 !important; margin: 0 0 1rem; }
             .mihomo-edit-panel { border: 0 !important; background: transparent !important; padding: 0 !important; margin: 0 0 0.8rem; }
             .mihomo-file-active { font-weight: bold; color: #5cb85c !important; }
             .mihomo-dns-panel { border: 0 !important; background: transparent !important; padding: 0 !important; margin: 0 0 1rem; }
             .mihomo-seg { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-            .mihomo-seg .btn.active { border-color: #5cb85c !important; color: #5cb85c !important; }
+
             .mihomo-dns-text { background: var(--bg-input); color: var(--text-main); border: 1px solid var(--border-color); font-family: monospace; font-size: 0.9em; padding: 0.6em; box-sizing: border-box; }
             .mihomo-dns-panel input[type=text] { background: var(--bg-input); color: var(--text-main); border: 1px solid var(--border-color); padding: .4em; }
              .mihomo-route-add { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
@@ -2322,17 +2338,17 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
         ]);
         
         var buttonContainer = E('div', { 'id': 'bottom-buttons', 'class': 'custom-actions', 'style': 'margin-top: 1rem;' }, [
-            E('button', { 'class': 'btn cbi-button-positive btn-save-custom', 'click': ui.createHandlerFn(this, 'handleSaveAndApply', isRunning) }, _('Сохранить')),
+            E('button', { 'class': 'btn cbi-button-positive', 'click': ui.createHandlerFn(this, 'handleSaveAndApply', isRunning) }, _('Сохранить')),
             E('button', { 'id': 'check-button', 'class': 'btn cbi-button-neutral', 'click': ui.createHandlerFn(this, 'handleCheck') }, _('Проверить конфигурацию')),
             E('button', { 'class': 'btn cbi-button-neutral', 'click': ui.createHandlerFn(this, 'handleShowLogs') }, _('Показать журнал'))
         ]);
         
         var middleActions = E('div', { 'id': 'middle-actions', 'class': 'custom-actions', 'style': 'display: none; margin-top: 0.8rem;' }, [
-            E('button', { 'class': 'btn cbi-button-positive btn-save-custom', 'click': ui.createHandlerFn(this, 'handleSaveAndApply', isRunning) }, _('Сохранить'))
+            E('button', { 'class': 'btn cbi-button-positive', 'click': ui.createHandlerFn(this, 'handleSaveAndApply', isRunning) }, _('Сохранить'))
         ]);
 
         var profileActions = E('div', { 'id': 'profile-actions', 'class': 'custom-actions', 'style': 'display: none; margin-top: 0.8rem;' }, [
-            E('button', { 'class': 'btn cbi-button-positive btn-save-custom', 'click': ui.createHandlerFn(this, 'handleSaveAndApply', isRunning) }, _('Сохранить')),
+            E('button', { 'class': 'btn cbi-button-positive', 'click': ui.createHandlerFn(this, 'handleSaveAndApply', isRunning) }, _('Сохранить')),
             E('button', { 'id': 'profile-check-button', 'class': 'btn cbi-button-neutral', 'click': ui.createHandlerFn(this, 'handleCheck') }, _('Проверить конфигурацию')),
             E('button', { 'id': 'profile-logs-button', 'class': 'btn cbi-button-neutral', 'click': ui.createHandlerFn(this, 'handleShowLogs') }, _('Показать журнал'))
         ]);
@@ -2348,26 +2364,26 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
         var overviewPanel = E('div', { 'class': 'mihomo-overview-panel', 'style': 'display:none;' });
         this.overviewPanel = overviewPanel;
 
-        var settingsRow = E('div', { 'class': 'mihomo-settings-row mihomo-seg', 'style': 'margin-bottom: 0.3rem;' });
+        var settingsRow = E('ul', { 'class': 'cbi-tabmenu mihomo-settings-row', 'style': 'margin-bottom: 0.3rem;' });
         this.settingsRow = settingsRow;
         this.renderSettingsRow();
 
-        var subRow = E('div', { 'class': 'mihomo-settings-row mihomo-seg mihomo-sub-row', 'style': 'margin-bottom: 0.5rem;' });
+        var subRow = E('ul', { 'class': 'cbi-tabmenu mihomo-settings-row mihomo-sub-row', 'style': 'margin-bottom: 0.5rem;' });
         this.subRow = subRow;
         this.renderSubRow();
 
-        var thirdRow = E('div', { 'class': 'mihomo-settings-row mihomo-seg mihomo-sub-row', 'style': 'margin-bottom: 0.5rem; display:none;' });
+        var thirdRow = E('ul', { 'class': 'cbi-tabmenu mihomo-settings-row mihomo-sub-row', 'style': 'margin-bottom: 0.5rem; display:none;' });
          this.thirdRow = thirdRow;
          this.renderThirdRow();
 
-         var fourthRow = E('div', { 'class': 'mihomo-settings-row mihomo-seg mihomo-sub-row', 'style': 'margin-bottom: 0.5rem; display:none;' });
+         var fourthRow = E('ul', { 'class': 'cbi-tabmenu mihomo-settings-row mihomo-sub-row', 'style': 'margin-bottom: 0.5rem; display:none;' });
          this.fourthRow = fourthRow;
          this.renderFourthRow();
 
          var routingPanel = E('div', { 'class': 'mihomo-routing-panel', 'style': 'display:none;' });
         this.routingPanel = routingPanel;
 
-        var dnsModeRow = E('div', { 'class': 'mihomo-settings-row mihomo-seg mihomo-sub-row', 'style': 'display:none; margin-bottom: 0.5rem;' });
+        var dnsModeRow = E('ul', { 'class': 'cbi-tabmenu mihomo-settings-row mihomo-sub-row', 'style': 'display:none; margin-bottom: 0.5rem;' });
         this.dnsModeRow = dnsModeRow;
 
         var dnsPanel = E('div', { 'class': 'mihomo-dns-panel', 'style': 'display:none;' });
@@ -2554,7 +2570,7 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
 				E('div', { 'style': 'flex-grow: 1;' }, input),
 				E('div', { 'class': 'toolbar-col', 'style': 'min-width: 10rem; display: flex; flex-direction: column; justify-content: space-between;' }, [
 					E('label', { 'for': 'suffixCheck', 'style': 'align-self: flex-start; font-size: 0.85em;' }, [ suffixCheck, ' . (дубликаты с точкой)' ]),
-					E('button', { 'class': 'btn btn-generate', 'style': 'align-self: center;', 'click': function() { self.handleAppendList(input.value, suffixCheck.checked); input.value = ''; } }, _('Добавить'))
+					E('button', { 'class': 'btn cbi-button-positive', 'style': 'align-self: center;', 'click': function() { self.handleAppendList(input.value, suffixCheck.checked); input.value = ''; } }, _('Добавить'))
 				])
 			]);
             container.appendChild(row);
@@ -2574,7 +2590,7 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
                 E('div', { 'style': 'flex-grow: 1;' }, input),
                 E('div', { 'class': 'toolbar-col' }, [ typeSelect ]),
                 E('div', { 'class': 'toolbar-col', 'style': 'min-width: 8rem; justify-content: flex-end;' }, [
-                    E('button', { 'class': 'btn btn-generate', 'click': function() { self.handleGenerateRules(input.value, typeSelect.value); input.value = ''; } }, _('Создать'))
+                    E('button', { 'class': 'btn cbi-button-positive', 'click': function() { self.handleGenerateRules(input.value, typeSelect.value); input.value = ''; } }, _('Создать'))
                 ])
             ]);
             container.appendChild(row);
@@ -2940,7 +2956,7 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
             }
         });
         container.appendChild(E('div', { style: 'margin:.5rem 0;' }, [
-            E('button', { 'class': 'btn cbi-button-positive btn-save-custom', click: function() {
+            E('button', { 'class': 'btn cbi-button-positive', click: function() {
                 var nm = lName.value.trim();
                 var file = lPick.input.files && lPick.input.files[0];
                 if (file) {
@@ -2986,7 +3002,7 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
             container.appendChild(E('div', { style: 'margin:.2rem 0;' }, [E('label', { style: 'display:flex; align-items:center; gap:.6rem;' }, [cb, E('span', {}, s)])]));
         });
          container.appendChild(E('div', { style: 'margin:.5rem 0;' }, [
-             E('button', { 'class': 'btn cbi-button-positive btn-save-custom', click: function() {
+             E('button', { 'class': 'btn cbi-button-positive', click: function() {
                   var nm = oName.value.trim();
                   if (!nm) { ui.addNotification(null, E('p', _('Введите название')), 'error'); return; }
                   if (nm === 'config') { ui.addNotification(null, E('p', _('Имя config зарезервировано Mihomo')), 'error'); return; }
@@ -3017,17 +3033,17 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
                  configSection.appendChild(node);
              }
          });
-         var configButtons = E('div', { class: 'mihomo-seg', style: 'margin:.5rem 0 1rem;' });
+         var configButtons = E('ul', { class: 'cbi-tabmenu mihomo-settings-row mihomo-sub-row', style: 'margin:.5rem 0 1rem;' });
           configTitles.forEach(function(title, idx) {
-              configButtons.appendChild(E('button', { class: 'btn cbi-button-neutral' + (idx === 0 ? ' active' : ''), click: function() {
+              configButtons.appendChild(makeLuciTab(_(title), idx === 0, function() {
                   var isOpen = configSections[idx].style.display !== 'none';
                   configSections.forEach(function(section) { section.style.display = 'none'; });
-                  Array.prototype.forEach.call(configButtons.children, function(button) { button.classList.remove('active'); });
+                  Array.prototype.forEach.call(configButtons.children, function(tab) { tab.classList.add('cbi-tab-disabled'); });
                   if (!isOpen) {
                       configSections[idx].style.display = 'block';
-                      configButtons.children[idx].classList.add('active');
+                      configButtons.children[idx].classList.remove('cbi-tab-disabled');
                   }
-              } }, _(title)));
+              }));
           });
          container.appendChild(configButtons);
          configSections.forEach(function(section, idx) { section.style.display = idx === 0 ? 'block' : 'none'; container.appendChild(section); });
@@ -3068,15 +3084,15 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
           var localStatus;
           var setMode = function(isOnline) {
               online = isOnline;
-              localBtn.classList.toggle('active', !online);
-              onlineBtn.classList.toggle('active', online);
+              localBtn.classList.toggle('cbi-tab-disabled', online);
+              onlineBtn.classList.toggle('cbi-tab-disabled', !online);
               urlField.style.display = online ? 'block' : 'none';
               intervalField.style.display = online ? 'block' : 'none';
               localStatus.style.display = online ? 'none' : 'block';
           };
-          localBtn = E('button', { class: 'btn cbi-button-neutral', click: function() { setMode(false); } }, _('Локально'));
-          onlineBtn = E('button', { class: 'btn cbi-button-neutral', click: function() { setMode(true); url.focus(); } }, _('Онлайн'));
-          var typeRow = E('div', { class: 'mihomo-seg', style: 'margin:.4rem 0;' }, [localBtn, onlineBtn]);
+          localBtn = makeLuciTab(_('Локально'), !online, function() { setMode(false); });
+          onlineBtn = makeLuciTab(_('Онлайн'), online, function() { setMode(true); url.focus(); });
+          var typeRow = E('ul', { class: 'cbi-tabmenu mihomo-settings-row mihomo-sub-row', style: 'margin:.4rem 0;' }, [localBtn, onlineBtn]);
           var field = function(label, input) { return E('div', { style: 'margin:.35rem 0;' }, [E('label', { style: 'display:block; opacity:.8; margin-bottom:.15rem;' }, label), input]); };
           urlField = field(_('Ссылка'), url);
           intervalField = field(_('Обновление'), interval.element);
@@ -3089,7 +3105,7 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
               intervalField,
               localStatus,
               E('div', { style: 'display:flex; gap:.5rem; margin-top:.6rem;' }, [
-                  E('button', { class: 'btn cbi-button-positive btn-save-custom mihomo-overview-card-action', click: function() {
+                  E('button', { class: 'btn cbi-button-positive mihomo-overview-card-action', click: function() {
                       var newName = name.value.trim().replace(/\.ya?ml$/i, '');
                       if (!newName || newName === 'config') { ui.addNotification(null, E('p', newName === 'config' ? _('Имя config зарезервировано Mihomo') : _('Введите название')), 'error'); return; }
                       var iv = online ? interval.value() : '0';
@@ -3182,7 +3198,7 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
                  E('button', { 'class': 'btn cbi-button-neutral mihomo-overview-card-action', click: function(ev) { var card = ev.currentTarget; while (card && !card.classList.contains('mihomo-overview-card')) card = card.parentNode; if (card) self.openConfigCardEdit(card, p, profPath); } }, _('Изменить данные')),
                  E('button', { 'class': 'btn cbi-button-neutral mihomo-overview-card-action', click: function() { self.toggleConfigEditor(profPath); } }, _('Открыть в редакторе'))
              ];
-            if (!isActive) actions.push(E('button', { 'class': 'btn cbi-button-positive btn-save-custom mihomo-overview-card-action', click: function() { self.applyProfile(p.name); } }, _('Применить')));
+            if (!isActive) actions.push(E('button', { 'class': 'btn cbi-button-positive mihomo-overview-card-action', click: function() { self.applyProfile(p.name); } }, _('Применить')));
             if (p.url) actions.push(E('button', { 'class': 'btn cbi-button-neutral mihomo-overview-card-action', click: function() { self.refreshSource('config', p.name); } }, _('Обновить')));
             if (!isActive) actions.push(E('button', { 'class': 'btn cbi-button-reset mihomo-overview-card-action', click: function() {
                 if (confirm(_('Удалить %s?').format(p.name))) callProfilesDelete(p.name).then(function(res) {
@@ -3216,7 +3232,7 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
         
         container.appendChild(E('div', { style: 'margin:.3rem 0;' }, [lPick.btn]));
         container.appendChild(E('div', { style: 'margin:.5rem 0;' }, [
-            E('button', { 'class': 'btn cbi-button-positive btn-save-custom', click: function() {
+            E('button', { 'class': 'btn cbi-button-positive', click: function() {
                 var nm = lName.value.trim();
                 var file = lPick.input.files && lPick.input.files[0];
                 if (!nm && file) { nm = file.name.replace(/\.(yaml|yml|txt)$/i, ''); }
@@ -3265,7 +3281,7 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
         container.appendChild(E('div', { style: 'margin:.3rem 0;' }, [E('span', {}, _('Обновлять'))]));
         container.appendChild(E('div', { style: 'margin:.3rem 0;' }, [oInterval.element]));
          container.appendChild(E('div', { style: 'margin:.5rem 0;' }, [
-             E('button', { 'class': 'btn cbi-button-positive btn-save-custom', click: function() {
+             E('button', { 'class': 'btn cbi-button-positive', click: function() {
                  var nm = oName.value.trim();
                  if (!nm) { ui.addNotification(null, E('p', _('Введите название')), 'error'); return; }
                  var url = oUrl.value.trim();
@@ -3293,17 +3309,17 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
                  currentSection.appendChild(node);
              }
          });
-         var ruleButtons = E('div', { class: 'mihomo-seg', style: 'margin:.5rem 0 1rem;' });
+         var ruleButtons = E('ul', { class: 'cbi-tabmenu mihomo-settings-row mihomo-sub-row', style: 'margin:.5rem 0 1rem;' });
           ruleTitles.forEach(function(title, idx) {
-              ruleButtons.appendChild(E('button', { class: 'btn cbi-button-neutral' + (idx === 0 ? ' active' : ''), click: function() {
+              ruleButtons.appendChild(makeLuciTab(_(title), idx === 0, function() {
                   var isOpen = ruleSections[idx].style.display !== 'none';
                   ruleSections.forEach(function(section) { section.style.display = 'none'; });
-                  Array.prototype.forEach.call(ruleButtons.children, function(button) { button.classList.remove('active'); });
+                  Array.prototype.forEach.call(ruleButtons.children, function(tab) { tab.classList.add('cbi-tab-disabled'); });
                   if (!isOpen) {
                       ruleSections[idx].style.display = 'block';
-                      ruleButtons.children[idx].classList.add('active');
+                      ruleButtons.children[idx].classList.remove('cbi-tab-disabled');
                   }
-              } }, _(title)));
+              }));
           });
          container.appendChild(ruleButtons);
          ruleSections.forEach(function(section, idx) { section.style.display = idx === 0 ? 'block' : 'none'; container.appendChild(section); });
@@ -3337,28 +3353,28 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
           var localStatus;
           var setMode = function(isOnline) {
               online = isOnline;
-              localBtn.classList.toggle('active', !online);
-              onlineBtn.classList.toggle('active', online);
+              localBtn.classList.toggle('cbi-tab-disabled', online);
+              onlineBtn.classList.toggle('cbi-tab-disabled', !online);
               urlField.style.display = online ? 'block' : 'none';
               intervalField.style.display = online ? 'block' : 'none';
               localStatus.style.display = online ? 'none' : 'block';
           };
-          localBtn = E('button', { class: 'btn cbi-button-neutral', click: function() { setMode(false); } }, _('Локально'));
-          onlineBtn = E('button', { class: 'btn cbi-button-neutral', click: function() { setMode(true); url.focus(); } }, _('Онлайн'));
+          localBtn = makeLuciTab(_('Локально'), !online, function() { setMode(false); });
+          onlineBtn = makeLuciTab(_('Онлайн'), online, function() { setMode(true); url.focus(); });
           var field = function(label, input) { return E('div', { style: 'margin:.35rem 0;' }, [E('label', { style: 'display:block; opacity:.8; margin-bottom:.15rem;' }, label), input]); };
           urlField = field(_('Ссылка'), url);
           intervalField = field(_('Обновление'), interval.element);
           localStatus = E('div', { style: 'margin:.5rem 0; opacity:.8;' }, _('Без обновлений'));
           var edit = E('div', { class: 'mihomo-config-card-edit', style: 'margin-top:.8rem;' }, [
               E('div', { style: 'margin:.35rem 0; opacity:.8;' }, _('Тип конфигурации')),
-              E('div', { class: 'mihomo-seg', style: 'margin:.4rem 0;' }, [localBtn, onlineBtn]),
+              E('ul', { class: 'cbi-tabmenu mihomo-settings-row mihomo-sub-row', style: 'margin:.4rem 0;' }, [localBtn, onlineBtn]),
               field(_('Название'), name),
               field(_('Формат'), extSelect),
               urlField,
               intervalField,
               localStatus,
               E('div', { style: 'display:flex; gap:.5rem; margin-top:.6rem;' }, [
-                  E('button', { class: 'btn cbi-button-positive btn-save-custom mihomo-overview-card-action', click: function() {
+                  E('button', { class: 'btn cbi-button-positive mihomo-overview-card-action', click: function() {
                       var newBase = name.value.trim().replace(/\.(yaml|yml|txt)$/i, '');
                       if (!validateFilename(newBase)) { ui.addNotification(null, E('p', _('Некорректное имя')), 'error'); return; }
                       var targetName = newBase + extSelect.value;
@@ -3507,7 +3523,7 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
         panel.appendChild(row(_('Обновлять'), E('div', { style: 'display:flex; align-items:center; gap:.3rem;' }, [iSel, iIn])));
 
         panel.appendChild(E('div', { style: 'margin:.6rem 0 0; display:flex; gap:.5rem;' }, [
-            E('button', { 'class': 'btn cbi-button-positive btn-save-custom', click: function() {
+            E('button', { 'class': 'btn cbi-button-positive', click: function() {
                 var newName = name;
                 if (type === 'config') {
                     newName = nameField.value.trim();
@@ -3776,7 +3792,7 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
               E('span', {}, _('Время начала')), tStart,
               E('span', {}, _('Время окончания')), tEnd,
               E('span', {}, _('Дни недели')), dayBox,
-             E('button', { 'class': 'btn cbi-button-positive btn-save-custom', click: function() {
+             E('button', { 'class': 'btn cbi-button-positive', click: function() {
                 var nm = tName.value.trim();
                 if (!nm) { ui.addNotification(null, E('p', _('Введите название')), 'error'); return; }
                 if (!tProf.value) { ui.addNotification(null, E('p', _('Выберите профиль')), 'error'); return; }
@@ -3843,7 +3859,7 @@ panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; fl
               E('span', {}, _('Частота проверки в минутах')), gInt,
               E('span', {}, _('Частота проверки во время сбоев в минутах')), gThr,
               E('span', {}, _('Тип подключения')), gMode,
-             E('button', { 'class': 'btn cbi-button-positive btn-save-custom', click: function() {
+             E('button', { 'class': 'btn cbi-button-positive', click: function() {
                 var nm = gName.value.trim();
                 if (!nm) { ui.addNotification(null, E('p', _('Введите название')), 'error'); return; }
                 if (!gUrls.value.trim()) { ui.addNotification(null, E('p', _('Укажите хотя бы один URL')), 'error'); return; }
@@ -3916,7 +3932,7 @@ panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; fl
               E('span', {}, _('Время начала')), cStart,
              E('span', {}, _('Время окончания')), cEnd,
              E('span', {}, _('Дни недели')), cDays.box,
-             E('button', { 'class': 'btn cbi-button-positive btn-save-custom', click: function() {
+             E('button', { 'class': 'btn cbi-button-positive', click: function() {
                  var nm = cName.value.trim();
                  if (!nm) { ui.addNotification(null, E('p', _('Введите название')), 'error'); return; }
                  if (!cUrls.value.trim()) { ui.addNotification(null, E('p', _('Укажите хотя бы один URL')), 'error'); return; }
@@ -4001,7 +4017,7 @@ panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; fl
             ]),
             E('div', { class: 'right', style: 'margin-top:1rem;' }, [
                 E('button', { class: 'btn cbi-button-neutral', click: ui.hideModal }, _('Отмена')), ' ',
-                E('button', { class: 'btn cbi-button-positive btn-save-custom', click: function() {
+                E('button', { class: 'btn cbi-button-positive', click: function() {
                     var nm = name.value.trim();
                     if (!nm) { ui.addNotification(null, E('p', _('Введите название')), 'error'); return; }
                     if (!prof.value) { ui.addNotification(null, E('p', _('Выберите профиль')), 'error'); return; }
@@ -4032,7 +4048,7 @@ panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; fl
             ]),
             E('div', { class: 'right', style: 'margin-top:1rem;' }, [
                 E('button', { class: 'btn cbi-button-neutral', click: ui.hideModal }, _('Отмена')), ' ',
-                E('button', { class: 'btn cbi-button-positive btn-save-custom', click: function() {
+                E('button', { class: 'btn cbi-button-positive', click: function() {
                     var nm = name.value.trim();
                     if (!nm) { ui.addNotification(null, E('p', _('Введите название')), 'error'); return; }
                     if (!urls.value.trim()) { ui.addNotification(null, E('p', _('Укажите хотя бы один URL')), 'error'); return; }
@@ -4075,7 +4091,7 @@ panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; fl
             ]),
             E('div', { class: 'right', style: 'margin-top:1rem;' }, [
                 E('button', { class: 'btn cbi-button-neutral', click: ui.hideModal }, _('Отмена')), ' ',
-                E('button', { class: 'btn cbi-button-positive btn-save-custom', click: function() {
+                E('button', { class: 'btn cbi-button-positive', click: function() {
                     var nm = nameInput.value.trim();
                     if (!nm) { ui.addNotification(null, E('p', _('Введите название')), 'error'); return; }
                     if (!urls.value.trim()) { ui.addNotification(null, E('p', _('Укажите хотя бы один URL')), 'error'); return; }
@@ -4185,7 +4201,7 @@ panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; fl
             };
         }
         var edit = E('div', { class: 'mihomo-config-card-edit', style: 'margin-top:.8rem;' }, rows.concat([E('div', { style: 'display:flex; gap:.5rem; margin-top:.6rem;' }, [
-            E('button', { class: 'btn cbi-button-positive btn-save-custom mihomo-overview-card-action', click: onSave }, _('Сохранить')),
+            E('button', { class: 'btn cbi-button-positive mihomo-overview-card-action', click: onSave }, _('Сохранить')),
             E('button', { class: 'btn cbi-button-neutral mihomo-overview-card-action', click: function() { edit.remove(); actions.style.display = 'flex'; if (head) head.style.display = ''; for (var i = 0; i < details.length; i++) details[i].style.display = ''; } }, _('Закрыть'))
         ])]));
         cardEl.insertBefore(edit, actions);
@@ -4239,7 +4255,7 @@ panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; fl
         ]);
         var footer = E('div', { 'class': 'right', 'style': 'margin-top: 1.5rem;' }, [
             E('button', { 'class': 'btn', 'click': ui.hideModal }, _('Отмена')), ' ',
-            E('button', { 'class': 'btn cbi-button-positive btn-save-custom', 'click': function() {
+            E('button', { 'class': 'btn cbi-button-positive', 'click': function() {
                 var filename = nameInput.value.trim();
                 if (!filename || !validateFilename(filename)) { ui.addNotification(null, E('p', _('Некорректное имя')), 'error'); return; }
                 var fullPath = RULE_DIR + filename + typeSelect.value;
@@ -4333,7 +4349,8 @@ panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; fl
     },
     
     compareMagiVersions: function(left, right) {
-        var parts = function(v) { return (String(v || '').replace(/^v/i, '').match(/[0-9]+/g) || []).map(function(n) { return parseInt(n, 10); }); };
+        var base = function(v) { return String(v || '').replace(/^v/i, '').replace(/[-_]r\d+$/i, '').replace(/-\d+$/, ''); };
+        var parts = function(v) { return (base(v).match(/[0-9]+/g) || []).map(function(n) { return parseInt(n, 10); }); };
         var a = parts(left), b = parts(right);
         var len = Math.max(a.length, b.length);
         for (var i = 0; i < len; i++) {
@@ -4388,7 +4405,7 @@ panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; fl
         var pkgCmd = "if command -v apk >/dev/null 2>&1; then apk info -v magitrickle 2>/dev/null | head -1 | sed -n 's/^magitrickle-//p' | cut -d' ' -f1 | tr -d ' \\r\\n'; else opkg list-installed 2>/dev/null | grep '^magitrickle ' | awk '{print $3}' | head -1 | tr -d ' \\r\\n'; fi";
         var resolve = variant === 'mod' ? "$(" + tagCmd + ")" : "$(" + pkgCmd + ")";
 return "mkdir -p /etc/mixomo/versions; prev_variant=$(sed -n '1p' /etc/mixomo/versions/magitrickle 2>/dev/null | tr -d ' \\r\\n'); prev=$(sed -n '2p' /etc/mixomo/versions/magitrickle 2>/dev/null | tr -d ' \\r\\n'); " +
-             "ver=" + resolve + "; ver=$(printf '%s' \"$ver\" | tr -d ' \\r\\n'); " +
+             "ver=" + resolve + "; ver=$(printf '%s' \"$ver\" | tr -d ' \\r\\n' | sed 's/[-_]r[0-9]*$//; s/-[0-9][0-9]*$//'); " +
              "[ -z \"$ver\" ] && [ \"$prev_variant\" = '" + variant + "' ] && ver=\"$prev\"; " +
              "printf '%s\\n%s\\n' '" + variant + "' \"$ver\" > /etc/mixomo/versions/magitrickle";
     },
@@ -4579,14 +4596,15 @@ return "mkdir -p /etc/mixomo/versions; prev_variant=$(sed -n '1p' /etc/mixomo/ve
 
     getMagitrickleVersion: function() {
         return fs.read('/etc/mixomo/versions/magitrickle').catch(function() { return ''; }).then(function(state) {
-            var stored = String(state || '').replace(/^[^\n]*\n/, '').trim();
+            var stored = String(state || '').replace(/^[^\n]*\n/, '').trim().replace(/[-_]r\d+$/i, '').replace(/-\d+$/, '');
             var storedMatch = stored.match(/v?[0-9]+\.[0-9]+\.[0-9]+[0-9A-Za-z.\-]*/);
-            if (storedMatch) return storedMatch[0].indexOf('v') === 0 ? storedMatch[0] : 'v' + storedMatch[0];
+            if (storedMatch) { var sv = String(storedMatch[0]).replace(/[-_]r\d+$/i, '').replace(/-\d+$/, ''); return sv.indexOf('v') === 0 ? sv : 'v' + sv; }
             var cmd = 'if command -v timeout >/dev/null 2>&1; then timeout 5 magitrickled --version 2>&1; else magitrickled --version 2>&1; fi';
             return fs.exec('/bin/sh', ['-c', cmd]).then(function(res) {
                 var output = (((res && res.stdout) || '') + '\n' + ((res && res.stderr) || '')).replace(/\x1b\[[0-9;]*m/g, '');
                 var match = output.match(/version[= ]+v?([0-9]+\.[0-9]+\.[0-9]+[0-9A-Za-z.\-]*)/i);
-                return match ? 'v' + match[1] : 'Неизвестно';
+                if (match) { var bv = String(match[1]).replace(/[-_]r\d+$/i, '').replace(/-\d+$/, ''); return 'v' + bv; }
+                return 'Неизвестно';
             }).catch(function() { return 'Неизвестно'; });
         });
     },
@@ -4610,8 +4628,8 @@ return "mkdir -p /etc/mixomo/versions; prev_variant=$(sed -n '1p' /etc/mixomo/ve
             var title = self.overviewPanel ? self.overviewPanel.querySelector('[data-mihomo-card="magitrickle"] .mihomo-overview-card-title') : null;
             if (title) title.textContent = _('MagiTrickle') + ' ' + self.magitrickleVersion;
             self.setMagitrickleButtonIdle();
-            return fs.exec('/bin/sh', ['-c', 'service magitrickle status >/dev/null 2>&1 || pidof magitrickled >/dev/null 2>&1']).catch(function() { return { code: 1 }; }).then(function(st) {
-                self.magitrickleRunning = st && st.code === 0;
+            return fs.exec('/bin/sh', ['-c', 'service magitrickle status 2>&1; pidof magitrickled 2>/dev/null; true']).catch(function() { return { code: 1 }; }).then(function(st) {
+                self.magitrickleRunning = isMagiRunningOutput(st);
                 if (self.overviewPanel && self.activeView === 'overview') return self.refreshOverview();
             });
         });
@@ -4635,8 +4653,9 @@ return "mkdir -p /etc/mixomo/versions; prev_variant=$(sed -n '1p' /etc/mixomo/ve
              var match = self.magitrickleVariant === 'mod'
                  ? output.match(/v?([0-9]+\.[0-9]+\.[0-9]+[0-9A-Za-z.\-]*)/)
                  : (output.match(/^\s*([0-9]+\.[0-9]+\.[0-9]+[0-9A-Za-z.\-]*)\s*:/m) || output.match(/^magitrickle\s+-\s+([0-9]+\.[0-9]+\.[0-9]+[0-9A-Za-z.\-]*)/m));
-             var available = match ? match[1] : '';
-            if (!available) throw new Error(_('Не удалось определить доступную версию MagiTrickle'));
+              var available = match ? match[1] : '';
+              available = String(available || '').replace(/[-_]r\d+$/i, '').replace(/-\d+$/, '');
+             if (!available) throw new Error(_('Не удалось определить доступную версию MagiTrickle'));
             self.magitrickleAvailableVersion = available;
             if (self.compareMagiVersions(available, self.magitrickleVersion) > 0) {
                 button.disabled = false;
@@ -4735,12 +4754,17 @@ return "mkdir -p /etc/mixomo/versions; prev_variant=$(sed -n '1p' /etc/mixomo/ve
 
     handleMagiTrickleAction: function(act) {
          var self = this;
+         ui.showModal(null, [E('p', { 'class': 'spinning' }, _('Выполнение...'))]);
+         self.magitrickleRunning = act !== 'stop';
+         if (self.overviewPanel && self.activeView === 'overview') self.refreshOverview();
          var prepare = (act === 'start' || act === 'restart') ? fs.exec('/bin/sh', ['-c', this.magitrickleKillStale()]) : Promise.resolve();
          prepare.then(function() {
             return fs.exec('/bin/sh', ['-c', self.magitrickleService(act)]);
         }).then(function() {
             return self.refreshMagitrickle();
-        }).catch(function(e) { ui.addNotification(null, E('p', e.message), 'error'); });
+        }).then(function() {
+            ui.hideModal();
+        }).catch(function(e) { ui.hideModal(); ui.addNotification(null, E('p', e.message), 'error'); });
     },
 
     handleServiceAction: function(act) {

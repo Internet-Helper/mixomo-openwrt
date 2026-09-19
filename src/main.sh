@@ -21,7 +21,7 @@ MIXOMO_ASSET_ROOT="${MIXOMO_ASSET_ROOT:-$MIXOMO_DEFAULT_ASSET_ROOT}"
 
 mixomo_write_version() {
     ensure_dir /etc/mixomo/versions || return 1
-    printf '%s\n%s\n' "${MIXOMO_INSTALLED_VERSION:-v0.3.2}" "${MIXOMO_BUNDLE_SHA:-}" > /etc/mixomo/versions/mixomo || return 1
+    printf '%s\n%s\n' "${MIXOMO_INSTALLED_VERSION:-v0.3.3}" "${MIXOMO_BUNDLE_SHA:-}" > /etc/mixomo/versions/mixomo || return 1
 }
 
 mixomo_main() {
@@ -42,7 +42,7 @@ mixomo_main() {
         return 0
     fi
     printf '%s\n' ""
-    log_done "Mixomo OpenWrt v0.3.2"
+    log_done "Mixomo OpenWrt v0.3.3"
     printf '%s\n' ""
     uci -q delete firewall.Block_443_UDP.direction 2>/dev/null || true
     uci -q delete firewall.Block_443_UDP.reject_forward 2>/dev/null || true
@@ -61,7 +61,7 @@ mixomo_main() {
     ui_install || return 1
     finalize_install || return 1
     mixomo_write_version || return 1
-    log_done "$(T "Установка Mixomo OpenWrt v0.3.2 завершена" "Mixomo OpenWrt v0.3.2 installation completed")"
+    log_done "$(T "Установка Mixomo OpenWrt v0.3.3 завершена" "Mixomo OpenWrt v0.3.3 installation completed")"
 }
 
 mixomo_main "$@"
