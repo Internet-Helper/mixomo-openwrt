@@ -13,8 +13,17 @@ start() {
         i=$((i + 1))
     done
     ip route replace default dev Mihomo table "$routing_table" 2>/dev/null || true
+    ip rule del priority 19000 fwmark 0x233 2>/dev/null || true
     if [ "$(uci -q get network.mihomo_route_router.mark)" = 0x233 ]; then
         ip rule add priority 19000 fwmark 0x233 lookup "$routing_table" 2>/dev/null || true
+    else
+        nft delete table inet mihomo_router_routing 2>/dev/null || true
+        rm -f /etc/mihomo/mihomo-router-routing.nft
+        if [ -n "$(uci -q get firewall.mihomo_router_routing)" ]; then
+            uci delete firewall.mihomo_router_routing
+            uci commit firewall
+            /etc/init.d/firewall reload >/dev/null 2>&1 || true
+        fi
     fi
     [ -x /etc/init.d/magitrickle ] && /etc/init.d/magitrickle restart >/dev/null 2>&1 || true
 }
