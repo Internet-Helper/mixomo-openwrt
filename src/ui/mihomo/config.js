@@ -4577,8 +4577,8 @@ return "mkdir -p /etc/mixomo/versions; prev_variant=$(sed -n '1p' /etc/mixomo/ve
         fs.exec('/bin/sh', ['-c', cmd]).then(function(res) {
             var output = (res && res.stdout) || '';
             if (!output) throw new Error(_('Не удалось получить актуальную версию Mixomo'));
-            var versionMatch = output.match(/^MIXOMO_VERSION=([^\\r\\n]+)/m);
-            var shaMatch = output.match(/^MIXOMO_BUNDLE_SHA256=([^\\r\\n]+)/m);
+            var versionMatch = output.match(/^MIXOMO_VERSION=([^\r\n]+)/m);
+            var shaMatch = output.match(/^MIXOMO_BUNDLE_SHA256=([^\r\n]+)/m);
             if (!versionMatch || !shaMatch) throw new Error(_('Не удалось определить SHA bundle Mixomo'));
             return self.getMixomoState().then(function(local) {
                 self.mixomoVersion = local;
