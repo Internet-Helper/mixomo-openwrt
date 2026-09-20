@@ -5,6 +5,15 @@
 
 MAGITRICKLE_VARIANT=""
 
+magitrickle_prompt() {
+    local text="$1"
+    printf "${GREEN}%s${NC}%s" "${MIXOMO_STEP:+$MIXOMO_STEP }" "$text"
+}
+
+magitrickle_line() {
+    printf "${GREEN}%s${NC}%s\n" "${MIXOMO_STEP:+$MIXOMO_STEP }" "$1"
+}
+
 magitrickle_read_variant() {
     sed -n '1p' "$MAGITRICKLE_VERSION_FILE" 2>/dev/null | tr -d ' \r\n'
 }
@@ -81,12 +90,12 @@ magitrickle_select() {
     installed=$(magitrickle_detect_variant)
     if [ -n "$installed" ]; then
         label=$(magitrickle_label "$installed")
-        printf '%s\n' "$(T "Установленная версия: $label" "Installed version: $label")"
-        printf '%s\n' "1) $(T "Обновить $label (нажмите Enter для выбора)" "Update $label (press Enter to select)")"
+        magitrickle_line "$(T "Установленная версия: $label" "Installed version: $label")"
+        magitrickle_line "1) $(T "Обновить $label (нажмите Enter для выбора)" "Update $label (press Enter to select)")"
         if [ "$installed" = mod ]; then other=original; else other=mod; fi
         other_label=$(magitrickle_label "$other")
-        printf '%s\n' "2) $(T "Изменить версию на $other_label" "Switch version to $other_label")"
-        printf '%s' "$(T "Ваш выбор: " "Your choice: ")"
+        magitrickle_line "2) $(T "Изменить версию на $other_label" "Switch version to $other_label")"
+        magitrickle_prompt "$(T "Ваш выбор: " "Your choice: ")"
         choice=$(read_user_input) || return 1
         case "$choice" in
             1|"") MAGITRICKLE_VARIANT="$installed" ;;
@@ -94,10 +103,10 @@ magitrickle_select() {
             *) magitrickle_select ;;
         esac
     else
-        printf '%s\n' "$(T "Какую версию установить?" "Which version to install?")"
-        printf '%s\n' "1. Original $(T "(нажмите Enter для выбора)" "(press Enter to select)")"
-        printf '%s\n' "2. Mod"
-        printf '%s' "$(T "Ваш выбор: " "Your choice: ")"
+        magitrickle_line "$(T "Какую версию установить?" "Which version to install?")"
+        magitrickle_line "1. Original $(T "(нажмите Enter для выбора)" "(press Enter to select)")"
+        magitrickle_line "2. Mod"
+        magitrickle_prompt "$(T "Ваш выбор: " "Your choice: ")"
         choice=$(read_user_input) || return 1
         case "$choice" in
             1|"") MAGITRICKLE_VARIANT=original ;;
@@ -197,6 +206,7 @@ magitrickle_install() {
     local installed latest now_version config=/etc/magitrickle/state/config.yaml
     local temp_dir
     magitrickle_select || return 1
+    step_start "${MIXOMO_STEP:+$MIXOMO_STEP }[ONLINE] $(T "Загрузка MagiTrickle" "Downloading MagiTrickle")"
     installed=$(magitrickle_read_variant)
     [ "$installed" = "$MAGITRICKLE_VARIANT" ] && [ -x /etc/init.d/magitrickle ] && {
         now_version=$(magitrickle_read_version)

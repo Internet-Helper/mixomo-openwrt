@@ -532,6 +532,40 @@ function escapeHtml(text) {
     });
 }
 
+var MIHOMO_DASHBOARDS = {
+    zashboard: {
+        label: 'Zashboard',
+        externalUi: './UI/zashboard/',
+        externalUiUrl: 'https://github.com/Zephyruso/zashboard/releases/latest/download/dist-cdn-fonts.zip'
+    },
+    metacubex: {
+        label: 'MetaCube',
+        externalUi: './UI/metacubex/',
+        externalUiUrl: 'https://github.com/MetaCubeX/metacubexd/releases/latest/download/compressed-dist.tgz'
+    }
+};
+
+function getMihomoDashboardSettings(panel) {
+    return MIHOMO_DASHBOARDS[panel] || MIHOMO_DASHBOARDS.zashboard;
+}
+
+function applyMihomoDefaults(content, panel) {
+    var settings = getMihomoDashboardSettings(panel);
+    var lines = [
+        'external-controller: 0.0.0.0:9090',
+        'external-ui: ' + settings.externalUi,
+        'external-ui-url: \"' + settings.externalUiUrl + '\"',
+        'mixed-port: 7890',
+        'redir-port: 5001'
+    ];
+    if (panel === 'metacubex') lines.push('routing-mark: 2');
+    var keys = /^(external-controller|external-ui|external-ui-url|mixed-port|redir-port|routing-mark)[ \t]*:/;
+    var result = String(content || '').replace(/\r\n/g, '\n').replace(/\\n/g, '\n').split('\n').filter(function(line) { return !keys.test(line); }).join('\n');
+    result = result.replace(/(^|\n)([^\n]*?)(?=(external-controller|external-ui|external-ui-url|mixed-port|redir-port|routing-mark)[ \t]*:)/g, '$1$2\n');
+    result = result.replace(/^(mode:[^\n]*?)(ipv6:)/m, '$1\n$2').replace(/^\n+/, '');
+    return lines.join('\n') + '\n' + result;
+}
+
 function backendLabel(backend) {
     return (backend === 'redir-tproxy') ? 'Redir-TProxy' : 'Tun-Socks5';
 }
@@ -916,8 +950,13 @@ return view.extend({
              var serviceButton = self.isRunning
                  ? E('button', { class: 'btn cbi-button-reset mihomo-overview-card-action mihomo-card-stop', click: function(ev) { ev.stopPropagation(); self.handleServiceAction('stop'); } }, _('Остановить'))
                  : E('button', { class: 'btn cbi-button-positive mihomo-overview-card-action mihomo-card-stop', click: function(ev) { ev.stopPropagation(); self.handleServiceAction('start'); } }, _('Запустить'));
-              var mihomoDashboard = E('button', { class: 'btn cbi-button-neutral mihomo-overview-card-action', click: function(ev) { ev.stopPropagation(); self.handleOpenDashboard(mainConfigContent); } }, _('Панель управления'));
-              var mihomoConfig = E('button', { class: 'btn cbi-button-neutral mihomo-overview-card-action', click: function(ev) { ev.stopPropagation(); self.switchView('configs'); } }, _('Конфигурация'));
+               var mihomoDashboard = E('button', { class: 'btn cbi-button-neutral mihomo-overview-card-action', click: function(ev) { ev.stopPropagation(); self.handleOpenDashboard(mainConfigContent); } }, _('Панель управления'));
+                var mihomoDashboardActions = E('div', { style: 'display:flex; align-items:center; gap:.4rem; margin-left:auto;' }, [mihomoDashboard, self.mihomoDashboardSelect]);
+                var mihomoStatusValue = E('div', { style: 'display:flex; align-items:center; width:100%;' }, [
+                    E('span', {}, self.isRunning ? _('Работает') : _('Остановлен')),
+                    mihomoDashboardActions
+                ]);
+                var mihomoConfig = E('button', { class: 'btn cbi-button-neutral mihomo-overview-card-action', click: function(ev) { ev.stopPropagation(); self.switchView('configs'); } }, _('Конфигурация'));
                var mihomoServiceActions = E('div', { style: 'display:flex; align-items:center; gap:.4rem; margin-left:auto;' }, [self.updateButton, self.mihomoChannelSelect]);
                  var magiServiceButton = self.magitrickleRunning
  ? E('button', { class: 'btn cbi-button-reset mihomo-overview-card-action mihomo-card-stop', click: function(ev) { ev.stopPropagation(); self.handleMagiTrickleAction('stop'); } }, _('Остановить'))
@@ -931,7 +970,7 @@ E('option', { value: 'original' }, 'Original'),
                   var magiServiceActions = E('div', { style: 'display:flex; align-items:center; gap:.4rem; margin-left:auto;' }, [self.magitrickleUpdateButton, magiVariantSelect]);
                  var magiAction = E('button', { class: 'btn cbi-button-neutral mihomo-overview-card-action', click: function(ev) { ev.stopPropagation(); self.switchView('magitrickle'); } }, _('Конфигурация'));
                  var cards = {
-                    mihomo: card('mihomo', _('Mihomo') + ' ' + (self.currentVersion || _('Загрузка...')), self.isRunning ? _('Работает') : _('Остановлен'), '', self.isRunning ? 'is-ok' : 'is-muted', [mihomoConfig, mihomoDashboard, serviceButton], mihomoServiceActions),
+                    mihomo: card('mihomo', _('Mihomo') + ' ' + (self.currentVersion || _('Загрузка...')), mihomoStatusValue, '', self.isRunning ? 'is-ok' : 'is-muted', [mihomoConfig, serviceButton], mihomoServiceActions),
                     magitrickle: card('magitrickle', _('MagiTrickle') + ' ' + magiVersion, magiStatus ? _('Работает') : _('Остановлен'), '', magiStatus ? 'is-ok' : 'is-muted', [magiAction, magiServiceButton], magiServiceActions),
                   profile: card('profile', _('Активная конфигурация Mihomo'), active, '', 'is-muted', action('configs')),
                  schedule: card('schedule', _('Расписание'), plural(scheduleActiveCount, [_('активное расписание'), _('активных расписания'), _('активных расписаний')]), '', 'is-muted', E('button', { class: 'btn cbi-button-neutral mihomo-overview-card-action', click: function(ev) { ev.stopPropagation(); self.activeView = 'configs'; self.activeSub = 'schedule'; self.activeThird = 'list'; self.renderSettingsRow(); self.showViewContent(); } }, _('Открыть'))),
@@ -2108,8 +2147,9 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
          this.magitrickleVersion = magitrickleVersion ? (magitrickleVersion.indexOf('v') === 0 ? magitrickleVersion : 'v' + magitrickleVersion) : _('Неизвестно');
          this.magitrickleVariant = magitrickleVariant === 'mod' ? 'mod' : 'original';
         
-         var latestVersionEl = E('span', { 'id': 'mihomo-latest-version', 'style': 'margin-left: 4px; font-size: 0.9em; opacity: 0.7; display: none;' }, '');
-         this.latestVersionEl = latestVersionEl;
+          var latestVersionEl = E('span', { 'id': 'mihomo-latest-version', 'style': 'margin-left: 4px; font-size: 0.9em; opacity: 0.7; display: none;' }, '');
+          this.latestVersionEl = latestVersionEl;
+          try { this.dashboardPanel = localStorage.getItem('mihomo_dashboard_panel') === 'metacubex' ? 'metacubex' : 'zashboard'; } catch (e) { this.dashboardPanel = 'zashboard'; }
          try { this.mihomoChannel = localStorage.getItem('mihomo_channel') === 'alpha' ? 'alpha' : 'release'; } catch (e) { this.mihomoChannel = 'release'; }
          var mihomoChannelSelect = E('select', { class: 'cbi-input-select', style: 'width:6rem; height:28px;', change: function(ev) {
              ev.stopPropagation();
@@ -2128,7 +2168,18 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
              E('option', { value: 'alpha' }, _('Prerelease'))
          ]);
          mihomoChannelSelect.value = this.mihomoChannel;
-         this.mihomoChannelSelect = mihomoChannelSelect;
+          this.mihomoChannelSelect = mihomoChannelSelect;
+          var mihomoDashboardSelect = E('select', { class: 'cbi-input-select', style: 'width:6rem; height:28px;', change: function(ev) {
+              ev.stopPropagation();
+              self.dashboardPanel = ev.target.value === 'metacubex' ? 'metacubex' : 'zashboard';
+              try { localStorage.setItem('mihomo_dashboard_panel', self.dashboardPanel); } catch (e) {}
+              if (editor && (currentFile === MAIN_CONFIG || currentFile.indexOf('/etc/mihomo/profiles/') === 0)) editor.setValue(applyMihomoDefaults(editor.getValue(), self.dashboardPanel), -1);
+          } }, [
+              E('option', { value: 'zashboard' }, 'Zashboard'),
+              E('option', { value: 'metacubex' }, 'MetaCube')
+          ]);
+          mihomoDashboardSelect.value = this.dashboardPanel;
+          this.mihomoDashboardSelect = mihomoDashboardSelect;
           var updateButton = E('button', { 'id': 'mihomo-update-btn', 'class': 'btn cbi-button-neutral', 'style': 'margin: 0;', 'disabled': true }, _('Проверить обновление'));
          this.updateButton = updateButton;
           var magitrickleUpdateButton = E('button', { 'id': 'magitrickle-update-btn', 'class': 'btn cbi-button-neutral mihomo-overview-card-action', 'disabled': true }, _('Проверить обновление'));
@@ -2271,6 +2322,7 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
               .mihomo-overview-card-actions .btn { margin-left: 0 !important; }
               .mihomo-overview-card-actions .mihomo-card-stop { margin-left: auto !important; }
                 .mihomo-overview-card-action { height: 28px !important; font-size: .9em; white-space: nowrap; cursor: pointer; }
+             .mihomo-overview-card-value .mihomo-overview-card-action { font-size: .58em; }
 
 
 
@@ -4288,25 +4340,41 @@ panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; fl
         var self = this;
         var content = editor.getValue();
         var configPath = currentFile;
-        if (configPath === MAIN_CONFIG) mainConfigContent = content;
+        var profilePrefix = '/etc/mihomo/profiles/';
+        var activeProfile = self.profilesData && (self.profilesData.active || self.profilesData.activeProfile);
+        var activeProfilePath = activeProfile ? profilePrefix + activeProfile + '.yaml' : null;
+        var isMihomoConfig = configPath === MAIN_CONFIG || configPath.indexOf(profilePrefix) === 0;
+        var targetPaths = isMihomoConfig ? [MAIN_CONFIG] : [configPath];
+        if (isMihomoConfig && activeProfilePath && targetPaths.indexOf(activeProfilePath) < 0) targetPaths.push(activeProfilePath);
+        var prepared = {};
+        var prepare = function(path) {
+            if (path === configPath) return Promise.resolve(content);
+            return fs.read(path).catch(function() { return ''; });
+        };
         ui.showModal(null, [E('p', { 'class': 'spinning' }, _('Сохранение...'))]);
-        fs.write(configPath, content).then(function() {
-            return normalizeEditorConfig(configPath);
-        }).then(function() {
-            if (configPath === MAIN_CONFIG) {
-                return null;
-            }
-            var profilePrefix = '/etc/mihomo/profiles/';
-            if (configPath.indexOf(profilePrefix) !== 0) return null;
-            var profileName = configPath.slice(profilePrefix.length).replace(/\.ya?ml$/, '');
-            var active = self.profilesData && (self.profilesData.active || self.profilesData.activeProfile);
-            if (active !== profileName) return null;
-            return callProfilesApply(profileName).then(function(res) {
-                if (!res || !res.ok) throw new Error((res && res.error) || _('Не удалось применить профиль'));
+        Promise.all(targetPaths.map(function(path) {
+            return prepare(path).then(function(value) {
+                prepared[path] = isMihomoConfig ? applyMihomoDefaults(value, self.dashboardPanel) : value;
             });
+        })).then(function() {
+            if (isMihomoConfig) {
+                content = prepared[configPath];
+                editor.setValue(content, -1);
+                if (configPath === MAIN_CONFIG) mainConfigContent = content;
+            }
+            return targetPaths.reduce(function(promise, path) {
+                return promise.then(function() { return fs.write(path, prepared[path]); }).then(function() { return normalizeEditorConfig(path); });
+            }, Promise.resolve());
         }).then(function() {
-            if (configPath === MAIN_CONFIG) {
-                return fs.exec('/usr/bin/mihomo', ['-d', '/etc/mihomo', '-t', configPath]).then(function(res) {
+            if (isMihomoConfig && activeProfilePath) {
+                var profileName = activeProfilePath.slice(profilePrefix.length).replace(/\.ya?ml$/, '');
+                return callProfilesApply(profileName).then(function(res) {
+                    if (!res || !res.ok) throw new Error((res && res.error) || _('Не удалось применить профиль'));
+                });
+            }
+        }).then(function() {
+            if (isMihomoConfig) {
+                return fs.exec('/usr/bin/mihomo', ['-d', '/etc/mihomo', '-t', MAIN_CONFIG]).then(function(res) {
                     if (res.code !== 0) throw new Error((res.stdout || '') + (res.stderr || ''));
                     if (wasRunning) return fs.exec('/etc/init.d/mihomo', ['restart']);
                 });

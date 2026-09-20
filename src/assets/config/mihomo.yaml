@@ -1,14 +1,15 @@
-mode: rule
-ipv6: false
+external-controller: 0.0.0.0:9090
+external-ui: ./UI/zashboard/
+external-ui-url: "https://github.com/Zephyruso/zashboard/releases/latest/download/dist-cdn-fonts.zip"
 mixed-port: 7890
 redir-port: 5001
+mode: rule
+ipv6: false
 log-level: error
 allow-lan: true
 unified-delay: true
 tcp-concurrent: false
 find-process-mode: off
-external-controller: 0.0.0.0:9090
-routing-mark: 2
 profile:
   store-selected: true
   store-fake-ip: true
@@ -36,6 +37,7 @@ sniffer:
     - +.vsean.net
     - cudy.net
 
+
 dns:
   enable: true
   listen: 0.0.0.0:7880
@@ -52,13 +54,17 @@ dns:
     - https://77.88.8.8/dns-query
     - https://77.88.8.1/dns-query
 
+
 proxies:
   - name: Домашний интернет
     type: direct
 
+
 proxy-groups:
 
+
 rule-providers:
+
 
 rules:
   - MATCH,Домашний интернет

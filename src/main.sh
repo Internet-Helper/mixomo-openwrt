@@ -1,5 +1,6 @@
 #!/bin/sh
 [ "${MIXOMO_DEBUG:-0}" = 1 ] && set -x
+trap 'exit 130' INT
 MIXOMO_SOURCE_ROOT="${MIXOMO_SOURCE_ROOT:-$(CDPATH= cd "$(dirname "$0")" && pwd)}"
 if [ -d "$MIXOMO_SOURCE_ROOT/src" ]; then
     MIXOMO_COMPONENT_ROOT="$MIXOMO_SOURCE_ROOT/src"
@@ -47,13 +48,12 @@ mixomo_main() {
     uci -q delete firewall.Block_443_UDP.direction 2>/dev/null || true
     uci -q delete firewall.Block_443_UDP.reject_forward 2>/dev/null || true
     uci commit firewall 2>/dev/null || true
-    step_start "[1/5] [ONLINE] $(T "Установка зависимостей" "Installing dependencies")"
+    step_start "[1/5] [ONLINE] $(T "Загрузка зависимостей" "Downloading dependencies")"
     install_required_dependencies || return 1
-    step_start "[2/5] [ONLINE] $(T "Установка Mihomo" "Installing Mihomo")"
+    step_start "[2/5] [ONLINE] $(T "Загрузка Mihomo" "Downloading Mihomo")"
     MIXOMO_STEP="[2/5]" mihomo_install || return 1
-    step_start "[3/5] [ONLINE] $(T "Установка hev-socks5-tunnel" "Installing hev-socks5-tunnel")"
+    step_start "[3/5] [ONLINE] $(T "Загрузка hev-socks5-tunnel" "Downloading hev-socks5-tunnel")"
     MIXOMO_STEP="[3/5]" hev_install || return 1
-    step_start "[4/5] [ONLINE] $(T "Установка MagiTrickle" "Installing MagiTrickle")"
     MIXOMO_STEP="[4/5]" magitrickle_install || return 1
     step_start "[5/5] $(T "Завершение" "Finalizing")"
     runtime_ucode_install || return 1
