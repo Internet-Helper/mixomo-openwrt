@@ -23,7 +23,7 @@
 - Всё остальное идёт через Вашего домашнего провайдера на его полной скорости, минуя прокси‑ядро
 - При необходимости можно использовать локальную маршрутизацию, чтобы отправлять весь трафик выбранных IP/CIDR в ядро Mihomo
 
-<img width="963" height="746" alt="2" src="https://github.com/user-attachments/assets/d86d1922-1683-436d-acf9-1ab7012b09cc" />
+<img width="960" height="753" alt="2" src="https://github.com/user-attachments/assets/955240e6-c3b9-4a96-bcf0-373e5642e8c6" />
 
 # Требования
 - OpenWrt 24.10+ и 25.12+
@@ -33,11 +33,11 @@
 # Установка актуальной версии  
 #### Команда:
 ```
-curl -fsSL https://github.com/Internet-Helper/mixomo-openwrt/raw/v0.3.3/install.sh | sh
+curl -fsSL https://github.com/Internet-Helper/mixomo-openwrt/raw/main/install.sh | sh
 ```
 #### Альтернативная команда:
 ```
-wget -qO- https://github.com/Internet-Helper/mixomo-openwrt/raw/v0.3.3/install.sh | sh
+wget -qO- https://github.com/Internet-Helper/mixomo-openwrt/raw/main/install.sh | sh
 ```
 
 # Установка тестовой версии  
@@ -66,11 +66,11 @@ wget -qO- https://github.com/Internet-Helper/mixomo-openwrt/raw/main/test-instal
 # Удаление  
 #### Команда для удаления:
 ```
-curl -fsSL https://github.com/Internet-Helper/mixomo-openwrt/raw/v0.3.3/delete.sh | sh
+curl -fsSL https://github.com/Internet-Helper/mixomo-openwrt/raw/main/delete.sh | sh
 ```
 #### Альтернативная команда для удаления:
 ```
-wget -qO- https://github.com/Internet-Helper/mixomo-openwrt/raw/v0.3.3/delete.sh | sh
+wget -qO- https://github.com/Internet-Helper/mixomo-openwrt/raw/main/delete.sh | sh
 ```
 
 # Лицензия
