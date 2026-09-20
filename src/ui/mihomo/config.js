@@ -566,6 +566,10 @@ function applyMihomoDefaults(content, panel) {
     return lines.join('\n') + '\n' + result;
 }
 
+function isEnabledValue(value) {
+    return value === true || value === 1 || value === '1' || value === 'true' || value === 'on';
+}
+
 function backendLabel(backend) {
     return (backend === 'redir-tproxy') ? 'Redir-TProxy' : 'Tun-Socks5';
 }
@@ -1749,17 +1753,18 @@ E('option', { value: 'original' }, 'Original'),
         ]));
         else {
             var grid = E('div', { class: 'mihomo-overview-cards' });
-            rules.forEach(function(rule) {
-                var addr = displaySource(rule.source);
+             rules.forEach(function(rule) {
+                 var enabled = isEnabledValue(rule.enabled);
+                 var addr = displaySource(rule.source);
                 var rows = [E('div', { class: 'mihomo-overview-card-head' }, E('div', { class: 'mihomo-overview-card-title' }, rule.label || addr || '—'))];
                 if (rule.label) rows.push(E('div', { class: 'mihomo-overview-card-detail' }, addr));
                 rows.push(E('div', { class: 'mihomo-overview-card-detail' }, backendLabel(rule.backend || 'tun-socks5')));
                 rows.push(E('div', { class: 'mihomo-overview-card-actions' }, [
                     E('button', { class: 'btn cbi-button-neutral mihomo-overview-card-action', click: function(ev) { var card = ev.currentTarget; while (card && !card.classList.contains('mihomo-overview-card')) card = card.parentNode; if (card) self.openRoutingCardEdit(card, rule); } }, _('Изменить данные')),
-                    E('button', { class: 'btn cbi-button-neutral mihomo-overview-card-action', click: function() { callRoutingEnabled(rule.id, !rule.enabled).then(function(res) { if (self.showRoutingError(res)) self.refreshRouting(); }); } }, rule.enabled ? _('Отключить') : _('Включить')),
+                    E('button', { class: 'btn cbi-button-neutral mihomo-overview-card-action', click: function() { callRoutingEnabled(rule.id, !enabled).then(function(res) { if (self.showRoutingError(res)) self.refreshRouting(); }); } }, enabled ? _('Отключить') : _('Включить')),
                     E('button', { class: 'btn cbi-button-reset mihomo-overview-card-action', click: function() { if (confirm(_('Удалить это правило?'))) callRoutingDelete(rule.id).then(function(res) { if (self.showRoutingError(res)) self.refreshRouting(); }); } }, _('Удалить'))
                 ]));
-                var cardEl = E('div', { class: 'mihomo-overview-card ' + (rule.enabled ? 'is-ok' : 'is-muted'), draggable: true }, rows);
+                var cardEl = E('div', { class: 'mihomo-overview-card ' + (enabled ? 'is-ok' : 'is-muted'), draggable: true }, rows);
                 cardEl.addEventListener('dragstart', function(ev) {
                     self.routingDragId = String(rule.id);
                     cardEl.classList.add('mihomo-overview-dragging');
@@ -1819,16 +1824,17 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
             panel.appendChild(E('p', { style: 'opacity:.75; margin-top:.35rem;' }, _('Адресов пока нет.')));
         } else {
             var grid2 = E('div', { class: 'mihomo-overview-cards' });
-            exclusions.forEach(function(ex) {
-                var dest = displaySource(ex.dest);
+             exclusions.forEach(function(ex) {
+                 var enabled = isEnabledValue(ex.enabled);
+                 var dest = displaySource(ex.dest);
                 var rows = [E('div', { class: 'mihomo-overview-card-head' }, E('div', { class: 'mihomo-overview-card-title' }, ex.label || dest || '—'))];
                 if (ex.label) rows.push(E('div', { class: 'mihomo-overview-card-detail' }, dest));
                 rows.push(E('div', { class: 'mihomo-overview-card-actions' }, [
                     E('button', { class: 'btn cbi-button-neutral mihomo-overview-card-action', click: function(ev) { var card = ev.currentTarget; while (card && !card.classList.contains('mihomo-overview-card')) card = card.parentNode; if (card) self.openExclusionCardEdit(card, ex); } }, _('Изменить данные')),
-                    E('button', { class: 'btn cbi-button-neutral mihomo-overview-card-action', click: function() { callRoutingExcludeEnabled(ex.id, !ex.enabled).then(function(res) { if (self.showRoutingError(res)) self.refreshRouting(); }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); }); } }, ex.enabled ? _('Отключить') : _('Включить')),
+                    E('button', { class: 'btn cbi-button-neutral mihomo-overview-card-action', click: function() { callRoutingExcludeEnabled(ex.id, !enabled).then(function(res) { if (self.showRoutingError(res)) self.refreshRouting(); }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); }); } }, enabled ? _('Отключить') : _('Включить')),
                     E('button', { class: 'btn cbi-button-reset mihomo-overview-card-action', click: function() { if (confirm(_('Удалить этот адрес?'))) callRoutingExcludeDelete(ex.id).then(function(res) { if (self.showRoutingError(res)) self.refreshRouting(); }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); }); } }, _('Удалить'))
                 ]));
-                var cardEl = E('div', { class: 'mihomo-overview-card ' + (ex.enabled ? 'is-ok' : 'is-muted'), draggable: true }, rows);
+                var cardEl = E('div', { class: 'mihomo-overview-card ' + (enabled ? 'is-ok' : 'is-muted'), draggable: true }, rows);
                 cardEl.addEventListener('dragstart', function(ev) {
                     self.routingDragId = String(ex.id);
                     cardEl.classList.add('mihomo-overview-dragging');

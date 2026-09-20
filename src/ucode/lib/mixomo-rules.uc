@@ -503,12 +503,13 @@ const methods = {
 				apply_network();
 				ensure_router_policy(table);
 			} else {
-				system([ 'ip', 'rule', 'del', 'priority', '19000', 'fwmark', ROUTER_MARK ]);
 				if (uci.get('network', PREFIX + 'router') != null)
 					uci.delete('network', PREFIX + 'router');
+				uci.commit('network');
+				disable_router_mark();
 				cleanup_if_unused();
-				if (uci.get('network', TABLE_SECTION, 'table') != null)
-					system([ '/etc/init.d/network', 'reload' ]);
+				system([ '/etc/init.d/network', 'reload' ]);
+				system([ 'ip', 'rule', 'del', 'priority', '19000', 'fwmark', ROUTER_MARK ]);
 			}
 			return emit_status();
 		}
