@@ -64,15 +64,14 @@ wget -qO- https://github.com/Internet-Helper/mixomo-openwrt/raw/main/test-instal
 - **Если всё равно не хватило места для обновления** - сохраните конфигурации Mihomo и MagiTrickle, запустите скрипт удаления и заново запустите скрипт установки 
 
 # Удаление  
-#### Команда для удаления:
+#### Команда:
 ```
 curl -fsSL https://github.com/Internet-Helper/mixomo-openwrt/raw/main/delete.sh | sh
 ```
-#### Альтернативная команда для удаления:
+#### Альтернативная команда:
 ```
 wget -qO- https://github.com/Internet-Helper/mixomo-openwrt/raw/main/delete.sh | sh
 ```
 
-# Лицензия
-
+# Лицензия  
 Данный проект распространяется по лицензии [Apache 2.0](https://github.com/Internet-Helper/mixomo-openwrt/blob/main/LICENSE).
