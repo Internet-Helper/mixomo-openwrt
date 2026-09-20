@@ -562,9 +562,9 @@ function applyMihomoDefaults(content, panel) {
             'external-ui-url: "' + settings.externalUiUrl + '"'
         );
     }
-    var keys = /^(external-controller|external-ui|external-ui-url|mixed-port|redir-port|routing-mark)[ \t]*:/;
+    var keys = /^(external-controller|external-ui|external-ui-url|mixed-port|redir-port)[ \t]*:/;
     var result = String(content || '').replace(/\r\n/g, '\n').replace(/\\n/g, '\n').split('\n').filter(function(line) { return !keys.test(line); }).join('\n');
-    result = result.replace(/(^|\n)([^\n]*?)(?=(external-controller|external-ui|external-ui-url|mixed-port|redir-port|routing-mark)[ \t]*:)/g, '$1$2\n');
+    result = result.replace(/(^|\n)([^\n]*?)(?=(external-controller|external-ui|external-ui-url|mixed-port|redir-port)[ \t]*:)/g, '$1$2\n');
     result = result.replace(/^(mode:[^\n]*?)(ipv6:)/m, '$1\n$2').replace(/^\n+/, '');
     return lines.join('\n') + '\n' + result;
 }
