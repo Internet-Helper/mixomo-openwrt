@@ -2,10 +2,9 @@
 set -eu
 
 SCRIPT_DIR=$(CDPATH= cd "$(dirname "$0")" && pwd)
-MIXOMO_VERSION=v0.3.3
-MIXOMO_DEFAULT_MANIFEST=https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/v0.3.3/manifest.stable
+MIXOMO_RELEASES_API=https://api.github.com/repos/Internet-Helper/mixomo-openwrt/releases/latest
 MIXOMO_SOURCE_URL=https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt
-MIXOMO_MANIFEST_PATH=${MIXOMO_MANIFEST_PATH:-$MIXOMO_DEFAULT_MANIFEST}
+MIXOMO_MANIFEST_PATH=${MIXOMO_MANIFEST_PATH:-}
 MIXOMO_SOURCE_ROOT=${MIXOMO_SOURCE_ROOT:-$SCRIPT_DIR}
 MIXOMO_LOCAL_ROOT=${MIXOMO_LOCAL_ROOT:-}
 MIXOMO_LAUNCH_DIR=$(pwd)
@@ -69,6 +68,18 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+if [ -z "$MIXOMO_MANIFEST_PATH" ]; then
+    latest_file=$(mktemp /tmp/mixomo-release.XXXXXX) || fail "Не удалось создать временный файл"
+    download "$latest_file" "$MIXOMO_RELEASES_API" || fail "Не удалось получить latest stable release"
+    latest_tag=$(sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$latest_file" | sed -n '1p')
+    rm -f "$latest_file"
+    case "$latest_tag" in
+        v[0-9A-Za-z._-]*) ;;
+        *) fail "Некорректный latest stable tag" ;;
+    esac
+    MIXOMO_MANIFEST_PATH=$MIXOMO_SOURCE_URL/$latest_tag/manifest.stable
+fi
+
 if [ -f "$MIXOMO_MANIFEST_PATH" ]; then
     MANIFEST=$MIXOMO_MANIFEST_PATH
 elif case "$MIXOMO_MANIFEST_PATH" in file://*) true;; *) false;; esac; then
@@ -108,7 +119,7 @@ ref=${MIXOMO_REF_OVERRIDE:-$(manifest_value MIXOMO_REF)}
 bundle=$(manifest_value MIXOMO_BUNDLE)
 expected=$(manifest_value MIXOMO_BUNDLE_SHA256)
 [ "$schema" = 1 ] || fail "Неподдерживаемая версия manifest"
-[ "$version" = "$MIXOMO_VERSION" ] || fail "Несовместимая версия: $version"
+[ -n "$version" ] || fail "В manifest отсутствует версия"
 validate_ref "$ref"
 validate_bundle "$bundle"
 STAGE=$(mktemp -d /tmp/mixomo-stage.XXXXXX) || fail "Не удалось создать временный каталог"

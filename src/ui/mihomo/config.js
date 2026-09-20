@@ -4555,7 +4555,7 @@ return "mkdir -p /etc/mixomo/versions; prev_variant=$(sed -n '1p' /etc/mixomo/ve
     mixomoManifestUrl: function() {
         return this.mixomoChannel === 'test'
             ? 'https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/main/manifest.test'
-            : 'https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/main/manifest.stable';
+            : 'https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/v0.3.3/manifest.stable';
     },
 
     mixomoInstallerUrl: function() {
@@ -4611,6 +4611,7 @@ return "mkdir -p /etc/mixomo/versions; prev_variant=$(sed -n '1p' /etc/mixomo/ve
         var log = '/tmp/mixomo-mixomo-task.log';
         var installer = '/tmp/mixomo-update.sh';
         var url = this.mixomoInstallerUrl();
+        var manifest = this.mixomoManifestUrl();
         this.mixomoBusy = true;
         button.disabled = true;
         button.className = 'btn cbi-button-action';
@@ -4618,7 +4619,7 @@ return "mkdir -p /etc/mixomo/versions; prev_variant=$(sed -n '1p' /etc/mixomo/ve
         if (this.mixomoChannelSelect) this.mixomoChannelSelect.disabled = true;
         var command = 'rm -f ' + marker + ' ' + log + '; ' +
             '( wget -qO ' + installer + ' -T 300 "' + url + '" && chmod 700 ' + installer +
-            ' && MAGITRICKLE="$(sed -n "1p" /etc/mixomo/versions/magitrickle 2>/dev/null)" MIXOMO_UPDATE_ONLY=1 sh ' + installer +
+             ' && MAGITRICKLE="$(sed -n "1p" /etc/mixomo/versions/magitrickle 2>/dev/null)" MIXOMO_MANIFEST_PATH="' + manifest + '" MIXOMO_UPDATE_ONLY=1 sh ' + installer +
             ' </dev/null > ' + log + ' 2>&1; printf "%s" "$?" > ' + marker + ' ) >/dev/null 2>&1 &';
         var readMarker = function() { return fs.exec('/bin/sh', ['-c', 'cat ' + marker + ' 2>/dev/null']).then(function(res) { return (res && res.stdout) || ''; }).catch(function() { return ''; }); };
         var readTail = function() { return fs.exec('/bin/sh', ['-c', 'tail -20 ' + log + ' 2>/dev/null']).then(function(res) { return (res && res.stdout) || ''; }).catch(function() { return ''; }); };
