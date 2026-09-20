@@ -1,6 +1,3 @@
-external-controller: 0.0.0.0:9090
-external-ui: ./UI/zashboard/
-external-ui-url: "https://github.com/Zephyruso/zashboard/releases/latest/download/dist-cdn-fonts.zip"
 mixed-port: 7890
 redir-port: 5001
 mode: rule
@@ -10,6 +7,7 @@ allow-lan: true
 unified-delay: true
 tcp-concurrent: false
 find-process-mode: off
+routing-mark: 2
 profile:
   store-selected: true
   store-fake-ip: true

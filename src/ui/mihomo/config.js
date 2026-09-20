@@ -546,19 +546,22 @@ var MIHOMO_DASHBOARDS = {
 };
 
 function getMihomoDashboardSettings(panel) {
-    return MIHOMO_DASHBOARDS[panel] || MIHOMO_DASHBOARDS.zashboard;
+    return MIHOMO_DASHBOARDS[panel] || null;
 }
 
 function applyMihomoDefaults(content, panel) {
     var settings = getMihomoDashboardSettings(panel);
     var lines = [
-        'external-controller: 0.0.0.0:9090',
-        'external-ui: ' + settings.externalUi,
-        'external-ui-url: \"' + settings.externalUiUrl + '\"',
         'mixed-port: 7890',
         'redir-port: 5001'
     ];
-    if (panel === 'metacubex') lines.push('routing-mark: 2');
+    if (settings) {
+        lines.unshift(
+            'external-controller: 0.0.0.0:9090',
+            'external-ui: ' + settings.externalUi,
+            'external-ui-url: "' + settings.externalUiUrl + '"'
+        );
+    }
     var keys = /^(external-controller|external-ui|external-ui-url|mixed-port|redir-port|routing-mark)[ \t]*:/;
     var result = String(content || '').replace(/\r\n/g, '\n').replace(/\\n/g, '\n').split('\n').filter(function(line) { return !keys.test(line); }).join('\n');
     result = result.replace(/(^|\n)([^\n]*?)(?=(external-controller|external-ui|external-ui-url|mixed-port|redir-port|routing-mark)[ \t]*:)/g, '$1$2\n');
@@ -2155,7 +2158,8 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
         
           var latestVersionEl = E('span', { 'id': 'mihomo-latest-version', 'style': 'margin-left: 4px; font-size: 0.9em; opacity: 0.7; display: none;' }, '');
           this.latestVersionEl = latestVersionEl;
-          try { this.dashboardPanel = localStorage.getItem('mihomo_dashboard_panel') === 'metacubex' ? 'metacubex' : 'zashboard'; } catch (e) { this.dashboardPanel = 'zashboard'; }
+          try { this.dashboardPanel = localStorage.getItem('mihomo_dashboard_panel') || ''; } catch (e) { this.dashboardPanel = ''; }
+          if (this.dashboardPanel !== 'zashboard' && this.dashboardPanel !== 'metacubex') this.dashboardPanel = '';
          try { this.mihomoChannel = localStorage.getItem('mihomo_channel') === 'alpha' ? 'alpha' : 'release'; } catch (e) { this.mihomoChannel = 'release'; }
          var mihomoChannelSelect = E('select', { class: 'cbi-input-select', style: 'width:6rem; height:28px;', change: function(ev) {
              ev.stopPropagation();
@@ -2177,10 +2181,15 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
           this.mihomoChannelSelect = mihomoChannelSelect;
           var mihomoDashboardSelect = E('select', { class: 'cbi-input-select', style: 'width:6rem; height:28px;', change: function(ev) {
               ev.stopPropagation();
-              self.dashboardPanel = ev.target.value === 'metacubex' ? 'metacubex' : 'zashboard';
+              var next = ev.target.value;
+              self.dashboardPanel = (next === 'zashboard' || next === 'metacubex') ? next : '';
               try { localStorage.setItem('mihomo_dashboard_panel', self.dashboardPanel); } catch (e) {}
-              if (editor && (currentFile === MAIN_CONFIG || currentFile.indexOf('/etc/mihomo/profiles/') === 0)) editor.setValue(applyMihomoDefaults(editor.getValue(), self.dashboardPanel), -1);
+              if (editor && (currentFile === MAIN_CONFIG || currentFile.indexOf('/etc/mihomo/profiles/') === 0)) {
+                  editor.setValue(applyMihomoDefaults(editor.getValue(), self.dashboardPanel), -1);
+                  self.handleSaveAndApply(self.isRunning);
+              }
           } }, [
+              E('option', { value: '' }, '—'),
               E('option', { value: 'zashboard' }, 'Zashboard'),
               E('option', { value: 'metacubex' }, 'MetaCube')
           ]);
