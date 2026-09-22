@@ -20,15 +20,23 @@ var loadedScripts = {};
 var VALID_ACTIONS = ['start', 'stop', 'restart', 'check', 'logs'];
 
 var MIXOMO_EN = {
+    'Некорректный интервал': 'Invalid interval',
+    'Provider уже существует': 'Provider already exists',
+    'Не удалось сохранить provider': 'Could not save provider',
+    'Не удалось удалить provider': 'Could not delete provider',
+    'Provider не найден на роутере': 'Provider not found on router',
+    'Конфигурация создана.': 'Configuration created.',
+    'Конфигурация сохранена.': 'Configuration saved.',
+    'Не удалось создать конфигурацию': 'Could not create configuration',
+    'Заполните поля': 'Fill in the fields',
+    'MagiTrickle установлен, но не запущен': 'MagiTrickle is installed but not running',
+    'Предыдущая копия восстановлена': 'Previous backup restored',
     '(доступна новая версия %s)': '(new version %s available)',
     'Файл /etc/dnsmasq.conf будет полностью очищен, останутся только ваши правила.': 'The /etc/dnsmasq.conf file will be completely cleared; only your rules will remain.',
     'DNS-серверы': 'DNS servers',
     'Распаковка архива...': 'Extracting archive...',
     'Режим использования DNS': 'DNS usage mode',
     'Редактировать': 'Edit',
-    'Редактировать исключение': 'Edit exclusion',
-    'Редактировать правило': 'Edit rule',
-    'Ручное редактирование': 'Manual editing',
     'Включено': 'Enabled',
     'Включить': 'Enable',
     'Включить исходящий трафик этого устройства через Mihomo?': 'Route this devices outbound traffic through Mihomo?',
@@ -43,21 +51,14 @@ var MIXOMO_EN = {
     'Вывод:': 'Output:',
     'Действие': 'Action',
     'Добавление...': 'Adding...',
-    'Добавлять устройства и подсети можно только из локальных диапазонов.': 'Devices and subnets can only be added from local ranges.',
     'Добавить': 'Add',
     'Добавить автоматически': 'Add automatically',
-    'Добавить адрес': 'Add address',
-    'Добавить DNS-сервер': 'Add DNS server',
-    'Добавить правило': 'Add rule',
+     'Добавить DNS-сервер': 'Add DNS server',
+     'Добавить ссылку': 'Add link',
     'Дополнительное подтверждение': 'Additional confirmation',
-    'Локальная маршрутизация': 'Local routing',
     'Файл уже существует': 'File already exists',
     'Чтобы Mihomo увидел файл, добавьте эту секцию в rule-providers:': 'For Mihomo to see the file, add this section to rule-providers:',
-    'Или укажите самостоятельно:': 'Or specify manually:',
     'Имя файла:': 'File name:',
-    'Исключённые адреса': 'Excluded addresses',
-    'Адрес': 'Address',
-    'Адрес (IP или CIDR)': 'Address (IP or CIDR)',
     'Адреса': 'Addresses',
     'Адресов пока нет.': 'No addresses yet.',
     'Расписания пока нет.': 'No schedules yet.',
@@ -73,7 +74,6 @@ var MIXOMO_EN = {
     'Восьмой': 'Eighth',
     'Девятый': 'Ninth',
     'Десятый': 'Tenth',
-    'остановлен': 'stopped',
     'Установлена самая актуальная версия': 'The latest version is installed',
     'Удаление бэкапа...': 'Deleting backup...',
     'Удаление...': 'Deleting...',
@@ -83,8 +83,7 @@ var MIXOMO_EN = {
     'Удалить это правило?': 'Delete this rule?',
     'Удалить этот адрес?': 'Delete this address?',
      'Установить обновление': 'Install update',
-     'Установка обновления...': 'Installing update...',
-     'Установлена самая актуальная версия': 'The latest version is installed',
+
      'Доступно обновление MagiTrickle': 'MagiTrickle update available',
      'Авто': 'Auto',
      'Русский': 'Russian',
@@ -96,21 +95,13 @@ var MIXOMO_EN = {
      'Ошибка проверки обновлений Mixomo': 'Mixomo update check error',
      'Переключить Mixomo на канал %s?': 'Switch Mixomo to the %s channel?',
      'Превышено время ожидания операции Mixomo': 'Timed out waiting for Mixomo operation',
-     'Не удалось скачать установщик Mixomo': 'Could not download Mixomo installer',
      'Не удалось установить Mixomo': 'Could not install Mixomo',
-     'Не удалось определить версию Mixomo': 'Could not determine Mixomo version',
-     'Версия Mixomo': 'Mixomo version',
      'Mixomo обновлён. Перезагрузить страницу?': 'Mixomo was updated. Reload the page?',
-     'Не удалось прочитать версию Mixomo': 'Could not read Mixomo version',
      'Не удалось получить актуальную версию Mixomo': 'Could not get the latest Mixomo version',
      'Не удалось определить SHA bundle Mixomo': 'Could not determine Mixomo bundle SHA',
-     'Не удалось выполнить операцию Mixomo': 'Could not perform Mixomo operation',
-     'Не удалось дождаться переустановки MagiTrickle': 'Timed out waiting for MagiTrickle reinstall',
      'Установка ядра...': 'Installing the core...',
-    'Название': 'Name',
     'Название (необязательно)': 'Name (optional)',
     'Направлять исходящий трафик этого устройства через Mihomo': "Route this device's outgoing traffic through Mihomo",
-    'Настройки': 'Settings',
     'Не удалось получить состояние DNS': 'Could not get DNS status',
     'Не удалось применить правило': 'Could not apply the rule',
      'Не удалось применить профиль': 'Could not apply the profile',
@@ -119,32 +110,24 @@ var MIXOMO_EN = {
     'Некорректный DNS: укажите IPv4 с октетами не длиннее 3 цифр (например 8.8.8.8 или 127.0.0.1#7880)': 'Invalid DNS: provide an IPv4 with octets no longer than 3 digits (e.g. 8.8.8.8 or 127.0.0.1#7880)',
     'Ничего не выбрано. Удалить все правила DNS из dnsmasq?': 'Nothing selected. Delete all DNS rules from dnsmasq?',
     'Новый файл правил': 'New rules file',
-    'Закрепить локальные IP за конкретными устройствами можно в ': 'You can pin local IPs to specific devices in ',
     'Запуск Mihomo...': 'Starting Mihomo...',
     'Запустить': 'Start',
     'Загрузка...': 'Loading...',
-    'Обновлено успешно! Перезагрузка...': 'Updated successfully! Reloading...',
     'Блокировать QUIC (UDP/443)': 'Block QUIC (UDP/443)',
-    'Отключено': 'Disabled',
     'Отключить': 'Disable',
-    'Открыть панель управления': 'Open dashboard',
     'Отмена': 'Cancel',
     'Отменить': 'Cancel',
     'Ошибка DNS: ': 'DNS error: ',
     'Ошибка RPC': 'RPC error',
-    'Ошибка пути': 'Path error',
     'Ошибка маршрутизации: ': 'Routing error: ',
     'Ошибка. Повторить обновление?': 'Error. Retry the update?',
     'Ошибка: ': 'Error: ',
     'Ошибка: %s': 'Error: %s',
     'Очистить /etc/dnsmasq.conf перед применением': 'Clear /etc/dnsmasq.conf before applying',
-    'Через Mihomo': 'Via Mihomo',
     'Мимо Mihomo': 'Bypass Mihomo',
     'Дополнительно': 'Advanced',
     'Остановить': 'Stop',
     'Остановка Mihomo...': 'Stopping Mihomo...',
-    'Такое название уже есть среди пресетов': 'This name already exists among the presets',
-    'Текст помещается между маркерами # Rules from Mixomo и # End rules from Mixomo. В ручном режиме ничего не генерируется автоматически.': 'The text is placed between the # Rules from Mixomo and # End rules from Mixomo markers. In manual mode nothing is generated automatically.',
     'Тип подключения': 'Connection type',
     'Тип файла:': 'File type:',
     'Скачивание архива %s...': 'Downloading archive %s...',
@@ -153,17 +136,36 @@ var MIXOMO_EN = {
     'Создание бэкапа...': 'Creating backup...',
     'Создание...': 'Creating...',
     'Создать': 'Create',
-    'Создать новый': 'Create new',
     'Сохранение...': 'Saving...',
     'Сохранить': 'Save',
+    'Личная': 'Personal',
+    'Конфигурация из подписок': 'Subscription-based configuration',
+    'Обновление через proxy-providers': 'Updates via proxy-providers',
+    'Удалить ссылку': 'Delete link',
+    'Расписание создано. Для просмотра нажмите «Все расписание».': 'Schedule created. Click “All schedules” to view it.',
+    'Карточки': 'Cards',
+    'Таблица': 'Table',
+     'Перезапуск': 'Restart',
+     'Интервал перезапуска Mihomo': 'Mihomo restart interval',
+     'Заполнить header самостоятельно': 'Fill in the header manually',
+    'Интервал обновления конфигурации': 'Configuration update interval',
+    'Ссылка на подписку': 'Subscription link',
+    'Ссылка на конфигурацию': 'Configuration link',
+    'Выберите шаблон для «Личная»': 'Select a template for “Personal”',
+    'Вернуть прошлую копию': 'Restore previous copy',
+    'Использовать Default': 'Use Default',
+    'Использовать чистый шаблон': 'Use empty template',
+    'Открыть конфигурацию': 'Open configuration',
+    'Шаблон применён, но сервис не перезапустился': 'Template applied, but the service failed to restart',
     'Стандартный': 'Standard',
+    'Шаблон MagiTrickle применён': 'MagiTrickle template applied',
+    'Не удалось применить шаблон MagiTrickle': 'Could not apply the MagiTrickle template',
     'Статических арендах DHCP': 'DHCP static leases',
     'Статус': 'Status',
     'По порядку': 'In order',
     'Обязательный режим для использования секции DNS в Mihomo': 'Required mode for using the DNS section in Mihomo',
     'Автоматический выбор самого быстрого сервера.': 'Automatically picks the fastest server.',
     'Запрос ко всем серверам сразу, ответ от самого первого.': 'Queries all servers at once, using the very first response.',
-    'Заменит правила из «Простого режима», если они там есть, на указанные вами ниже.': "Will replace the rules from “Simple Mode”, if they exist there, with the ones you specify below.",
     'Набор правил (.yaml)': 'Rules set (.yaml)',
     'Простой список (.txt)': 'Plain list (.txt)',
     '(Пусто)': '(Empty)',
@@ -173,15 +175,12 @@ var MIXOMO_EN = {
     'Конфигурация': 'Configuration',
     'Конфигурации': 'Configs',
     'Списки правил': 'Rules lists',
-    'Добавить конфигурацию': 'Add configuration',
-    'Добавить список правил': 'Add rules list',
     'Создать конфигурацию': 'Create configuration',
      'Создать список правил': 'Create rules list',
      'Все компоненты': 'All components',
      'Автоматическое копирование перед обновлением': 'Automatic backup before update',
      'Максимальное количество копий для каждого компонента: ': 'Number of copies for each component: ',
      'Импортировать': 'Import',
-    'Источник': 'Source',
      'Обновлять': 'Update every',
      'Обновление': 'Update',
      'Каждый': 'Every',
@@ -194,39 +193,26 @@ var MIXOMO_EN = {
     'никогда': 'never',
     'ч': 'h',
     'Обновить': 'Refresh',
-    '(активный)': '(active)',
     'Импорт...': 'Importing...',
     'Обновление...': 'Refreshing...',
-    'Выберите хотя бы одну секцию': 'Select at least one section',
-    'Укажите ссылку или выберите файл': 'Provide a link or choose a file',
     'Не удалось получить профили': 'Could not get profiles',
      'Расписание': 'Schedule',
      'Все расписание': 'All schedules',
      'Создать расписание': 'Create schedule',
      'По триггеру и времени': 'By trigger and time',
-     'Автоматическое переключение конфигурации по времени или по триггеру.': 'Automatic configuration switching by time or trigger.',
-    'Профиль по умолчанию': 'Default profile',
+    'Постоянная конфигурация': 'Persistent configuration',
+    'Конфигурация во время расписания': 'On-schedule configuration',
     'По времени': 'By time',
     'По триггеру': 'By trigger',
     'Все дни': 'All days',
     'День %s': 'Day %s',
-    'Вс': 'Sun',
-    'Пн': 'Mon',
-    'Вт': 'Tue',
-    'Ср': 'Wed',
-    'Чт': 'Thu',
-    'Пт': 'Fri',
-    'Сб': 'Sat',
      'день': 'day',
      'дня': 'days',
      'дней': 'days',
      'ссылка': 'link',
      'ссылки': 'links',
      'ссылок': 'links',
-    'URL-адреса для проверки (через пробел), основной и фолбэк-профили.': 'URLs to check (space separated), primary and fallback profiles.',
-    'Проверять каждые, мин': 'Check every, min',
      'Порог сбоев': 'Failure threshold',
-     'Расписание создано': 'Schedule created',
      'Через Mihomo': 'Through Mihomo',
      'Напрямую': 'Direct',
      'Основной профиль': 'Primary profile',
@@ -240,8 +226,6 @@ var MIXOMO_EN = {
     'Укажите хотя бы один URL': 'Provide at least one URL',
     'Не удалось получить расписание': 'Could not get the schedule',
     'Все конфигурации': 'All configs',
-    'Все списки': 'All lists',
-    'Добавленные адреса': 'Added addresses',
     'Профиль': 'Profile',
     'Время': 'Time',
     'Дни': 'Days',
@@ -249,77 +233,43 @@ var MIXOMO_EN = {
     'Выбрать время (в часах)': 'Choose time (hours)',
     'Интервал от 1 до 8760 часов': 'Interval from 1 to 8760 hours',
     'Ссылка': 'Link',
-    'Открыть в редакторе': 'Open in editor',
-    'Редактировать список правил': 'Edit rules list',
     'Конфигурация создана. Для просмотра нажмите «Все конфигурации».': 'Configuration created. Click "All configs" to view.',
     'Список правил создан. Для просмотра нажмите «Все списки».': 'Rules list created. Click "All lists" to view.',
-    'Скрыть': 'Hide',
     'Закрыть': 'Close',
-    'Локальная конфигурация': 'Local configuration',
-    'Онлайн конфигурация': 'Online configuration',
-    'Сохранить следующие блоки:': 'Save the following blocks:',
-    'Выберите файл': 'Choose a file',
     'Укажите ссылку': 'Provide a link',
-    '[активно]': '[active]',
     'Загрузить файл': 'Upload file',
     'Формат списка': 'List format',
      'Локальный список правил': 'Local rules list',
-     'Онлайн список правил': 'Online rules list',
-     'Локально': 'Local',
      'Онлайн': 'Online',
-     'Необязательные опции': 'Optional settings',
-     'Необязательно': 'Optional',
+     'Опционально': 'Optional',
      'Имя config зарезервировано Mihomo': 'The name config is reserved by Mihomo',
      'Изменить данные': 'Edit details',
      'Открыть в редакторе': 'Open in editor',
      'Локальная конфигурация': 'Local configuration',
      'Название расписания': 'Schedule name',
-     'URL для проверки (можно несколько через пробел)': 'Check URL (multiple separated by spaces)',
-     'Профиль при наличии связи': 'Profile when connected',
-     'Профиль при отсутствии связи': 'Profile when disconnected',
      'Профиль во время расписания': 'Profile during schedule',
+    'Активная конфигурация при успешной загрузке ссылок': 'Active configuration on successful link load',
+    'Активная конфигурация при отсутствии загрузки ссылок': 'Active configuration when links fail to load',
      'Ссылки для проверки (можно указать несколько через пробел)': 'Links to check (multiple separated by spaces)',
      'Активный профиль при успешной загрузке ссылок': 'Active profile when links load successfully',
      'Активный профиль при отсутствии загрузки ссылок': 'Active profile when links fail to load',
      'Частота проверки в минутах': 'Check frequency in minutes',
-     'Частота повторной проверки при первом сбое в минутах': 'Retry frequency after first failure in minutes',
      'Частота проверки во время сбоев в минутах': 'Failure check frequency in minutes',
-     'IP': 'IP',
-     'Ручной ввод': 'Manual input',
      'Название': 'Name',
-     'Адрес': 'Address',
      'IP (можно указать несколько через пробел)': 'IP (multiple separated by spaces)',
      'Добавить DNS': 'Add DNS',
-     'Добавление IP или CIDR': 'Add IP or CIDR',
-     'Список IP или CIDR': 'IP or CIDR list',
-     'Добавление DNS-сервера': 'Add DNS server',
-     'Список DNS-серверов': 'DNS server list',
      'Панель управления': 'Dashboard',
-     'IP или CIDR (ручной ввод)': 'IP or CIDR (manual)',
-     'Автоматический IP': 'Automatic IP',
-     'Ручной ввод IP или CIDR': 'Manual IP or CIDR input',
-     'Автоматический': 'Automatic',
-     'Ручной ввод': 'Manual input',
-     'По времени и триггеру': 'By time and trigger',
-     'Понедельник': 'Monday',
-     'Вторник': 'Tuesday',
-     'Среда': 'Wednesday',
-     'Четверг': 'Thursday',
-     'Пятница': 'Friday',
-     'Суббота': 'Saturday',
 
     'Скопировать активную конфигурацию': 'Copy the active configuration',
     'Перетащить': 'Drag',
     'Трафик к этим адресам никогда не направляется через Mihomo.': 'Traffic to these addresses is never routed through Mihomo.',
     'Параллельный': 'Parallel',
     'По умолчанию добавлены следующие подсети, без возможности их удалить:': 'The following subnets are added by default, without the ability to remove them:',
-    'Подождите...': 'Please wait...',
     'Ожидайте...': 'Please wait...',
     'Подтверждение': 'Confirmation',
     'Показать журнал': 'Show log',
     'Списков правил пока нет.': 'No rules lists yet.',
     'При добавлении абсолютно весь трафик устройств направляется через Mihomo': 'When added, all traffic from these devices is routed through Mihomo',
-    'При применении они будут удалены.': 'They will be removed when applied.',
     'Применение...': 'Applying...',
     'Применить': 'Apply',
     'Все устройства переходят на TCP вместо UDP (QUIC) на 443 порту, что упрощает маршрутизацию в Mihomo.': 'All devices switch to TCP instead of UDP (QUIC) on port 443, which simplifies routing in Mihomo.',
@@ -330,13 +280,10 @@ var MIXOMO_EN = {
     'Проверка обновлений...': 'Checking for updates...',
     'Проверка ядра...': 'Checking the core...',
     'Проверка...': 'Checking...',
-    'Простое редактирование': 'Simple editing',
     'Простое добавление': 'Simple add',
     'Ручное добавление': 'Manual add',
-    'работает': 'running',
     'DNS-сервер создан': 'DNS server created',
     'IP или CIDR': 'IP or CIDR',
-    'Автоматическое копирование': 'Automatic backup',
     'Активная конфигурация Mihomo': 'Active Mihomo configuration',
     'Восстановить': 'Restore',
     'Восстановить выбранную резервную копию?': 'Restore the selected backup?',
@@ -375,7 +322,6 @@ var MIXOMO_EN = {
     'Ошибка установки MagiTrickle': 'MagiTrickle installation error',
     'Переключить Mihomo на канал %s и установить его версию?': 'Switch Mihomo to the %s channel and install its version?',
     'Переключить вариант MagiTrickle? Компонент будет переустановлен.': 'Switch the MagiTrickle variant? The component will be reinstalled.',
-    'Правил пока нет.': 'No rules yet.',
     'Превышено время ожидания операции MagiTrickle': 'MagiTrickle operation timed out',
     'Прикрепить IP к устройству можно в ': 'You can pin an IP to a device in ',
     'Работает': 'Running',
@@ -480,7 +426,8 @@ var callDnsClear = rpc.declare({ object: 'mihomo-dns', method: 'clear', expect: 
 var callDnsAddPreset = rpc.declare({ object: 'mihomo-dns', method: 'add_preset', params: ['name', 'value'], expect: { '': {} } });
 var callDnsRemovePreset = rpc.declare({ object: 'mihomo-dns', method: 'remove_preset', params: ['name'], expect: { '': {} } });
 var callProfilesList = rpc.declare({ object: 'mihomo-profiles', method: 'list', expect: { '': {} } });
-var callProfilesApply = rpc.declare({ object: 'mihomo-profiles', method: 'apply', params: ['name'], expect: { '': {} } });
+var callProfilesApply = rpc.declare({ object: 'mihomo-profiles', method: 'apply', params: ['name', 'panel'], expect: { '': {} } });
+var callDashboardSet = rpc.declare({ object: 'mihomo-profiles', method: 'set_dashboard', params: ['panel'], expect: { '': {} } });
 var callProfilesNormalize = rpc.declare({ object: 'mihomo-profiles', method: 'normalize', params: ['path'], expect: { '': {} } });
 var callProfilesImport = rpc.declare({ object: 'mihomo-profiles', method: 'import', params: ['name', 'url', 'content', 'sections', 'interval'], expect: { '': {} } });
 var callProfilesCreate = rpc.declare({ object: 'mihomo-profiles', method: 'create', params: ['name', 'copyActive'], expect: { '': {} } });
@@ -494,14 +441,22 @@ var callSetOrder = rpc.declare({ object: 'mihomo-profiles', method: 'set_order',
 var callProfilesImportFull = rpc.declare({ object: 'mihomo-profiles', method: 'import_full', params: ['name', 'url', 'content'], expect: { '': {} } });
 var callProfilesRename = rpc.declare({ object: 'mihomo-profiles', method: 'rename_profile', params: ['old', 'new'], expect: { '': {} } });
 var callRulesRename = rpc.declare({ object: 'mihomo-profiles', method: 'rule_rename', params: ['old', 'new', 'ext'], expect: { '': {} } });
+var callSubscriptionsList = rpc.declare({ object: 'mihomo-profiles', method: 'subscription_list', expect: { '': {} } });
+var callSubscriptionAdd = rpc.declare({ object: 'mihomo-profiles', method: 'subscription_add', params: ['id', 'url', 'interval', 'manual', 'mihomo_version', 'hwid', 'device_os', 'openwrt_version', 'router_model'], expect: { '': {} } });
+var callSubscriptionUpdate = rpc.declare({ object: 'mihomo-profiles', method: 'subscription_update', params: ['id', 'url', 'interval', 'manual', 'mihomo_version', 'hwid', 'device_os', 'openwrt_version', 'router_model'], expect: { '': {} } });
+var callSubscriptionDelete = rpc.declare({ object: 'mihomo-profiles', method: 'subscription_delete', params: ['id'], expect: { '': {} } });
+var callSubscriptionGenerate = rpc.declare({ object: 'mihomo-profiles', method: 'subscription_generate', params: ['name'], expect: { '': {} } });
+var callSubscriptionReplace = rpc.declare({ object: 'mihomo-profiles', method: 'subscription_replace', params: ['old', 'name'], expect: { '': {} } });
+var callHappyKeyStatus = rpc.declare({ object: 'mihomo-profiles', method: 'happy_key_status', expect: { '': {} } });
+var callHappyKeyGenerate = rpc.declare({ object: 'mihomo-profiles', method: 'happy_key_generate', expect: { '': {} } });
 var callScheduleList = rpc.declare({ object: 'mihomo-schedule', method: 'list', expect: { '': {} } });
 var callScheduleDefault = rpc.declare({ object: 'mihomo-schedule', method: 'default', params: ['profile'], expect: { '': {} } });
 var callScheduleSave = rpc.declare({ object: 'mihomo-schedule', method: 'save', params: ['type', 'name', 'enabled', 'profile', 'start', 'end', 'days', 'dom', 'months', 'urls', 'interval', 'fallback', 'primary', 'threshold', 'old', 'mode'], expect: { '': {} } });
 var makeScheduleCheckMode = function(value) {
     var mode = value === 'mihomo' ? 'mihomo' : 'direct';
     var box = E('div', { class: 'mihomo-seg' });
-    var direct = E('button', { type: 'button', class: 'btn cbi-button-neutral' + (mode === 'direct' ? ' active' : ''), click: function() { box.value = 'direct'; direct.classList.add('active'); mihomo.classList.remove('active'); } }, _('Напрямую'));
-    var mihomo = E('button', { type: 'button', class: 'btn cbi-button-neutral' + (mode === 'mihomo' ? ' active' : ''), click: function() { box.value = 'mihomo'; mihomo.classList.add('active'); direct.classList.remove('active'); } }, _('Через Mihomo'));
+    var direct = E('button', { type: 'button', class: 'btn ' + (mode === 'direct' ? 'cbi-button-positive' : 'cbi-button-neutral') + ' mihomo-route-choice' + (mode === 'direct' ? ' active' : ''), click: function() { box.value = 'direct'; direct.classList.add('active', 'cbi-button-positive'); direct.classList.remove('cbi-button-neutral'); mihomo.classList.remove('active', 'cbi-button-positive'); mihomo.classList.add('cbi-button-neutral'); } }, _('Напрямую'));
+    var mihomo = E('button', { type: 'button', class: 'btn ' + (mode === 'mihomo' ? 'cbi-button-positive' : 'cbi-button-neutral') + ' mihomo-route-choice' + (mode === 'mihomo' ? ' active' : ''), click: function() { box.value = 'mihomo'; mihomo.classList.add('active', 'cbi-button-positive'); mihomo.classList.remove('cbi-button-neutral'); direct.classList.remove('active', 'cbi-button-positive'); direct.classList.add('cbi-button-neutral'); } }, _('Через Mihomo'));
     box.value = mode;
     box.appendChild(direct);
     box.appendChild(mihomo);
@@ -549,11 +504,20 @@ function getMihomoDashboardSettings(panel) {
     return MIHOMO_DASHBOARDS[panel] || null;
 }
 
+function detectMihomoDashboard(content) {
+    var match = String(content || '').match(/^\s*external-ui\s*:\s*["']?([^"'\s#]+)["']?/m);
+    var value = match ? match[1].toLowerCase() : '';
+    if (value.indexOf('zashboard') >= 0) return 'zashboard';
+    if (value.indexOf('metacubex') >= 0) return 'metacubex';
+    return '';
+}
+
 function applyMihomoDefaults(content, panel) {
     var settings = getMihomoDashboardSettings(panel);
     var lines = [
         'mixed-port: 7890',
-        'redir-port: 5001'
+        'redir-port: 5001',
+        'allow-lan: true'
     ];
     if (settings) {
         lines.unshift(
@@ -562,9 +526,9 @@ function applyMihomoDefaults(content, panel) {
             'external-ui-url: "' + settings.externalUiUrl + '"'
         );
     }
-    var keys = /^(external-controller|external-ui|external-ui-url|mixed-port|redir-port)[ \t]*:/;
+    var keys = /^(external-controller|external-ui|external-ui-url|mixed-port|redir-port|allow-lan)[ \t]*:/;
     var result = String(content || '').replace(/\r\n/g, '\n').replace(/\\n/g, '\n').split('\n').filter(function(line) { return !keys.test(line); }).join('\n');
-    result = result.replace(/(^|\n)([^\n]*?)(?=(external-controller|external-ui|external-ui-url|mixed-port|redir-port)[ \t]*:)/g, '$1$2\n');
+    result = result.replace(/(^|\n)([^\n]*?)(?=(external-controller|external-ui|external-ui-url|mixed-port|redir-port|allow-lan)[ \t]*:)/g, '$1$2\n');
     result = result.replace(/^(mode:[^\n]*?)(ipv6:)/m, '$1\n$2').replace(/^\n+/, '');
     return lines.join('\n') + '\n' + result;
 }
@@ -604,8 +568,9 @@ function normalizeEditorConfig(path) {
     return callProfilesNormalize(path).then(function(res) {
         if (!res || !res.ok) throw new Error((res && res.error) || _('Не удалось нормализовать конфигурацию'));
         return fs.read(path).then(function(content) {
-            if (editor && path === currentFile) editor.setValue(content || '', -1);
-            if (path === MAIN_CONFIG) mainConfigContent = content || '';
+            if (content == null) return;
+            if (editor && path === currentFile) editor.setValue(content, -1);
+            if (path === MAIN_CONFIG) mainConfigContent = content;
         });
     });
 }
@@ -763,6 +728,11 @@ return view.extend({
         return result && result.ok;
     },
 
+    showProfileError: function(result) {
+        if (!result || !result.ok) ui.addNotification(null, E('p', (result && trError(result.error)) || _('Не удалось создать конфигурацию')), 'error');
+        return result && result.ok;
+    },
+
     confirmRouterRouting: function(enable) {
         var self = this;
         var text = enable
@@ -796,7 +766,7 @@ return view.extend({
         var details = cardEl.querySelectorAll('.mihomo-overview-card-detail');
         if (head) head.style.display = 'none';
         for (var di = 0; di < details.length; di++) details[di].style.display = 'none';
-        var field = function(label, input) { return E('div', { style: 'margin:.35rem 0;' }, [E('label', { style: 'display:block; opacity:.8; margin-bottom:.15rem;' }, label), input]); };
+        var field = function(label, input) { return E('div', { style: 'margin:.35rem 0; text-align:center;' }, [E('label', { style: 'display:block; opacity:.8; margin-bottom:.15rem;' }, label), input]); };
         var nameInput = E('input', { type: 'text', value: rule.label || '', style: 'width:100%; box-sizing:border-box;' });
         var known = E('select', { style: 'width:100%; box-sizing:border-box;' }, [E('option', { value: '' }, _('Выберите устройство...'))].concat(clients.map(function(c) {
             return E('option', { value: c.ip }, (c.name ? c.name + ' — ' : '') + c.ip);
@@ -848,7 +818,7 @@ return view.extend({
         var details = cardEl.querySelectorAll('.mihomo-overview-card-detail');
         if (head) head.style.display = 'none';
         for (var di = 0; di < details.length; di++) details[di].style.display = 'none';
-        var field = function(label, input) { return E('div', { style: 'margin:.35rem 0;' }, [E('label', { style: 'display:block; opacity:.8; margin-bottom:.15rem;' }, label), input]); };
+        var field = function(label, input) { return E('div', { style: 'margin:.35rem 0; text-align:center;' }, [E('label', { style: 'display:block; opacity:.8; margin-bottom:.15rem;' }, label), input]); };
         var nameInput = E('input', { type: 'text', value: ex.label || '', style: 'width:100%; box-sizing:border-box;' });
         var dest = E('input', { type: 'text', value: displaySource(ex.dest), style: 'width:100%; box-sizing:border-box;' });
         var edit = E('div', { class: 'mihomo-config-card-edit', style: 'margin-top:.8rem;' }, [
@@ -879,7 +849,7 @@ return view.extend({
     },
 
     getOverviewOrder: function() {
-        var defaultOrder = ['magitrickle', 'mihomo', 'schedule', 'profile', 'rules', 'routing', 'dns', 'backup'];
+         var defaultOrder = ['magitrickle', 'mihomo', 'schedule', 'rules', 'routing', 'dns'];
         try {
             var saved = JSON.parse(localStorage.getItem('mihomo_overview_order') || 'null');
             if (Array.isArray(saved) && saved.length === defaultOrder.length && defaultOrder.every(function(id) { return saved.indexOf(id) >= 0; })) return saved;
@@ -901,8 +871,18 @@ return view.extend({
     refreshOverview: function() {
         var self = this;
         var safeCall = function(call) { return call().catch(function() { return {}; }); };
-        return Promise.all([safeCall(callDnsStatus), safeCall(callRoutingStatus), safeCall(callProfilesList), safeCall(callScheduleList), safeCall(callBackupStatus)]).then(function(data) {
-            var dns = data[0] || {}, routing = data[1] || {}, profiles = data[2] || {}, schedules = data[3] || {}, backups = data[4] || {};
+        var markerP = fs.read('/etc/mixomo/templates/magitrickle-template.active').then(function(v) { return String(v || ''); }).catch(function() { return ''; });
+        return Promise.all([safeCall(callDnsStatus), safeCall(callRoutingStatus), safeCall(callProfilesList), safeCall(callScheduleList), safeCall(callBackupStatus), markerP]).then(function(data) {
+             var dns = data[0] || {}, routing = data[1] || {}, profiles = data[2] || {}, schedules = data[3] || {}, backups = data[4] || {};
+             self.profilesData = profiles;
+             var markerRaw = (typeof data[5] === 'string') ? data[5].trim() : '';
+
+             var marker = markerRaw === 'from-mixomo' ? 'from-mixomo' : 'own';
+             self.magitrickleTemplate = marker;
+             try { localStorage.setItem('magitrickle_template', marker); } catch (e) {}
+             if (self.magitrickleTemplateSelect) self.magitrickleTemplateSelect.value = marker;
+
+
             self.backupData = backups;
             self.backupSettings = backups.settings || {};
             var magiStatus = self.magitrickleRunning;
@@ -963,22 +943,37 @@ return view.extend({
                     E('span', {}, self.isRunning ? _('Работает') : _('Остановлен')),
                     mihomoDashboardActions
                 ]);
-                var mihomoConfig = E('button', { class: 'btn cbi-button-neutral mihomo-overview-card-action', click: function(ev) { ev.stopPropagation(); self.switchView('configs'); } }, _('Конфигурация'));
-               var mihomoServiceActions = E('div', { style: 'display:flex; align-items:center; gap:.4rem; margin-left:auto;' }, [self.updateButton, self.mihomoChannelSelect]);
+                 var mihomoConfig = E('button', { class: 'btn cbi-button-neutral mihomo-overview-card-action', click: function(ev) { ev.stopPropagation(); self.switchView('configs'); } }, _('Открыть конфигурацию'));
+                 var mihomoConfigSelect = E('select', { class: 'cbi-input-select', style: 'width:7.4rem;', change: function(ev) { ev.stopPropagation(); self.applyProfile(ev.target.value, ev.target); } },
+                     (profiles.profiles || []).map(function(p) { return E('option', { value: p.name }, p.name === 'default' ? 'Default' : p.name); }));
+                 mihomoConfigSelect.value = profiles.active || '';
+                 var mihomoConfigActions = E('div', { style: 'display:flex; align-items:center; gap:.4rem;' }, [mihomoConfig, mihomoConfigSelect]);
+                var mihomoServiceActions = E('div', { style: 'display:flex; align-items:center; gap:.4rem; margin-left:auto;' }, [self.updateButton, self.mihomoChannelSelect]);
+
                  var magiServiceButton = self.magitrickleRunning
  ? E('button', { class: 'btn cbi-button-reset mihomo-overview-card-action mihomo-card-stop', click: function(ev) { ev.stopPropagation(); self.handleMagiTrickleAction('stop'); } }, _('Остановить'))
                     : E('button', { class: 'btn cbi-button-positive mihomo-overview-card-action mihomo-card-stop', click: function(ev) { ev.stopPropagation(); self.handleMagiTrickleAction('start'); } }, _('Запустить'));
-                 var magiVariantSelect = E('select', { class: 'cbi-input-select', style: 'width:6rem; height:28px;', change: function(ev) { ev.stopPropagation(); self.switchMagiTrickleVariant(ev.target.value, ev.target); } }, [
+                 var magiVariantSelect = E('select', { class: 'cbi-input-select', style: 'width:7.4rem;', change: function(ev) { ev.stopPropagation(); self.switchMagiTrickleVariant(ev.target.value, ev.target); } }, [
 E('option', { value: 'original' }, 'Original'),
                       E('option', { value: 'mod' }, 'Mod')
                  ]);
-                 magiVariantSelect.value = self.magitrickleVariant;
-                 self.magitrickleVariantSelect = magiVariantSelect;
-                  var magiServiceActions = E('div', { style: 'display:flex; align-items:center; gap:.4rem; margin-left:auto;' }, [self.magitrickleUpdateButton, magiVariantSelect]);
-                 var magiAction = E('button', { class: 'btn cbi-button-neutral mihomo-overview-card-action', click: function(ev) { ev.stopPropagation(); self.switchView('magitrickle'); } }, _('Конфигурация'));
-                 var cards = {
-                    mihomo: card('mihomo', _('Mihomo') + ' ' + (self.currentVersion || _('Загрузка...')), mihomoStatusValue, '', self.isRunning ? 'is-ok' : 'is-muted', [mihomoConfig, serviceButton], mihomoServiceActions),
-                    magitrickle: card('magitrickle', _('MagiTrickle') + ' ' + magiVersion, magiStatus ? _('Работает') : _('Остановлен'), '', magiStatus ? 'is-ok' : 'is-muted', [magiAction, magiServiceButton], magiServiceActions),
+                  magiVariantSelect.value = self.magitrickleVariant;
+                  self.magitrickleVariantSelect = magiVariantSelect;
+                   var magiServiceActions = E('div', { style: 'display:flex; align-items:center; gap:.4rem; margin-left:auto;' }, [self.magitrickleUpdateButton, magiVariantSelect]);
+                   var magiAction = E('button', { class: 'btn cbi-button-neutral mihomo-overview-card-action', click: function(ev) { ev.stopPropagation(); self.switchView('magitrickle'); } }, _('Открыть конфигурацию'));
+                   var magiTemplateSelect = E('select', { class: 'cbi-input-select', style: 'width:7.4rem;', change: function(ev) { ev.stopPropagation(); self.switchMagitrickleTemplate(ev.target.value, ev.target); } }, [
+E('option', { value: 'own' }, _('Личная')),
+                        E('option', { value: 'from-mixomo' }, 'Default')
+                   ]);
+                   magiTemplateSelect.value = self.magitrickleTemplate;
+                   self.magitrickleTemplateSelect = magiTemplateSelect;
+                   var magiStatusValue = E('div', { style: 'display:flex; align-items:center; width:100%;' }, [
+                       E('span', {}, magiStatus ? _('Работает') : _('Остановлен'))
+                   ]);
+
+                  var cards = {
+                    mihomo: card('mihomo', _('Mihomo') + ' ' + (self.currentVersion || _('Загрузка...')), mihomoStatusValue, '', self.isRunning ? 'is-ok' : 'is-muted', [mihomoConfigActions, serviceButton], mihomoServiceActions),
+                    magitrickle: card('magitrickle', _('MagiTrickle') + ' ' + magiVersion, magiStatusValue, '', magiStatus ? 'is-ok' : 'is-muted', [magiAction, magiTemplateSelect, magiServiceButton], magiServiceActions),
                   profile: card('profile', _('Активная конфигурация Mihomo'), active, '', 'is-muted', action('configs')),
                  schedule: card('schedule', _('Расписание'), plural(scheduleActiveCount, [_('активное расписание'), _('активных расписания'), _('активных расписаний')]), '', 'is-muted', E('button', { class: 'btn cbi-button-neutral mihomo-overview-card-action', click: function(ev) { ev.stopPropagation(); self.activeView = 'configs'; self.activeSub = 'schedule'; self.activeThird = 'list'; self.renderSettingsRow(); self.showViewContent(); } }, _('Открыть'))),
                  rules: card('rules', _('Списки правил'), plural(ruleCount, [_('список'), _('списка'), _('списков')]), '', 'is-muted', E('button', { class: 'btn cbi-button-neutral mihomo-overview-card-action', click: function(ev) { ev.stopPropagation(); self.activeView = 'configs'; self.activeSub = 'rules'; self.activeThird = 'list'; self.renderSettingsRow(); self.showViewContent(); } }, _('Открыть'))),
@@ -1015,10 +1010,16 @@ E('option', { value: 'original' }, 'Original'),
             return self.magitrickleVariant;
         };
         var stateP = settle(fs.read('/etc/mixomo/versions/magitrickle'), '');
+        var markerP = settle(fs.read('/etc/mixomo/templates/magitrickle-template.active'), '');
         var statusP = settle(fs.exec('/bin/sh', ['-c', 'service magitrickle status 2>&1; pidof magitrickled 2>/dev/null; true']), { code: 1 });
-        return Promise.all([statusP, stateP]).then(function(data) {
+        return Promise.all([statusP, stateP, markerP]).then(function(data) {
             var status = data[0] || {};
             var state = data[1] || '';
+            var marker = String(data[2] || '').trim();
+             self.magitrickleTemplate = marker === 'from-mixomo' ? 'from-mixomo' : 'own';
+
+            try { localStorage.setItem('magitrickle_template', self.magitrickleTemplate); } catch (e) {}
+            if (self.magitrickleTemplateSelect) self.magitrickleTemplateSelect.value = self.magitrickleTemplate;
             var stateVariant = (state.match(/^([^\n\r]+)/) || ['', ''])[1].trim();
             var stored = state.replace(/^[^\n]*\n/, '').trim();
             self.magitrickleRunning = isMagiRunningOutput(status);
@@ -1113,16 +1114,11 @@ E('option', { value: 'original' }, 'Original'),
         });
     },
 
-    switchThird: function(third) {
-        if (third === this.activeThird) {
-            if (this.viewVisible) {
-                this.viewVisible = false;
-                this.hideAllWindows();
-            } else {
-                this.showViewContent();
-            }
-            return;
-        }
+     switchThird: function(third) {
+         if (third === this.activeThird) {
+             this.showViewContent();
+             return;
+         }
          this.activeThird = third;
          this.renderThirdRow();
          this.renderFourthRow();
@@ -1133,18 +1129,13 @@ E('option', { value: 'original' }, 'Original'),
          if (!this.fourthRow) return;
          var self = this;
          L.dom.content(this.fourthRow, []);
-         if (!this.subRowVisible || this.activeView !== 'configs' || this.activeSub !== 'schedule' || this.activeThird !== 'add') {
-             this.fourthRow.style.display = 'none';
-             return;
-         }
-         this.fourthRow.style.display = 'flex';
-         [ { s: 'time', label: _('По времени') }, { s: 'trigger', label: _('По триггеру') }, { s: 'combined', label: _('По триггеру и времени') } ].forEach(function(it) {
-              self.fourthRow.appendChild(makeLuciTab(it.label, self.activeFourth === it.s, function() { self.switchFourth(it.s); }));
-         });
+          this.fourthRow.style.display = 'none';
+          return;
+
      },
 
       switchFourth: function(value) {
-          this.activeFourth = this.activeFourth === value ? null : value;
+          this.activeFourth = value;
           this.renderFourthRow();
           this.renderSchedulePanel();
       },
@@ -1152,16 +1143,9 @@ E('option', { value: 'original' }, 'Original'),
      switchSub: function(sub) {
          editorRequested = false;
          if (sub === this.activeSub) {
-             if (this.viewVisible) {
-                 this.viewVisible = false;
-                 if (this.thirdRow) this.thirdRow.style.display = 'none';
-                 if (this.fourthRow) this.fourthRow.style.display = 'none';
-                 this.hideAllWindows();
-            } else {
-                this.showViewContent();
-            }
-            return;
-        }
+             this.showViewContent();
+             return;
+         }
          this.activeSub = sub;
           if (sub === 'rules' || sub === 'list' || sub === 'schedule') this.activeThird = 'list';
           this.activeFourth = 'time';
@@ -1200,9 +1184,13 @@ E('option', { value: 'original' }, 'Original'),
          if (this.activeView === 'overview') {
              if (this.overviewPanel) this.overviewPanel.style.display = 'block';
              this.refreshOverview();
-         } else if (this.activeView === 'magitrickle') {
-             if (this.magitricklePanel) this.magitricklePanel.style.display = 'block';
-         } else if (this.activeView === 'backup') {
+          } else if (this.activeView === 'magitrickle') {
+              if (this.magitricklePanel) this.magitricklePanel.style.display = 'block';
+              if (this.magitricklePanelDirty) {
+                  this.magitricklePanelDirty = false;
+                  this.reloadMagitricklePanel(0);
+              }
+          } else if (this.activeView === 'backup') {
              if (this.backupPanel) this.backupPanel.style.display = 'block';
              this.refreshBackups();
          } else if (this.activeView === 'rules' && this.activeSub === 'list') {
@@ -1271,11 +1259,11 @@ E('option', { value: 'original' }, 'Original'),
               
                var retention = E('input', { type: 'number', min: 1, max: 20, value: self.backupSettings.retention || 1, style: 'width:5rem;' });
                var retentionRow = E('label', { style: 'display:block; margin:.4rem 0;' }, [_('Максимальное количество копий для каждого компонента: '), retention]);
-              var componentRows = [E('label', { style: 'display:block; margin:.35rem 0;' }, [allCheck, ' ', _('Все компоненты')])];
+              var componentRows = [                  E('label', { style: 'display:flex; align-items:center; gap:.25rem; margin:.35rem 0;' }, [allCheck, E('span', {}, _('Все компоненты'))])];
              componentNames.forEach(function(item) {
                  var check = E('input', { type: 'checkbox' });
                  componentChecks.push({ value: item.value, check: check });
-                 componentRows.push(E('label', { style: 'display:block; margin:.35rem 0;' }, [check, ' ', item.label]));
+                  componentRows.push(E('label', { style: 'display:flex; align-items:center; gap:.25rem; margin:.35rem 0;' }, [check, E('span', {}, item.label)]));
                  check.addEventListener('change', function() { allCheck.checked = false; });
              });
              allCheck.addEventListener('change', function() {
@@ -1309,8 +1297,8 @@ E('option', { value: 'original' }, 'Original'),
              var rows = [
                  E('h3', {}, _('Автоматическое копирование перед обновлением')),
                  E('div', { style: 'margin-bottom:0;' }, [
-                     E('label', { style: 'display:block; margin:.35rem 0;' }, [autoMihomo, ' ', _('Mihomo')]),
-                     E('label', { style: 'display:block; margin:.35rem 0 0;' }, [autoMagi, ' ', _('MagiTrickle')])
+                      E('label', { style: 'display:flex; align-items:center; gap:.25rem; margin:.35rem 0;' }, [autoMihomo, E('span', {}, _('Mihomo'))]),
+                      E('label', { style: 'display:flex; align-items:center; gap:.25rem; margin:.35rem 0 0;' }, [autoMagi, E('span', {}, _('MagiTrickle'))])
                  ]),
                   E('h3', {}, _('Ручное копирование')),
                   E('div', { style: 'margin-bottom:0;' }, componentRows.concat([retentionRow, create])),
@@ -1460,9 +1448,9 @@ E('option', { value: 'original' }, 'Original'),
         panel.appendChild(E('h4', _('Режим использования DNS')));
         dnsModes.forEach(function(mo) {
             panel.appendChild(E('p', { style: 'opacity:.8; margin:.4rem 0 0;' }, mo.desc));
-            var cb = E('input', { type: 'checkbox', style: 'flex-shrink:0; margin:0;', click: function() { self.dnsUsageMode = mo.value; self.renderDnsPanel(); } });
+            var cb = E('input', { type: 'checkbox', click: function() { self.dnsUsageMode = mo.value; self.renderDnsPanel(); } });
             cb.checked = (self.dnsUsageMode === mo.value);
-            panel.appendChild(E('label', { style: 'display:flex; align-items:center; gap:.6rem; margin:.1rem 0 .6rem;' }, [cb, E('span', {}, mo.label)]));
+            panel.appendChild(E('label', { style: 'display:flex; align-items:center; gap:.25rem; margin:.1rem 0 .6rem;' }, [cb, E('span', {}, mo.label)]));
         });
         panel.appendChild(E('h4', { style: 'margin-bottom:.5rem;' }, _('DNS-серверы')));
         var ordinals = [_('Первый'), _('Второй'), _('Третий'), _('Четвёртый'), _('Пятый'), _('Шестой'), _('Седьмой'), _('Восьмой'), _('Девятый'), _('Десятый')];
@@ -1505,9 +1493,9 @@ E('option', { value: 'original' }, 'Original'),
             grid.appendChild(cardEl);
         });
         panel.appendChild(grid);
-        var cleanCb = E('input', { type: 'checkbox', style: 'flex-shrink:0; margin:0;', click: function() { self.dnsClean = cleanCb.checked; } });
+        var cleanCb = E('input', { type: 'checkbox', click: function() { self.dnsClean = cleanCb.checked; } });
         cleanCb.checked = !!this.dnsClean;
-        panel.appendChild(E('label', { style: 'display:flex; align-items:center; gap:.6rem; margin:.8rem 0 .4rem;' }, [cleanCb, E('span', {}, _('Очистить /etc/dnsmasq.conf перед применением'))]));
+        panel.appendChild(E('label', { style: 'display:flex; align-items:center; gap:.25rem; margin:.8rem 0 .4rem;' }, [cleanCb, E('span', {}, _('Очистить /etc/dnsmasq.conf перед применением'))]));
         panel.appendChild(E('div', { style: 'margin-top:.8rem;' }, [
             E('button', { 'class': 'btn cbi-button-positive', click: function() { self.applySimpleDns(); } }, _('Применить'))
         ]));
@@ -1562,7 +1550,7 @@ E('option', { value: 'original' }, 'Original'),
         var details = cardEl.querySelectorAll('.mihomo-overview-card-detail');
         if (head) head.style.display = 'none';
         for (var di = 0; di < details.length; di++) details[di].style.display = 'none';
-        var field = function(label, input) { return E('div', { style: 'margin:.35rem 0;' }, [E('label', { style: 'display:block; opacity:.8; margin-bottom:.15rem;' }, label), input]); };
+        var field = function(label, input) { return E('div', { style: 'margin:.35rem 0; text-align:center;' }, [E('label', { style: 'display:block; opacity:.8; margin-bottom:.15rem;' }, label), input]); };
         var nameInput = E('input', { type: 'text', value: name, style: 'width:100%; box-sizing:border-box;' });
         var valueInput = E('input', { type: 'text', value: value || '', style: 'width:100%; box-sizing:border-box;' });
         var edit = E('div', { class: 'mihomo-config-card-edit', style: 'margin-top:.8rem;' }, [
@@ -2133,7 +2121,8 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
              fs.list(RULE_DIR).catch(function() { return []; }),
               fs.exec('/bin/sh', ['-c', 'service magitrickle status 2>&1; pidof magitrickled 2>/dev/null; true']).catch(function() { return { code: 1 }; }),
              fs.exec('/bin/sh', ['-c', 'if command -v timeout >/dev/null 2>&1; then timeout 5 magitrickled --version 2>&1; else magitrickled --version 2>&1; fi']).catch(function() { return { stdout: '' }; }),
-             fs.read('/etc/mixomo/versions/magitrickle').catch(function() { return ''; })
+             fs.read('/etc/mixomo/versions/magitrickle').catch(function() { return ''; }),
+             fs.read('/etc/mixomo/templates/magitrickle-template.active').catch(function() { return ''; })
 		]);
 	},
 	
@@ -2149,8 +2138,13 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
          var magitrickleStored = magitrickleState.replace(/^[^\n]*\n/, '').trim();
          var magitrickleMatch = magitrickleOutput.match(/version[= ]+v?([0-9]+\.[0-9]+\.[0-9]+[0-9A-Za-z.\-]*)/i);
         var magitrickleStoredMatch = magitrickleStored.match(/v?[0-9]+\.[0-9]+\.[0-9]+[0-9A-Za-z.\-]*/);
-        var magitrickleVersion = magitrickleStoredMatch ? magitrickleStoredMatch[0] : (magitrickleMatch ? 'v' + magitrickleMatch[1] : '');
-        var isRunning = !!(serviceInfo.mihomo && serviceInfo.mihomo.instances.main.running);
+         var magitrickleVersion = magitrickleStoredMatch ? magitrickleStoredMatch[0] : (magitrickleMatch ? 'v' + magitrickleMatch[1] : '');
+          var magitrickleMarker = String(data[6] || '').trim();
+          this.magitrickleTemplate = magitrickleMarker === 'from-mixomo' ? 'from-mixomo' : 'own';
+          try { localStorage.setItem('magitrickle_template', this.magitrickleTemplate); } catch (e) {}
+
+         var isRunning = !!(serviceInfo.mihomo && serviceInfo.mihomo.instances.main.running);
+
         this.isRunning = isRunning;
         this.magitrickleRunning = isMagiRunningOutput(magitrickleStatus);
          this.magitrickleVersion = magitrickleVersion ? (magitrickleVersion.indexOf('v') === 0 ? magitrickleVersion : 'v' + magitrickleVersion) : _('Неизвестно');
@@ -2158,10 +2152,12 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
         
           var latestVersionEl = E('span', { 'id': 'mihomo-latest-version', 'style': 'margin-left: 4px; font-size: 0.9em; opacity: 0.7; display: none;' }, '');
           this.latestVersionEl = latestVersionEl;
-          try { this.dashboardPanel = localStorage.getItem('mihomo_dashboard_panel') || ''; } catch (e) { this.dashboardPanel = ''; }
-          if (this.dashboardPanel !== 'zashboard' && this.dashboardPanel !== 'metacubex') this.dashboardPanel = '';
+           this.dashboardPanel = detectMihomoDashboard(mainConfigContent);
+           try { localStorage.setItem('mihomo_dashboard_panel', this.dashboardPanel); } catch (e) {}
+
+
          try { this.mihomoChannel = localStorage.getItem('mihomo_channel') === 'alpha' ? 'alpha' : 'release'; } catch (e) { this.mihomoChannel = 'release'; }
-         var mihomoChannelSelect = E('select', { class: 'cbi-input-select', style: 'width:6rem; height:28px;', change: function(ev) {
+         var mihomoChannelSelect = E('select', { class: 'cbi-input-select', style: 'width:7.4rem;', change: function(ev) {
              ev.stopPropagation();
              var previousChannel = self.mihomoChannel;
              var nextChannel = ev.target.value;
@@ -2179,11 +2175,12 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
          ]);
          mihomoChannelSelect.value = this.mihomoChannel;
           this.mihomoChannelSelect = mihomoChannelSelect;
-          var mihomoDashboardSelect = E('select', { class: 'cbi-input-select', style: 'width:6rem; height:28px;', change: function(ev) {
+          var mihomoDashboardSelect = E('select', { class: 'cbi-input-select', style: 'width:7.4rem;', change: function(ev) {
               ev.stopPropagation();
               var next = ev.target.value;
               self.dashboardPanel = (next === 'zashboard' || next === 'metacubex') ? next : '';
               try { localStorage.setItem('mihomo_dashboard_panel', self.dashboardPanel); } catch (e) {}
+              callDashboardSet(self.dashboardPanel).catch(function() {});
               if (editor && (currentFile === MAIN_CONFIG || currentFile.indexOf('/etc/mihomo/profiles/') === 0)) {
                   editor.setValue(applyMihomoDefaults(editor.getValue(), self.dashboardPanel), -1);
                   self.handleSaveAndApply(self.isRunning);
@@ -2203,7 +2200,7 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
           this.mixomoVersion = null;
           this.mixomoAvailableSha = null;
           try { this.mixomoChannel = localStorage.getItem('mixomo_channel') === 'test' ? 'test' : 'stable'; } catch (e) { this.mixomoChannel = 'stable'; }
-          var mixomoChannelSelect = E('select', { class: 'cbi-input-select', style: 'width:6rem; height:28px;', change: function(ev) {
+          var mixomoChannelSelect = E('select', { class: 'cbi-input-select', style: 'width:7.4rem;', change: function(ev) {
               ev.stopPropagation();
               var previousChannel = self.mixomoChannel;
               var nextChannel = ev.target.value;
@@ -2220,7 +2217,7 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
           ]);
           mixomoChannelSelect.value = this.mixomoChannel;
           this.mixomoChannelSelect = mixomoChannelSelect;
-           var mixomoLanguageSelect = E('select', { class: 'cbi-input-select', style: 'width:6rem; height:28px;', change: function(ev) {
+           var mixomoLanguageSelect = E('select', { class: 'cbi-input-select', style: 'width:7.4rem;', change: function(ev) {
                ev.stopPropagation();
                try { localStorage.setItem('mixomo_language', ev.target.value); } catch (e) {}
                window.location.reload();
@@ -2295,7 +2292,8 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
         `;
 
          var style = E('style', {}, cssVariables + `
-             .btn, .cbi-button { height: 28px !important; min-height: 28px !important; display: inline-flex !important; align-items: center; justify-content: center; vertical-align: middle; }
+              .btn, .cbi-button { height: 28px !important; min-height: 28px !important; max-height: 28px !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; vertical-align: middle; padding-top: 0 !important; padding-bottom: 0 !important; line-height: 1 !important; font-size: 13px !important; box-sizing: border-box !important; overflow: visible !important; white-space: nowrap !important; }
+              .cbi-input-select { height: 28px !important; min-height: 28px !important; max-height: 28px !important; padding-top: 0 !important; padding-bottom: 0 !important; line-height: 1 !important; font-size: 13px !important; box-sizing: border-box !important; vertical-align: middle; }
 
              #output-text {
                 font-size: 0.8rem !important;
@@ -2359,10 +2357,9 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
             .mihomo-dns-panel input[type=text] { background: var(--bg-input); color: var(--text-main); border: 1px solid var(--border-color); padding: .4em; }
              .mihomo-route-add { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
              .mihomo-route-add input:not([type=checkbox]), .mihomo-route-add select, .mihomo-files-panel input:not([type=checkbox]), .mihomo-files-panel select, .mihomo-dns-panel input:not([type=checkbox]), .mihomo-dns-panel select { width: 26rem; max-width: 100%; box-sizing: border-box; }
-             .mihomo-route-add input[type=checkbox], .mihomo-files-panel input[type=checkbox], .mihomo-dns-panel input[type=checkbox] { width: auto; }
              .mihomo-day-box { display: block; }
              .mihomo-day-box label { display: flex; align-items: center; gap: .6rem; margin: .35rem 0; }
-             .mihomo-day-box input, .mihomo-route-add label input, .mihomo-dns-panel label input { flex-shrink: 0; margin: 0; width: auto; }
+              .mihomo-day-box input, .mihomo-route-add label input, .mihomo-dns-panel label input { flex-shrink: 0; margin: 0; }
              .mihomo-route-add > span, .mihomo-files-panel div > span { opacity: .75; }
              .mihomo-files-panel .mihomo-interval-select { width: 4.5rem; min-width: 4.5rem; }
              .mihomo-files-panel input:not([type=checkbox]), .mihomo-files-panel select { background: var(--bg-input); color: var(--text-main); border: 1px solid var(--border-color); padding: .4em; }
@@ -2792,16 +2789,24 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
          return _('Обновление') + ' ' + this.hoursPrefixLabel(value).toLowerCase();
      },
 
-     mkIntervalEditor: function() {
-         var self = this;
-         var presets = [0, 1, 3, 6, 12, 24];
-        var opts = presets.map(function(h) {
-            return E('option', { value: String(h) }, h === 0 ? _('Без обновлений') : self.hoursPrefixLabel(h));
-        });
-        opts.push(E('option', { value: 'custom' }, _('Свой интервал в часах')));
-        var sel = E('select', { style: 'min-width:8rem;' }, opts);
-        var input = E('input', { type: 'number', min: '1', max: '8760', style: 'width:4.5rem; display:none;' });
-        sel.value = '0';
+     restartHoursLabel: function(value) {
+         var label = this.hoursPrefixLabel(value);
+         return _('Перезапуск') + ' ' + label.charAt(0).toLowerCase() + label.slice(1);
+     },
+
+     mkIntervalEditor: function(current) {
+          var self = this;
+          var presets = [0, 1, 3, 6, 12, 24];
+          current = current == null ? '0' : String(current);
+         var opts = presets.map(function(h) {
+             return E('option', { value: String(h) }, h === 0 ? _('Без обновлений') : self.hoursPrefixLabel(h));
+         });
+         var isCustom = current !== '0' && presets.indexOf(parseInt(current, 10)) === -1;
+         if (isCustom) opts.push(E('option', { value: current }, self.hoursPrefixLabel(current)));
+         opts.push(E('option', { value: 'custom' }, _('Свой интервал в часах')));
+         var sel = E('select', { style: 'min-width:8rem;' }, opts);
+         var input = E('input', { type: 'number', min: '1', max: '8760', style: 'width:4.5rem; display:none;' });
+         sel.value = current;
         sel.addEventListener('change', function() {
             input.style.display = sel.value === 'custom' ? 'inline-block' : 'none';
             if (sel.value === 'custom' && !input.value) input.value = '12';
@@ -2959,19 +2964,25 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
                  return callProfilesList();
              }).then(function(res) {
                  if (!res || res.ok !== true) return;
-                 self.profilesData = res;
-                 if (self.activeView === 'configs' && self.activeSub === 'list' && self.activeThird === 'list') self.updateConfigCardStates(res.active || '');
+                  self.profilesData = res;
+                  self.syncScheduleDefaultSelect(res.active || res.activeProfile || '');
+                  if (self.activeView === 'configs' && self.activeSub === 'list' && self.activeThird === 'list') self.updateConfigCardStates(res.active || '');
                  if (self.activeView === 'overview' && !self.magitrickleBusy && !self.mixomoBusy) self.refreshOverview();
              });
          }, 60000);
      },
 
-     refreshProfiles: function() {
-         var self = this;
-         return callProfilesList().then(function(res) {
+      syncScheduleDefaultSelect: function(active) {
+          if (this.scheduleDefaultSelect && active) this.scheduleDefaultSelect.value = active;
+      },
+
+      refreshProfiles: function() {
+          var self = this;
+          return callProfilesList().then(function(res) {
             if (!res || res.ok !== true) { self.showRoutingError(res || { ok: false, error: _('Не удалось получить профили') }); return; }
-            self.profilesData = res;
-            var cOrder = res.configsOrder || [];
+             self.profilesData = res;
+             self.syncScheduleDefaultSelect(res.active || res.activeProfile || '');
+             var cOrder = res.configsOrder || [];
             if (cOrder.length) {
                 self.configsOrderArr = cOrder.slice();
             } else if (!self.configsOrderArr || !self.configsOrderArr.length) {
@@ -2992,25 +3003,26 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
         var self = this;
         var sections = ['proxies', 'proxy-groups', 'proxy-providers', 'rule-providers', 'rules'];
         var inStyle = 'width:100%; max-width:26rem;';
-         container.appendChild(E('div', { style: 'margin:.5rem 0 1rem;' }, [
-             E('button', { class: 'btn cbi-button-neutral', click: function() { self.switchSub('list'); } }, '← ' + _('Все конфигурации'))
-         ]));
 
-         container.appendChild(E('button', { class: 'mihomo-config-section-title btn cbi-button-neutral' }, _('Локально')));
-         var lName = E('input', { type: 'text', style: inStyle });
-        container.appendChild(E('div', { style: 'margin:.3rem 0;' }, [E('span', {}, _('Название'))]));
-        container.appendChild(E('div', { style: 'margin:.3rem 0;' }, [lName]));
-         var lCopy = E('input', { type: 'checkbox' });
-         container.appendChild(E('div', { style: 'margin:.5rem 0 .2rem;' }, [E('span', {}, _('Необязательно'))]));
-          
-         var copyRow = E('div', { style: 'margin:.3rem 0;' }, [E('label', { style: 'display:flex; align-items:center; gap:.6rem;' }, [lCopy, E('span', {}, _('Скопировать активную конфигурацию'))])]);
-        container.appendChild(copyRow);
-        var lPick = this.mkFilePicker('.yaml,.yml,.txt');
-        
-        var uploadOptional = E('div', { style: 'margin:.5rem 0 .2rem;' }, [E('span', {}, _('Необязательно'))]);
-         container.appendChild(uploadOptional);
-         var uploadRow = E('div', { style: 'margin:.3rem 0;' }, [lPick.btn]);
-        container.appendChild(uploadRow);
+          var sharedProfileName = E('input', { type: 'text', style: inStyle });
+          var localPanel = E('div', { style: 'display:none;' });
+          var localTab = E('button', { type: 'button', class: 'btn cbi-button-neutral' }, _('Локально'));
+
+          var lName = sharedProfileName;
+          var lCopy = E('input', { type: 'checkbox' });
+          localPanel.appendChild(E('div', { style: 'margin:.5rem 0 .2rem;' }, [E('span', {}, _('Опционально'))]));
+           
+          var copyRow = E('div', { style: 'margin:.3rem 0;' }, [E('label', { style: 'display:flex; align-items:center; gap:.25rem;' }, [lCopy, E('span', {}, _('Скопировать активную конфигурацию'))])]);
+         localPanel.appendChild(copyRow);
+         var lPick = this.mkFilePicker('.yaml,.yml,.txt');
+         
+         var uploadOptional = E('div', { style: 'margin:.5rem 0 .2rem;' }, [E('span', {}, _('Опционально'))]);
+          localPanel.appendChild(uploadOptional);
+          var uploadRow = E('div', { style: 'margin:.3rem 0;' }, [lPick.btn]);
+         localPanel.appendChild(uploadRow);
+          var localCreateRow = E('div', { style: 'margin:.5rem 0;' });
+          localPanel.appendChild(localCreateRow);
+
          lCopy.addEventListener('change', function() {
              uploadRow.style.display = lCopy.checked ? 'none' : 'block';
              uploadOptional.style.display = lCopy.checked ? 'none' : 'block';
@@ -3022,8 +3034,7 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
                  uploadOptional.style.display = 'none';
             }
         });
-        container.appendChild(E('div', { style: 'margin:.5rem 0;' }, [
-            E('button', { 'class': 'btn cbi-button-positive', click: function() {
+        localCreateRow.appendChild(E('button', { 'class': 'btn cbi-button-positive', click: function() {
                 var nm = lName.value.trim();
                 var file = lPick.input.files && lPick.input.files[0];
                 if (file) {
@@ -3048,72 +3059,137 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
                         if (self.showRoutingError(res)) { ui.addNotification(null, E('p', _('Конфигурация создана. Для просмотра нажмите «Все конфигурации».')), 'info'); self.refreshProfiles(); }
                     }).catch(function(err) { ui.hideModal(); self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
                 }
-              }}, _('Создать'))
-          ]));
- 
-           container.appendChild(E('button', { class: 'mihomo-config-section-title btn cbi-button-neutral' }, _('Онлайн')));
-         var oName = E('input', { type: 'text', style: inStyle });
-         container.appendChild(E('div', { style: 'margin:.3rem 0;' }, [E('span', {}, _('Название'))]));
-         container.appendChild(E('div', { style: 'margin:.3rem 0;' }, [oName]));
-         var oUrl = E('input', { type: 'text', placeholder: '', style: inStyle });
-         container.appendChild(E('div', { style: 'margin:.3rem 0;' }, [E('span', {}, _('Ссылка'))]));
-         container.appendChild(E('div', { style: 'margin:.3rem 0;' }, [oUrl]));
-         var oInterval = this.mkIntervalEditor();
-         container.appendChild(E('div', { style: 'margin:.3rem 0;' }, [E('span', {}, _('Обновление'))]));
-        container.appendChild(E('div', { style: 'margin:.3rem 0;' }, [oInterval.element]));
-        container.appendChild(E('p', { style: 'opacity:.8; margin:.5rem 0 .3rem;' }, _('Сохранить следующие блоки:')));
-        var secCbs = {};
-        sections.forEach(function(s) {
-            var cb = E('input', { type: 'checkbox', 'checked': true });
-            secCbs[s] = cb;
-            container.appendChild(E('div', { style: 'margin:.2rem 0;' }, [E('label', { style: 'display:flex; align-items:center; gap:.6rem;' }, [cb, E('span', {}, s)])]));
-        });
-         container.appendChild(E('div', { style: 'margin:.5rem 0;' }, [
-             E('button', { 'class': 'btn cbi-button-positive', click: function() {
-                  var nm = oName.value.trim();
-                  if (!nm) { ui.addNotification(null, E('p', _('Введите название')), 'error'); return; }
-                  if (nm === 'config') { ui.addNotification(null, E('p', _('Имя config зарезервировано Mihomo')), 'error'); return; }
-                  var url = oUrl.value.trim();
-                  if (!url) { ui.addNotification(null, E('p', _('Укажите ссылку')), 'error'); return; }
-                  var interval = oInterval.value();
-                  if (interval === null) return;
-                  var sel = sections.filter(function(s) { return secCbs[s].checked; });
-                 if (!sel.length) { ui.addNotification(null, E('p', _('Выберите хотя бы одну секцию')), 'error'); return; }
-                 ui.showModal(null, [E('p', { 'class': 'spinning' }, _('Импорт...'))]);
-                 callProfilesImport(nm, url, '', sel.join(','), interval).then(function(res) {
-                     ui.hideModal();
-                     if (self.showRoutingError(res)) { ui.addNotification(null, E('p', _('Конфигурация создана. Для просмотра нажмите «Все конфигурации».')), 'info'); self.refreshProfiles(); }
-                 }).catch(function(err) { ui.hideModal(); self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
-             }}, _('Импортировать'))
-         ]));
-         var configNodes = [];
-         while (container.firstChild) configNodes.push(container.removeChild(container.firstChild));
-          var configSections = [];
-          var configTitles = [];
-          var configSection = null;
-          configNodes.forEach(function(node) {
-              if (node.classList && node.classList.contains('mihomo-config-section-title')) {
-                 configSection = E('div', { style: 'margin-top:1rem;' });
-                 configSections.push(configSection);
-                 configTitles.push(node.textContent);
-             } else if (configSection) {
-                 configSection.appendChild(node);
-             }
-         });
-         var configButtons = E('ul', { class: 'cbi-tabmenu mihomo-settings-row mihomo-sub-row', style: 'margin:.5rem 0 1rem;' });
-          configTitles.forEach(function(title, idx) {
-              configButtons.appendChild(makeLuciTab(_(title), idx === 0, function() {
-                  var isOpen = configSections[idx].style.display !== 'none';
-                  configSections.forEach(function(section) { section.style.display = 'none'; });
-                  Array.prototype.forEach.call(configButtons.children, function(tab) { tab.classList.add('cbi-tab-disabled'); });
-                  if (!isOpen) {
-                      configSections[idx].style.display = 'block';
-                      configButtons.children[idx].classList.remove('cbi-tab-disabled');
-                  }
-              }));
-          });
-         container.appendChild(configButtons);
-         configSections.forEach(function(section, idx) { section.style.display = idx === 0 ? 'block' : 'none'; container.appendChild(section); });
+              }}, _('Создать')));
+
+           var onlineTabs = E('div', { class: 'mihomo-seg', style: 'margin:.5rem 0 1rem;' });
+
+            var subscriptionPanel = E('div');
+            var configPanel = E('div', { style: 'display:none;' });
+
+            var activateTypeTab = function(active) {
+                var tabs = { subscription: subscriptionTab, config: configTab, local: localTab };
+                var panels = { subscription: subscriptionPanel, config: configPanel, local: localPanel };
+                Object.keys(tabs).forEach(function(key) {
+                    var tab = tabs[key];
+                    var panel = panels[key];
+                    var isActive = key === active;
+                    panel.style.display = isActive ? 'block' : 'none';
+                    tab.classList.toggle('cbi-button-positive', isActive);
+                    tab.classList.toggle('cbi-button-neutral', !isActive);
+                });
+            };
+            var subscriptionTab = E('button', { type: 'button', class: 'btn cbi-button-positive', click: function() { activateTypeTab('subscription'); } }, _('Ссылка на подписку'));
+            var configTab = E('button', { type: 'button', class: 'btn cbi-button-neutral', click: function() { activateTypeTab('config'); } }, _('Ссылка на конфигурацию'));
+            localTab.addEventListener('click', function() { activateTypeTab('local'); });
+
+            onlineTabs.appendChild(subscriptionTab); onlineTabs.appendChild(configTab); onlineTabs.appendChild(localTab);
+
+
+           var subscriptionRows = E('div');
+           var subscriptionEditors = [];
+           var subscriptionDefaults = { mihomo_version: '', hwid: 'Router', device_os: 'OpenWrt', openwrt_version: '', router_model: '' };
+
+           var subscriptionName = sharedProfileName;
+           var nextSubscriptionId = function() {
+               var n = 1;
+               var used = subscriptionEditors.map(function(editor) { return editor.id.value; });
+               var inputs = subscriptionRows.querySelectorAll('input');
+               for (var ii = 0; ii < inputs.length; ii++) {
+                   if (inputs[ii].value && inputs[ii].value.indexOf('sub-') === 0 && used.indexOf(inputs[ii].value) === -1) used.push(inputs[ii].value);
+               }
+               while (used.indexOf('sub-' + n) >= 0) n++;
+               return 'sub-' + n;
+           };
+           var renderSubscriptionRow = function(item) {
+               var row = E('div', { style: 'padding:0; margin:.6rem 0;' });
+                var isExisting = !!item.id;
+                var id = E('input', { type: 'text', value: item.id || nextSubscriptionId(), style: inStyle });
+                id.style.display = 'none';
+                var url = E('input', { type: 'text', value: item.url || '', style: inStyle });
+                var interval = self.mkIntervalEditor();
+                var intervalSelect = interval.element.querySelector('select');
+                var profileInterval = String(item.interval || '0');
+                if (profileInterval !== '0' && ['1', '3', '6', '12', '24'].indexOf(profileInterval) === -1) intervalSelect.appendChild(E('option', { value: profileInterval }, self.hoursLabel(profileInterval)));
+                intervalSelect.value = profileInterval;
+                var manual = E('input', { type: 'checkbox' });
+                manual.checked = isExisting && (item.manual === true || item.manual === '1' || item.manual === 1);
+
+                var headerLabels = { mihomo_version: 'User-Agent', hwid: 'x-hwid', device_os: 'x-device-os', openwrt_version: 'x-ver-os', router_model: 'x-device-model' };
+                var fields = ['mihomo_version', 'hwid', 'device_os', 'openwrt_version', 'router_model'].map(function(key) { return { key: key, input: E('input', { type: 'text', value: item[key] || '', style: inStyle }) }; });
+                var manualFields = E('div', { style: 'display:' + (manual.checked ? 'block' : 'none') + '; margin-top:.5rem;' });
+                fields.forEach(function(field) { manualFields.appendChild(E('div', { style: 'display:flex; flex-direction:column; align-items:flex-start; gap:.25rem; margin:.35rem 0;' }, [E('span', {}, headerLabels[field.key]), field.input])); });
+                manual.addEventListener('change', function() { manualFields.style.display = manual.checked ? 'block' : 'none'; });
+                var fieldBlock = function(label, input) { return E('div', { style: 'display:flex; flex-direction:column; align-items:flex-start; gap:.25rem; margin:.35rem 0;' }, [E('span', {}, label), input]); };
+               var body = [fieldBlock(_('Ссылка'), url), E('label', { style: 'display:flex; gap:.25rem; align-items:center; margin:.4rem 0;' }, [manual, E('span', {}, _('Заполнить header самостоятельно'))]), manualFields, fieldBlock(_('Интервал обновления конфигурации'), interval.element)];
+               var removeLink = E('button', { class: 'btn cbi-button-neutral', style: 'margin-top:.5rem;', click: function() {
+                   if (isExisting) {
+                       if (!confirm(_('Удалить %s?').format(id.value))) return;
+                       callSubscriptionDelete(id.value).then(function(res) { if (self.showRoutingError(res)) loadSubscriptions(); }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
+                       return;
+                   }
+                   var idx = subscriptionEditors.findIndex(function(editor) { return editor.id === id; });
+                   if (idx >= 0) subscriptionEditors.splice(idx, 1);
+                   row.remove();
+               } }, _('Удалить ссылку'));
+               body.push(E('div', { style: 'margin:.5rem 0 .2rem;' }, [E('span', {}, _('Опционально'))]));
+               body.push(E('div', { style: 'margin:.2rem 0 .5rem;' }, [removeLink]));
+
+               subscriptionEditors.push({ id: id, url: url, interval: interval, manual: manual, fields: fields, existing: isExisting });
+               row.appendChild(E('div', {}, body)); return row;
+
+
+           };
+            var addSubscriptionButton = E('button', { class: 'btn cbi-button-neutral', click: function() { subscriptionRows.appendChild(renderSubscriptionRow({ manual: false })); } }, _('Добавить ссылку'));
+            var loadSubscriptions = function() { return callSubscriptionsList().then(function(res) { if (!res || res.ok !== true) return; subscriptionDefaults = res.defaults || subscriptionDefaults; subscriptionEditors = []; L.dom.content(subscriptionRows, []); var providers = res.providers || []; if (providers.length) providers.forEach(function(item) { subscriptionRows.appendChild(renderSubscriptionRow(item)); }); else subscriptionRows.appendChild(renderSubscriptionRow({ manual: false, mihomo_version: subscriptionDefaults.mihomo_version, hwid: subscriptionDefaults.hwid, device_os: subscriptionDefaults.device_os, openwrt_version: subscriptionDefaults.openwrt_version, router_model: subscriptionDefaults.router_model, })); }); };
+
+             var subscriptionHeader = E('div', { style: 'display:flex; flex-direction:column; align-items:flex-start; gap:.4rem; margin:.4rem 0;' }, [E('span', {}, _('Название')), subscriptionName]);
+
+            container.appendChild(subscriptionHeader);
+          container.appendChild(onlineTabs);
+          container.appendChild(subscriptionPanel);
+          container.appendChild(configPanel);
+          container.appendChild(localPanel);
+             subscriptionPanel.appendChild(subscriptionRows);
+             subscriptionPanel.appendChild(E('div', { style: 'margin:.5rem 0;' }, [addSubscriptionButton]));
+            var saveSubscriptions = function() {
+               return subscriptionEditors.reduce(function(chain, editor) {
+                    return chain.then(function() {
+                        var args = [editor.id.value.trim(), editor.url.value.trim(), '24', editor.manual.checked];
+                       var selected = editor.interval.value();
+                       if (selected === null) throw new Error(_('Некорректный интервал'));
+                       args[2] = selected;
+
+
+                       editor.fields.forEach(function(field) { args.push(field.input.value); });
+                       if (!editor.existing) {
+                           var duplicate = subscriptionEditors.some(function(other) { return other !== editor && other.id.value.trim() === editor.id.value.trim(); });
+                           if (duplicate) throw new Error(_('Provider уже существует') + ': ' + editor.id.value.trim());
+                       }
+                       var saveCall = editor.existing ? callSubscriptionUpdate : callSubscriptionAdd;
+                       return saveCall.apply(null, args).then(function(res) {
+                           if (!res || !res.ok) throw new Error((res && res.error) || _('Не удалось сохранить provider') + ': ' + editor.id.value.trim());
+                           editor.existing = true;
+                       }).catch(function(err) { throw new Error((err && err.message) || _('Не удалось сохранить provider') + ': ' + editor.id.value.trim()); });
+                   });
+               }, Promise.resolve());
+           };
+           subscriptionPanel.appendChild(E('button', { class: 'btn cbi-button-positive', click: function() { var name = subscriptionName.value.trim(); if (!name) { ui.addNotification(null, E('p', _('Введите название')), 'error'); return; } ui.showModal(null, [E('p', { class: 'spinning' }, _('Создание...'))]); saveSubscriptions().then(function() { return callSubscriptionGenerate(name); }).then(function(res) { ui.hideModal(); if (self.showProfileError(res)) { ui.addNotification(null, E('p', _('Конфигурация создана.')), 'info'); self.refreshProfiles(); } else loadSubscriptions(); }).catch(function(err) { ui.hideModal(); self.showProfileError({ ok: false, error: err.message || _('Не удалось создать конфигурацию') }); }); } }, _('Создать')));
+
+          loadSubscriptions();
+           var oName = subscriptionName;
+
+           var oUrl = E('input', { type: 'text', style: inStyle });
+           configPanel.appendChild(E('div', { style: 'display:flex; flex-direction:column; align-items:flex-start; gap:.25rem; margin:.35rem 0;' }, [E('span', {}, _('Ссылка')), oUrl]));
+           var oInterval = this.mkIntervalEditor();
+           var secCbs = {};
+
+           configPanel.appendChild(E('div', { style: 'margin:.5rem 0 .2rem;' }, [E('span', {}, _('Опционально'))]));
+           sections.forEach(function(s) { var cb = E('input', { type: 'checkbox', checked: true }); secCbs[s] = cb; configPanel.appendChild(E('div', { style: 'margin:.2rem 0;' }, [E('label', { style: 'display:flex; align-items:center; gap:.25rem;' }, [cb, E('span', {}, s)])])); });
+
+           configPanel.appendChild(E('div', { style: 'display:flex; flex-direction:column; align-items:flex-start; gap:.25rem; margin:.35rem 0;' }, [E('span', {}, _('Интервал обновления конфигурации')), oInterval.element]));
+           configPanel.appendChild(E('button', { class: 'btn cbi-button-positive', click: function() { var nm = oName.value.trim(), url = oUrl.value.trim(), interval = oInterval.value(); if (!nm || !url || interval === null) { ui.addNotification(null, E('p', _('Заполните поля')), 'error'); return; } var sel = sections.filter(function(s) { return secCbs[s].checked; }); if (!sel.length) return; callProfilesImport(nm, url, '', sel.join(','), interval).then(function(res) { if (self.showRoutingError(res)) { ui.addNotification(null, E('p', _('Конфигурация создана.')), 'info'); self.refreshProfiles(); } }); } }, _('Импортировать')));
+
+
      },
 
      toggleConfigEditor: function(path) {
@@ -3127,22 +3203,169 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
          if (ed && ed.scrollIntoView) ed.scrollIntoView({ block: 'start' });
      },
 
-     openConfigCardEdit: function(cardEl, profile, path) {
-         var self = this;
-         var actions = cardEl.querySelector('.mihomo-overview-card-actions');
-         if (!actions || cardEl.querySelector('.mihomo-config-card-edit')) return;
-         actions.style.display = 'none';
+      openConfigCardEdit: function(cardEl, profile, path) {
+          var self = this;
+          var actions = cardEl.querySelector('.mihomo-overview-card-actions');
+          if (!actions || cardEl.querySelector('.mihomo-config-card-edit')) return;
+          actions.style.display = 'none';
+          var head = cardEl.querySelector('.mihomo-overview-card-head');
+          var detailBox = cardEl.querySelector('.mihomo-overview-card-detail');
+          if (head) head.style.display = 'none';
+          if (detailBox) detailBox.style.display = 'none';
+          var restore = function(edit) { edit.remove(); actions.style.display = 'flex'; if (head) head.style.display = ''; if (detailBox) detailBox.style.display = ''; };
+          var field = function(label, input) { return E('div', { style: 'margin:.35rem 0; text-align:center;' }, [E('label', { style: 'display:block; opacity:.8; margin-bottom:.15rem;' }, label), input]); };
+          if (profile.source === 'subscription') {
+              var name = E('input', { type: 'text', value: profile.name + '.yaml', style: 'width:100%; box-sizing:border-box;' });
+              var rows = E('div');
+              var editors = [];
+              var removedIds = [];
+              var online = true;
+              var localBtn;
+              var onlineBtn;
+              var onlinePanel;
+              var localStatus;
+              var setMode = function(isOnline) {
+                  online = isOnline;
+                  localBtn.classList.toggle('cbi-tab-disabled', online);
+                  onlineBtn.classList.toggle('cbi-tab-disabled', !online);
+                  onlinePanel.style.display = online ? 'block' : 'none';
+                  localStatus.style.display = online ? 'none' : 'block';
+              };
+              var nextId = function() {
+                  var n = 1;
+                  var used = editors.map(function(editor) { return editor.id.value; });
+                  var inputs = rows.querySelectorAll('input');
+                  for (var ii = 0; ii < inputs.length; ii++) {
+                      if (inputs[ii].value && inputs[ii].value.indexOf('sub-') === 0 && used.indexOf(inputs[ii].value) === -1) used.push(inputs[ii].value);
+                  }
+                  while (used.indexOf('sub-' + n) >= 0) n++;
+                  return 'sub-' + n;
+              };
+              var renderRow = function(item) {
+                  var existing = !!item.id;
+                  var row = E('div', { style: 'padding:0; margin:.6rem 0;' });
+                  var id = E('input', { type: 'text', value: item.id || nextId(), style: 'display:none;' });
+                  var url = E('input', { type: 'text', value: item.url || '', style: 'width:100%; box-sizing:border-box;', placeholder: _('Укажите ссылку') });
+                  var interval = self.mkIntervalEditor();
+                  var select = interval.element.querySelector('select');
+                  var value = String(item.interval || '24');
+                  if (value !== '0' && ['1', '3', '6', '12', '24'].indexOf(value) === -1) select.appendChild(E('option', { value: value }, self.hoursLabel(value)));
+                  select.value = value;
+                  var manual = E('input', { type: 'checkbox' });
+                  manual.checked = item.manual === true || item.manual === '1' || item.manual === 1;
+                  var labels = { mihomo_version: 'User-Agent', hwid: 'x-hwid', device_os: 'x-device-os', openwrt_version: 'x-ver-os', router_model: 'x-device-model' };
+                  var fields = ['mihomo_version', 'hwid', 'device_os', 'openwrt_version', 'router_model'].map(function(key) { return { key: key, input: E('input', { type: 'text', value: item[key] || '', style: 'width:100%; box-sizing:border-box;' }) }; });
+                  var manualFields = E('div', { style: 'display:' + (manual.checked ? 'block' : 'none') + '; margin-top:.5rem;' });
+                  fields.forEach(function(itemField) { manualFields.appendChild(field(labels[itemField.key], itemField.input)); });
+                  manual.addEventListener('change', function() { manualFields.style.display = manual.checked ? 'block' : 'none'; });
+                   var remove = E('button', { class: 'btn cbi-button-neutral', click: function() {
+                       if (!confirm(_('Удалить %s?').format(id.value))) return;
+                       if (existing && removedIds.indexOf(id.value) === -1) removedIds.push(id.value);
+                       for (var ri = editors.length - 1; ri >= 0; ri--) {
+                           if (editors[ri].id === id) editors.splice(ri, 1);
+                       }
+                       try {
+                           if (row.parentNode) row.parentNode.removeChild(row);
+                           else if (row.remove) row.remove();
+                       } catch (e) {}
+                   } }, _('Удалить ссылку'));
+                  editors.push({ id: id, url: url, interval: interval, manual: manual, fields: fields, existing: existing });
+                  row.appendChild(E('div', {}, [field(_('Ссылка'), url), E('label', { style: 'display:flex; gap:.25rem; align-items:center; margin:.4rem 0;' }, [manual, E('span', {}, _('Заполнить header самостоятельно'))]), manualFields, field(_('Интервал обновления конфигурации'), interval.element), E('div', { style: 'margin:.5rem 0 .2rem;' }, [E('span', {}, _('Опционально'))]), remove]));
+                  return row;
+              };
+               var load = function() { return callSubscriptionsList().then(function(res) { if (!res || res.ok !== true) { self.showRoutingError(res || { ok: false, error: _('Не удалось получить providers') }); return; } editors = []; removedIds = []; L.dom.content(rows, []); (res.providers || []).forEach(function(item) { rows.appendChild(renderRow(item)); }); if (!res.providers || !res.providers.length) rows.appendChild(renderRow({ interval: '24' })); }); };
+              localBtn = makeLuciTab(_('Локально'), false, function() { setMode(false); });
+              onlineBtn = makeLuciTab(_('Онлайн'), true, function() { setMode(true); });
+              var typeRow = E('ul', { class: 'cbi-tabmenu mihomo-settings-row mihomo-sub-row', style: 'margin:.4rem 0;' }, [localBtn, onlineBtn]);
+              onlinePanel = E('div', {}, [rows, E('button', { class: 'btn cbi-button-neutral', click: function() { rows.appendChild(renderRow({ interval: '24' })); } }, _('Добавить ссылку'))]);
+              localStatus = E('div', { style: 'margin:.5rem 0; opacity:.8; display:none;' }, _('Без обновлений'));
+               var save = function(newName) {
+                   if (!online) throw new Error(_('Выберите онлайн-конфигурацию'));
+                   var deleted = removedIds.slice();
+                   return removedIds.reduce(function(chain, id) {
+                       return chain.then(function() {
+                           return callSubscriptionDelete(id).then(function(res) {
+                               if (!res || !res.ok) throw new Error((res && res.error) || _('Не удалось удалить provider') + ': ' + id);
+                           });
+                       });
+                   }, Promise.resolve()).then(function() {
+                       removedIds = [];
+                       if (!deleted.length) return null;
+                       return callSubscriptionsList().then(function(res) {
+                           if (!res || !res.ok) throw new Error((res && res.error) || _('Не удалось получить providers'));
+                           var remaining = (res.providers || []).map(function(p) { return p.id; });
+                           var stuck = deleted.filter(function(id) { return remaining.indexOf(id) >= 0; });
+                           if (stuck.length) throw new Error(_('Не удалось удалить provider') + ': ' + stuck[0]);
+                       });
+                   }).then(function() {
+                       return editors.reduce(function(chain, editor) {
+                           return chain.then(function() {
+                               var args = [editor.id.value.trim(), editor.url.value.trim(), editor.interval.value(), editor.manual.checked];
+                           if (args[2] === null) throw new Error(_('Некорректный интервал'));
+                           editor.fields.forEach(function(itemField) { args.push(itemField.input.value); });
+                           if (!args[0] || !args[1]) throw new Error(_('Заполните ссылку'));
+                           var saveCall = editor.existing ? callSubscriptionUpdate : callSubscriptionAdd;
+                           return saveCall.apply(null, args).then(function(res) {
+                               if (!res || !res.ok) throw new Error((res && res.error) || _('Не удалось сохранить provider') + ': ' + args[0]);
+                               editor.existing = true;
+                           });
+                       });
+                   }, Promise.resolve()).then(function() {
+                       return callSubscriptionReplace(profile.name, newName).then(function(res) {
+                           if (!res || !res.ok) throw new Error((res && res.error) || _('Не удалось сохранить конфигурацию'));
+                       });
+                   }).then(function() {
+                       return callSubscriptionsList().then(function(res) {
+                           if (!res || !res.ok) throw new Error((res && res.error) || _('Не удалось получить providers'));
+                           var remaining = (res.providers || []).map(function(p) { return p.id; });
+                           var missing = editors.filter(function(editor) {
+                               return remaining.indexOf(editor.id.value.trim()) === -1;
+                           });
+                           if (missing.length) throw new Error(_('Provider не найден на роутере') + ': ' + missing[0].id.value.trim());
+                       });
+                   });
+                   });
+               };
+              var edit = E('div', { class: 'mihomo-config-card-edit', style: 'margin-top:.8rem;' }, [E('div', { style: 'margin:.35rem 0; opacity:.8;' }, _('Тип конфигурации')), typeRow, field(_('Название'), name), onlinePanel, localStatus, E('div', { style: 'display:flex; gap:.5rem; margin-top:.6rem;' }, [E('button', { class: 'btn cbi-button-positive mihomo-overview-card-action', click: function() {
+                  var newName = name.value.trim().replace(/\.ya?ml$/i, '');
+                  if (!newName || newName === 'config') { ui.addNotification(null, E('p', newName === 'config' ? _('Имя config зарезервировано Mihomo') : _('Введите название')), 'error'); return; }
+                  ui.showModal(null, [E('p', { class: 'spinning' }, _('Сохранение...'))]);
+                   save(newName).then(function() {
+                       if (newName !== profile.name) {
+                          var order = (self.configsOrderArr || []).slice();
+                          var index = order.indexOf(profile.name);
+                          if (index === -1) order.push(newName); else order[index] = newName;
+                          self.configsOrderArr = order;
+                          return self.persistOrder('configs', order);
+                      }
+                      return null;
+                  }).then(function() { return self.refreshProfiles(); }).then(function() { return load(); }).then(function() {
+                      var profPath = '/etc/mihomo/profiles/' + newName + '.yaml';
+                      var oldPath = '/etc/mihomo/profiles/' + profile.name + '.yaml';
+                      if (currentFile === oldPath && newName !== profile.name) {
+                          self.handleSelectFile(profPath);
+                          return null;
+                      }
+                      if (currentFile === profPath) {
+                          return fs.read(profPath).then(function(content) {
+                              if (editor && content != null) editor.setValue(content, -1);
+                          }).catch(function() {});
+                      }
+                      return null;
+                  }).then(function() { ui.hideModal(); ui.addNotification(null, E('p', _('Конфигурация сохранена.')), 'info'); }).catch(function(err) { ui.hideModal(); self.showRoutingError({ ok: false, error: (err && err.message) || _('Не удалось сохранить конфигурацию') }); });
+              } }, _('Сохранить')), E('button', { class: 'btn cbi-button-neutral mihomo-overview-card-action', click: function() { restore(edit); } }, _('Закрыть'))])]);
+              cardEl.insertBefore(edit, actions);
+              load();
+              setMode(true);
+              return;
+          }
           var name = E('input', { type: 'text', value: profile.name + '.yaml', style: 'width:100%; box-sizing:border-box;' });
-         var url = E('input', { type: 'text', value: profile.url || '', style: 'width:100%; box-sizing:border-box;', placeholder: _('Укажите ссылку') });
+          var url = E('input', { type: 'text', value: profile.url || '', style: 'width:100%; box-sizing:border-box;', placeholder: _('Укажите ссылку') });
           var interval = this.mkIntervalEditor();
           var intervalSelect = interval.element.querySelector('select');
           var profileInterval = String(profile.interval || '0');
           if (profileInterval !== '0' && ['1', '3', '6', '12', '24'].indexOf(profileInterval) === -1) intervalSelect.appendChild(E('option', { value: profileInterval }, self.hoursLabel(profileInterval)));
           intervalSelect.value = profileInterval;
-          var head = cardEl.querySelector('.mihomo-overview-card-head');
-          var detailBox = cardEl.querySelector('.mihomo-overview-card-detail');
-          if (head) head.style.display = 'none';
-          if (detailBox) detailBox.style.display = 'none';
           var localBtn;
           var onlineBtn;
           var online = !!profile.url;
@@ -3160,47 +3383,30 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
           localBtn = makeLuciTab(_('Локально'), !online, function() { setMode(false); });
           onlineBtn = makeLuciTab(_('Онлайн'), online, function() { setMode(true); url.focus(); });
           var typeRow = E('ul', { class: 'cbi-tabmenu mihomo-settings-row mihomo-sub-row', style: 'margin:.4rem 0;' }, [localBtn, onlineBtn]);
-          var field = function(label, input) { return E('div', { style: 'margin:.35rem 0;' }, [E('label', { style: 'display:block; opacity:.8; margin-bottom:.15rem;' }, label), input]); };
           urlField = field(_('Ссылка'), url);
           intervalField = field(_('Обновление'), interval.element);
           localStatus = E('div', { style: 'margin:.5rem 0; opacity:.8;' }, _('Без обновлений'));
-          var edit = E('div', { class: 'mihomo-config-card-edit', style: 'margin-top:.8rem;' }, [
-              E('div', { style: 'margin:.35rem 0; opacity:.8;' }, _('Тип конфигурации')),
-              typeRow,
-              field(_('Название'), name),
-              urlField,
-              intervalField,
-              localStatus,
-              E('div', { style: 'display:flex; gap:.5rem; margin-top:.6rem;' }, [
-                  E('button', { class: 'btn cbi-button-positive mihomo-overview-card-action', click: function() {
-                      var newName = name.value.trim().replace(/\.ya?ml$/i, '');
-                      if (!newName || newName === 'config') { ui.addNotification(null, E('p', newName === 'config' ? _('Имя config зарезервировано Mihomo') : _('Введите название')), 'error'); return; }
-                      var iv = online ? interval.value() : '0';
-                      if (iv === null) return;
-                      var rename = newName !== profile.name ? callProfilesRename(profile.name, newName) : Promise.resolve({ ok: true });
-                      rename.then(function(res) {
-                          if (!self.showRoutingError(res)) return;
-                          return callSetUrl('config', newName, online ? url.value.trim() : '', iv);
-                       }).then(function(res) {
-                           if (!res || !self.showRoutingError(res)) return;
-                           if (newName !== profile.name) {
-                               var order = (self.configsOrderArr || []).slice();
-                               var index = order.indexOf(profile.name);
-                               if (index === -1) order.push(newName);
-                               else order[index] = newName;
-                               self.configsOrderArr = order;
-                               self.persistOrder('configs', order);
-                           } else {
-                               self.refreshProfiles();
-                           }
-                       }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
-                  }}, _('Сохранить')),
-                  E('button', { class: 'btn cbi-button-neutral mihomo-overview-card-action', click: function() { edit.remove(); actions.style.display = 'flex'; if (head) head.style.display = ''; if (detailBox) detailBox.style.display = ''; } }, _('Закрыть'))
-              ])
-          ]);
+          var edit = E('div', { class: 'mihomo-config-card-edit', style: 'margin-top:.8rem;' }, [E('div', { style: 'margin:.35rem 0; opacity:.8;' }, _('Тип конфигурации')), typeRow, field(_('Название'), name), urlField, intervalField, localStatus, E('div', { style: 'display:flex; gap:.5rem; margin-top:.6rem;' }, [E('button', { class: 'btn cbi-button-positive mihomo-overview-card-action', click: function() {
+              var newName = name.value.trim().replace(/\.ya?ml$/i, '');
+              if (!newName || newName === 'config') { ui.addNotification(null, E('p', newName === 'config' ? _('Имя config зарезервировано Mihomo') : _('Введите название')), 'error'); return; }
+              var iv = online ? interval.value() : '0';
+              if (iv === null) return;
+              var rename = newName !== profile.name ? callProfilesRename(profile.name, newName) : Promise.resolve({ ok: true });
+              rename.then(function(res) { if (!self.showRoutingError(res)) return; return callSetUrl('config', newName, online ? url.value.trim() : '', iv); }).then(function(res) { if (!res || !self.showRoutingError(res)) return; if (newName !== profile.name) { var order = (self.configsOrderArr || []).slice(); var index = order.indexOf(profile.name); if (index === -1) order.push(newName); else order[index] = newName; self.configsOrderArr = order; self.persistOrder('configs', order); } else self.refreshProfiles(); }).then(function() {
+                  var profPath = '/etc/mihomo/profiles/' + newName + '.yaml';
+                  var oldPath = '/etc/mihomo/profiles/' + profile.name + '.yaml';
+                  if (currentFile === oldPath && newName !== profile.name) { self.handleSelectFile(profPath); return null; }
+                  if (currentFile === profPath) {
+                      return fs.read(profPath).then(function(content) {
+                          if (editor && content != null) editor.setValue(content, -1);
+                      }).catch(function() {});
+                  }
+                  return null;
+              }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
+          } }, _('Сохранить')), E('button', { class: 'btn cbi-button-neutral mihomo-overview-card-action', click: function() { restore(edit); } }, _('Закрыть'))])]);
           cardEl.insertBefore(edit, actions);
           setMode(online);
-     },
+      },
 
      renderConfigsList: function(container) {
         L.dom.content(container, []);
@@ -3217,15 +3423,23 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
             });
         }
         var grid = E('div', { class: 'mihomo-overview-cards' });
-         var mkCard = function(id, title, detail, isOk, actions) {
-             var detailEl = detail && detail.classList && detail.classList.contains('mihomo-overview-card-detail') ? detail : E('div', { class: 'mihomo-overview-card-detail' }, detail);
-             var cardEl = E('div', { class: 'mihomo-overview-card ' + (isOk ? 'is-ok' : 'is-muted'), draggable: true }, [
-                 E('div', { class: 'mihomo-overview-card-head' }, [
-                     E('div', { class: 'mihomo-overview-card-title' }, title)
-                 ]),
-                 detailEl,
-                 E('div', { class: 'mihomo-overview-card-actions' }, actions)
-             ]);
+          var mkCard = function(id, title, detail, isOk, actions) {
+              var detailEl = detail && detail.classList && detail.classList.contains('mihomo-overview-card-detail') ? detail : E('div', { class: 'mihomo-overview-card-detail' }, detail);
+              var headActions = [];
+              var bodyActions = [];
+              (actions || []).forEach(function(btn) {
+                  if (btn && btn.textContent === _('Удалить')) headActions.push(btn);
+                  else bodyActions.push(btn);
+              });
+              var cardEl = E('div', { class: 'mihomo-overview-card ' + (isOk ? 'is-ok' : 'is-muted'), draggable: true }, [
+                  E('div', { class: 'mihomo-overview-card-head' }, [
+                      E('div', { class: 'mihomo-overview-card-title' }, title),
+                      E('div', { style: 'margin-left:auto; display:flex; gap:.4rem;' }, headActions)
+                  ]),
+                  detailEl,
+                  E('div', { class: 'mihomo-overview-card-actions' }, bodyActions)
+              ]);
+
              if (id) {
                  cardEl.setAttribute('data-config-name', id);
                  cardEl.addEventListener('dragstart', function(ev) {
@@ -3257,10 +3471,11 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
 
         profiles.forEach(function(p, idx) {
              var isActive = (p.name === active);
-             var label = p.name === 'default' ? 'Default (default.yaml)' : p.name + '.yaml';
+             var label = p.name === 'default' ? 'Default' : p.name;
              var profPath = '/etc/mihomo/profiles/' + p.name + '.yaml';
-             var detail = E('div', { class: 'mihomo-overview-card-detail' }, [E('div', {}, p.url || _('Локальная конфигурация'))]);
-             detail.appendChild(E('div', {}, p.url ? (p.interval && p.interval !== '0' ? self.updateHoursLabel(p.interval) : _('Без обновлений')) : _('Без обновлений')));
+             var isSubscription = p.source === 'subscription';
+             var detail = E('div', { class: 'mihomo-overview-card-detail' }, [E('div', {}, isSubscription ? _('Конфигурация из подписок') : (p.url || _('Локальная конфигурация')))]);
+             detail.appendChild(E('div', {}, isSubscription ? _('Обновление через proxy-providers') : (p.url ? (p.interval && p.interval !== '0' ? self.updateHoursLabel(p.interval) : _('Без обновлений')) : _('Без обновлений'))));
              var actions = [
                  E('button', { 'class': 'btn cbi-button-neutral mihomo-overview-card-action', click: function(ev) { var card = ev.currentTarget; while (card && !card.classList.contains('mihomo-overview-card')) card = card.parentNode; if (card) self.openConfigCardEdit(card, p, profPath); } }, _('Изменить данные')),
                  E('button', { 'class': 'btn cbi-button-neutral mihomo-overview-card-action', click: function() { self.toggleConfigEditor(profPath); } }, _('Открыть в редакторе'))
@@ -3288,17 +3503,29 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
         var notifyRulesCreated = function() { ui.addNotification(null, E('p', _('Список правил создан. Для просмотра нажмите «Все списки».')), 'info'); };
         var inStyle = 'width:100%; max-width:26rem;';
 
-        container.appendChild(E('h4', _('Локально')));
-        var lName = E('input', { type: 'text', style: inStyle });
-        container.appendChild(E('div', { style: 'margin:.3rem 0;' }, [E('span', {}, _('Название'))]));
-        container.appendChild(E('div', { style: 'margin:.3rem 0;' }, [lName]));
-        var lExt = E('select', { style: 'width:auto; min-width:8rem;' }, [E('option', { value: '.yaml' }, '.yaml'), E('option', { value: '.txt' }, '.txt')]);
-        container.appendChild(E('div', { style: 'margin:.3rem 0;' }, [E('span', {}, _('Формат списка'))]));
-        container.appendChild(E('div', { style: 'margin:.3rem 0;' }, [lExt]));
-        var lPick = this.mkFilePicker('.yaml,.yml,.txt');
-        
-        container.appendChild(E('div', { style: 'margin:.3rem 0;' }, [lPick.btn]));
-        container.appendChild(E('div', { style: 'margin:.5rem 0;' }, [
+         var rulesName = E('input', { type: 'text', style: inStyle });
+         var rulesTabs = E('div', { class: 'mihomo-seg', style: 'margin:.5rem 0 1rem;' });
+         var rulesLocalPanel = E('div');
+         var rulesOnlinePanel = E('div', { style: 'display:none;' });
+          var rulesLocalTab = E('button', { type: 'button', class: 'btn cbi-button-neutral', click: function() { rulesLocalPanel.style.display = 'block'; rulesOnlinePanel.style.display = 'none'; rulesLocalTab.classList.add('cbi-button-positive'); rulesLocalTab.classList.remove('cbi-button-neutral'); rulesOnlineTab.classList.remove('cbi-button-positive'); rulesOnlineTab.classList.add('cbi-button-neutral'); } }, _('Локально'));
+          var rulesOnlineTab = E('button', { type: 'button', class: 'btn cbi-button-positive', click: function() { rulesLocalPanel.style.display = 'none'; rulesOnlinePanel.style.display = 'block'; rulesOnlineTab.classList.add('cbi-button-positive'); rulesOnlineTab.classList.remove('cbi-button-neutral'); rulesLocalTab.classList.remove('cbi-button-positive'); rulesLocalTab.classList.add('cbi-button-neutral'); } }, _('Онлайн'));
+          rulesTabs.appendChild(rulesOnlineTab); rulesTabs.appendChild(rulesLocalTab);
+          rulesLocalPanel.style.display = 'none'; rulesOnlinePanel.style.display = 'block';
+
+         container.appendChild(E('div', { style: 'display:flex; flex-direction:column; align-items:flex-start; gap:.25rem; margin:.35rem 0;' }, [E('span', {}, _('Название')), rulesName]));
+         container.appendChild(rulesTabs);
+         container.appendChild(rulesOnlinePanel);
+         container.appendChild(rulesLocalPanel);
+          var lName = rulesName;
+         var lExt = E('select', { style: 'width:auto; min-width:8rem;' }, [E('option', { value: '.yaml' }, '.yaml'), E('option', { value: '.txt' }, '.txt')]);
+         rulesLocalPanel.appendChild(E('div', { style: 'display:flex; flex-direction:column; align-items:flex-start; gap:.25rem; margin:.35rem 0;' }, [E('span', {}, _('Формат списка')), lExt]));
+
+         var lPick = this.mkFilePicker('.yaml,.yml,.txt');
+         
+         rulesLocalPanel.appendChild(E('div', { style: 'margin:.5rem 0 .2rem;' }, [E('span', {}, _('Опционально'))]));
+         rulesLocalPanel.appendChild(E('div', { style: 'margin:.3rem 0;' }, [lPick.btn]));
+         rulesLocalPanel.appendChild(E('div', { style: 'margin:.5rem 0;' }, [
+
             E('button', { 'class': 'btn cbi-button-positive', click: function() {
                 var nm = lName.value.trim();
                 var file = lPick.input.files && lPick.input.files[0];
@@ -3334,22 +3561,17 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
             }}, _('Создать'))
         ]));
 
-        container.appendChild(E('h4', { style: 'margin-top:1rem;' }, _('Онлайн')));
-        var oName = E('input', { type: 'text', style: inStyle });
-        container.appendChild(E('div', { style: 'margin:.3rem 0;' }, [E('span', {}, _('Название'))]));
-        container.appendChild(E('div', { style: 'margin:.3rem 0;' }, [oName]));
-        var oExt = E('select', { style: 'width:auto; min-width:8rem;' }, [E('option', { value: '.yaml' }, '.yaml'), E('option', { value: '.txt' }, '.txt')]);
-        container.appendChild(E('div', { style: 'margin:.3rem 0;' }, [E('span', {}, _('Формат списка'))]));
-        container.appendChild(E('div', { style: 'margin:.3rem 0;' }, [oExt]));
-        var oUrl = E('input', { type: 'text', placeholder: '', style: inStyle });
-        container.appendChild(E('div', { style: 'margin:.3rem 0;' }, [E('span', {}, _('Ссылка'))]));
-        container.appendChild(E('div', { style: 'margin:.3rem 0;' }, [oUrl]));
-        var oInterval = this.mkIntervalEditor();
-        container.appendChild(E('div', { style: 'margin:.3rem 0;' }, [E('span', {}, _('Обновлять'))]));
-        container.appendChild(E('div', { style: 'margin:.3rem 0;' }, [oInterval.element]));
-         container.appendChild(E('div', { style: 'margin:.5rem 0;' }, [
-             E('button', { 'class': 'btn cbi-button-positive', click: function() {
-                 var nm = oName.value.trim();
+         var oName = rulesName;
+         var oExt = E('select', { style: 'width:auto; min-width:8rem;' }, [E('option', { value: '.yaml' }, '.yaml'), E('option', { value: '.txt' }, '.txt')]);
+         rulesOnlinePanel.appendChild(E('div', { style: 'display:flex; flex-direction:column; align-items:flex-start; gap:.25rem; margin:.35rem 0;' }, [E('span', {}, _('Формат списка')), oExt]));
+         var oUrl = E('input', { type: 'text', placeholder: '', style: inStyle });
+         rulesOnlinePanel.appendChild(E('div', { style: 'display:flex; flex-direction:column; align-items:flex-start; gap:.25rem; margin:.35rem 0;' }, [E('span', {}, _('Ссылка')), oUrl]));
+         var oInterval = this.mkIntervalEditor();
+         rulesOnlinePanel.appendChild(E('div', { style: 'display:flex; flex-direction:column; align-items:flex-start; gap:.25rem; margin:.35rem 0;' }, [E('span', {}, _('Интервал обновления конфигурации')), oInterval.element]));
+          rulesOnlinePanel.appendChild(E('div', { style: 'margin:.5rem 0;' }, [
+              E('button', { 'class': 'btn cbi-button-positive', click: function() {
+                  var nm = oName.value.trim();
+
                  if (!nm) { ui.addNotification(null, E('p', _('Введите название')), 'error'); return; }
                  var url = oUrl.value.trim();
                  if (!url) { ui.addNotification(null, E('p', _('Укажите ссылку')), 'error'); return; }
@@ -3360,37 +3582,11 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
                      ui.hideModal();
                      if (self.showRoutingError(res)) { notifyRulesCreated(); self.refreshProfiles(); }
                  }).catch(function(err) { ui.hideModal(); self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
-             }}, _('Импортировать'))
-         ]));
-         var ruleNodes = [];
-         while (container.firstChild) ruleNodes.push(container.removeChild(container.firstChild));
-         var ruleSections = [];
-         var ruleTitles = [];
-         var currentSection = null;
-         ruleNodes.forEach(function(node) {
-             if (node.tagName === 'H4') {
-                 currentSection = E('div', { style: 'margin-top:1rem;' });
-                 ruleSections.push(currentSection);
-                 ruleTitles.push(node.textContent);
-             } else if (currentSection) {
-                 currentSection.appendChild(node);
-             }
-         });
-         var ruleButtons = E('ul', { class: 'cbi-tabmenu mihomo-settings-row mihomo-sub-row', style: 'margin:.5rem 0 1rem;' });
-          ruleTitles.forEach(function(title, idx) {
-              ruleButtons.appendChild(makeLuciTab(_(title), idx === 0, function() {
-                  var isOpen = ruleSections[idx].style.display !== 'none';
-                  ruleSections.forEach(function(section) { section.style.display = 'none'; });
-                  Array.prototype.forEach.call(ruleButtons.children, function(tab) { tab.classList.add('cbi-tab-disabled'); });
-                  if (!isOpen) {
-                      ruleSections[idx].style.display = 'block';
-                      ruleButtons.children[idx].classList.remove('cbi-tab-disabled');
-                  }
-              }));
-          });
-         container.appendChild(ruleButtons);
-         ruleSections.forEach(function(section, idx) { section.style.display = idx === 0 ? 'block' : 'none'; container.appendChild(section); });
-     },
+              }}, _('Создать'))
+          ]));
+
+      },
+
 
       openRuleCardEdit: function(cardEl, file, meta, fullPath) {
           var self = this;
@@ -3428,7 +3624,7 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
           };
           localBtn = makeLuciTab(_('Локально'), !online, function() { setMode(false); });
           onlineBtn = makeLuciTab(_('Онлайн'), online, function() { setMode(true); url.focus(); });
-          var field = function(label, input) { return E('div', { style: 'margin:.35rem 0;' }, [E('label', { style: 'display:block; opacity:.8; margin-bottom:.15rem;' }, label), input]); };
+          var field = function(label, input) { return E('div', { style: 'margin:.35rem 0; text-align:center;' }, [E('label', { style: 'display:block; opacity:.8; margin-bottom:.15rem;' }, label), input]); };
           urlField = field(_('Ссылка'), url);
           intervalField = field(_('Обновление'), interval.element);
           localStatus = E('div', { style: 'margin:.5rem 0; opacity:.8;' }, _('Без обновлений'));
@@ -3650,14 +3846,22 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
         if (this.editPanel) this.editPanel.style.display = 'none';
     },
 
-    applyProfile: function(name) {
-        var self = this;
-        ui.showModal(null, [E('p', { 'class': 'spinning' }, _('Применение...'))]);
-        callProfilesApply(name).then(function(res) {
-            ui.hideModal();
-            if (self.showRoutingError(res)) self.refreshProfiles();
-        }).catch(function(err) { ui.hideModal(); self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
-    },
+    applyProfile: function(name, select) {
+         var self = this;
+         var previous = self.profilesData && (self.profilesData.active || self.profilesData.activeProfile || '');
+         if (select) select.disabled = true;
+         ui.showModal(null, [E('p', { 'class': 'spinning' }, _('Применение...'))]);
+         callProfilesApply(name, self.dashboardPanel || '').then(function(res) {
+             ui.hideModal();
+             if (self.showRoutingError(res)) self.refreshProfiles();
+             else if (select) select.value = previous;
+         }).catch(function(err) {
+             ui.hideModal();
+             if (select) select.value = previous;
+             self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') });
+         }).finally(function() { if (select) select.disabled = false; });
+     },
+
 
     refreshSource: function(type, name) {
         var self = this;
@@ -3709,15 +3913,15 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
         var selectAll = !initial || initial === 'all';
         var dayChecks = [];
         var dayValues = [];
-        var allDays = E('input', { type: 'checkbox', style: 'flex-shrink:0; margin:0;' });
+        var allDays = E('input', { type: 'checkbox' });
         var dayBox = E('div', { class: 'mihomo-day-box', style: 'display:block;' });
-        dayBox.appendChild(E('label', { style: 'display:flex; align-items:center; gap:.6rem; margin:.35rem 0;' }, [allDays, E('span', {}, _('Все дни'))]));
+        dayBox.appendChild(E('label', { style: 'display:flex; align-items:center; gap:.25rem; margin:.35rem 0;' }, [allDays, E('span', {}, _('Все дни'))]));
         dayOrder.forEach(function(day) {
-            var check = E('input', { type: 'checkbox', style: 'flex-shrink:0; margin:0;' });
+            var check = E('input', { type: 'checkbox' });
             check.checked = selectAll || !!selected[String(day)];
             dayChecks.push(check);
             dayValues.push(day);
-            dayBox.appendChild(E('label', { style: 'display:flex; align-items:center; gap:.6rem; margin:.35rem 0;' }, [check, E('span', {}, _(dayNames[day]))]));
+            dayBox.appendChild(E('label', { style: 'display:flex; align-items:center; gap:.25rem; margin:.35rem 0;' }, [check, E('span', {}, _(dayNames[day]))]));
             check.addEventListener('change', function() { allDays.checked = false; });
         });
         allDays.checked = selectAll;
@@ -3765,24 +3969,32 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
            var timeDetail = function(item) { return (item.start || '—') + ' — ' + (item.end || '—') + ', ' + plural(dayCount(item.days), _('день'), _('дня'), _('дней')); };
            var linksDetail = function(item) { return plural(linkCount(item.urls), _('ссылка'), _('ссылки'), _('ссылок')) + ', ' + (item.mode === 'direct' ? _('Напрямую') : _('Через Mihomo')); };
           var addCard = function(type, name, enabled, configuration, scheduleType, detail) {
+              var cardTitle = scheduleType;
+              var cardDetail = detail;
+              if (type === 'restart') {
+                  cardTitle = detail;
+                  cardDetail = '';
+              }
               var toggleLabel = enabled ? _('Отключить') : _('Включить');
+              var rpcType = type === 'restart' ? 'time' : type;
               var actions = [E('button', { class: 'btn cbi-button-neutral mihomo-overview-card-action', click: function(ev) { var card = ev.currentTarget; while (card && !card.classList.contains('mihomo-overview-card')) card = card.parentNode; if (card) self.openScheduleCardEdit(card, type, name); } }, _('Изменить данные')),
                   E('button', { class: 'btn cbi-button-neutral mihomo-overview-card-action', click: function() {
                       var target = !enabled;
-                      var calls = type === 'combined' ? [callScheduleSetEnabled('time', name, target), callScheduleSetEnabled('trigger', name, target)] : [callScheduleSetEnabled(type, name, target)];
+                      var calls = type === 'combined' ? [callScheduleSetEnabled('time', name, target), callScheduleSetEnabled('trigger', name, target)] : [callScheduleSetEnabled(rpcType, name, target)];
                       Promise.all(calls).then(function(res) { var ok = true; res.forEach(function(r) { if (!r || r.ok !== true) ok = false; }); if (!ok) self.showRoutingError(res[0] || { ok: false }); else self.refreshSchedule(); }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
                   } }, toggleLabel),
                   E('button', { class: 'btn cbi-button-reset mihomo-overview-card-action', click: function() {
                       if (!confirm(_('Удалить %s?').format(name))) return;
-                      var calls = type === 'combined' ? [callScheduleDelete('time', name), callScheduleDelete('trigger', name)] : [callScheduleDelete(type, name)];
+                      var calls = type === 'combined' ? [callScheduleDelete('time', name), callScheduleDelete('trigger', name)] : [callScheduleDelete(rpcType, name)];
                       Promise.all(calls).then(function(res) { var ok = true; res.forEach(function(r) { if (!r || r.ok !== true) ok = false; }); if (!ok) self.showRoutingError(res[0] || { ok: false }); else self.refreshSchedule(); }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
                   } }, _('Удалить'))];
               grid.appendChild(E('div', { class: 'mihomo-overview-card ' + (enabled ? 'is-ok' : 'is-muted') }, [
                   E('div', { class: 'mihomo-overview-card-head' }, E('div', { class: 'mihomo-overview-card-title' }, name)),
                   E('div', { class: 'mihomo-overview-card-detail' }, _('Конфигурация') + ' ' + (configuration || '—')),
-                  E('div', { class: 'mihomo-overview-card-detail' }, scheduleType + ': ' + detail),
+                  E('div', { class: 'mihomo-overview-card-detail' }, type === 'restart' ? cardTitle : (cardTitle + ': ' + cardDetail)),
                   E('div', { class: 'mihomo-overview-card-actions' }, actions)
               ]));
+
           };
           var times = data.time || [];
           var triggers = data.trigger || [];
@@ -3793,18 +4005,57 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
           var names = [];
           times.forEach(function(item) { if (names.indexOf(item.name) === -1) names.push(item.name); });
           triggers.forEach(function(item) { if (names.indexOf(item.name) === -1) names.push(item.name); });
+          var isRestart = function(t) { return t && t.start === '00:00' && t.end === '00:00' && (t.days === 'all' || !t.days); };
           names.forEach(function(name) {
               var t = timeByName[name];
               var g = triggerByName[name];
               if (t && g) {
                   addCard('combined', name, !!(t.enabled || g.enabled), yamlName(t.profile || g.primary), _('По триггеру и времени'), timeDetail(t) + ', ' + linksDetail(g));
               } else if (t) {
-                  addCard('time', name, !!t.enabled, yamlName(t.profile), _('По времени'), timeDetail(t));
+                   if (isRestart(t)) addCard('restart', name, !!t.enabled, yamlName(t.profile), _('Перезапуск'), self.restartHoursLabel(t.interval || data.defaultInterval || '1'));
+
+                  else addCard('time', name, !!t.enabled, yamlName(t.profile), _('По времени'), timeDetail(t));
               } else {
                   addCard('trigger', name, !!g.enabled, yamlName(g.primary), _('По триггеру'), linksDetail(g));
               }
           });
           return grid;
+      },
+
+      renderScheduleTables: function(data) {
+          var self = this;
+          var wrap = E('div');
+          var yamlName = function(value) { return value ? value + (value.indexOf('.yaml') === -1 ? '.yaml' : '') : ''; };
+          var isRestart = function(t) { return t && t.start === '00:00' && t.end === '00:00' && (t.days === 'all' || !t.days); };
+          var mkTable = function(title, head, rows) {
+              var table = E('table', { class: 'table mihomo-routing-table', style: 'width:100%; margin-top:.4rem;' }, [E('thead', {}, E('tr', {}, head.map(function(h) { return E('th', {}, h); })))]);
+              var tb = E('tbody');
+              rows.forEach(function(cells) {
+                  var tr = E('tr', {});
+                  cells.forEach(function(cell) { tr.appendChild(E('td', {}, cell)); });
+                  tb.appendChild(tr);
+              });
+              table.appendChild(tb);
+              wrap.appendChild(E('h4', { style: 'margin-top:1rem;' }, title));
+              wrap.appendChild(table);
+          };
+          var times = data.time || [];
+          if (times.length) mkTable(_('По времени'), [_('Название'), _('Конфигурация'), _('Время'), _('Дни'), _('Статус'), _('Действие')], times.map(function(t) {
+              var enCb = E('input', { type: 'checkbox' });
+              enCb.checked = !!t.enabled;
+              enCb.addEventListener('click', function() { callScheduleSetEnabled('time', t.name, enCb.checked).then(function(res) { if (self.showRoutingError(res)) self.refreshSchedule(); }); });
+              var editBtn = E('button', { class: 'btn cbi-button-neutral', click: function() { self.editTimeSchedule(t); } }, _('Редактировать'));
+               return [t.name, yamlName(t.profile), isRestart(t) ? self.restartHoursLabel(t.interval || '1') : ((t.start || '—') + ' — ' + (t.end || '—')), t.days === 'all' ? _('Все дни') : t.days, enCb, editBtn];
+          }));
+          var triggers = data.trigger || [];
+          if (triggers.length) mkTable(_('По триггеру'), [_('Название'), _('Конфигурация'), _('Проверка'), _('Статус'), _('Действие')], triggers.map(function(t) {
+              var enCb = E('input', { type: 'checkbox' });
+              enCb.checked = !!t.enabled;
+              enCb.addEventListener('click', function() { callScheduleSetEnabled('trigger', t.name, enCb.checked).then(function(res) { if (self.showRoutingError(res)) self.refreshSchedule(); }); });
+              var editBtn = E('button', { class: 'btn cbi-button-neutral', click: function() { self.editTriggerSchedule(t); } }, _('Редактировать'));
+              return [t.name, yamlName(t.primary || t.fallback), t.urls, enCb, editBtn];
+          }));
+          return wrap;
       },
 
      renderSchedulePanel: function() {
@@ -3814,23 +4065,24 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
         while (panel.firstChild) panel.removeChild(panel.firstChild);
         var data = this.scheduleData || {};
 
-          var defaultValue = data.default || '';
+           var activeProfile = this.profilesData && (this.profilesData.active || this.profilesData.activeProfile || '');
+           var defaultValue = activeProfile || data.default || '';
 
 
-         var dayOrder = [1, 2, 3, 4, 5, 6, 0];
+           var dayOrder = [1, 2, 3, 4, 5, 6, 0];
          var dayNames = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
           var makeDayBox = function() {
               var dayChecks = [];
               var dayValues = [];
-              var allDays = E('input', { type: 'checkbox', style: 'flex-shrink:0; margin:0;' });
+              var allDays = E('input', { type: 'checkbox' });
               var dayBox = E('div', { class: 'mihomo-day-box', style: 'display:block;' });
-              dayBox.appendChild(E('label', { style: 'display:flex; align-items:center; gap:.6rem; margin:.35rem 0;' }, [allDays, E('span', {}, _('Все дни'))]));
+              dayBox.appendChild(E('label', { style: 'display:flex; align-items:center; gap:.25rem; margin:.35rem 0;' }, [allDays, E('span', {}, _('Все дни'))]));
               dayOrder.forEach(function(day) {
-                  var check = E('input', { type: 'checkbox', style: 'flex-shrink:0; margin:0;' });
+                  var check = E('input', { type: 'checkbox' });
                   check.checked = true;
                   dayChecks.push(check);
                   dayValues.push(day);
-                  dayBox.appendChild(E('label', { style: 'display:flex; align-items:center; gap:.6rem; margin:.35rem 0;' }, [check, E('span', {}, _(dayNames[day]))]));
+                  dayBox.appendChild(E('label', { style: 'display:flex; align-items:center; gap:.25rem; margin:.35rem 0;' }, [check, E('span', {}, _(dayNames[day]))]));
                   check.addEventListener('change', function() { allDays.checked = false; });
               });
              allDays.checked = true;
@@ -3845,17 +4097,71 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
              return { box: dayBox, getDays: getDays };
          };
 
-         panel.appendChild(E('h4', { style: 'margin-top:1rem;' }, _('По времени')));
-         var tName = E('input', { type: 'text', placeholder: '', style: 'min-width:8rem;' });
+           var schedName = E('input', { type: 'text', placeholder: '', style: 'min-width:12rem;' });
+           var restartDefSel = this.mkProfileSelect(defaultValue);
+           this.scheduleDefaultSelect = restartDefSel;
+           restartDefSel.addEventListener('change', function() {
+               callScheduleDefault(restartDefSel.value).then(function(res) { if (self.showRoutingError(res) && self.scheduleData) self.scheduleData.default = restartDefSel.value; }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
+           });
+           var restartName = E('input', { type: 'text', placeholder: '', style: 'min-width:12rem;' });
+           var restartInterval = this.mkIntervalEditor();
+           restartInterval.element.style.width = '100%';
+           restartInterval.element.style.maxWidth = '26rem';
+           restartInterval.element.querySelector('select').style.width = '100%';
+
+          var typeTabs = E('div', { class: 'mihomo-seg', style: 'margin:.5rem 0 1rem;' });
+          var schedPanels = {};
+          var schedButtons = {};
+          ['restart', 'time', 'trigger', 'combined'].forEach(function(key) {
+              var labels = { time: _('По времени'), trigger: _('По триггеру'), combined: _('По триггеру и времени'), restart: _('Перезапуск') };
+              var panel = E('div', { style: 'display:none;' });
+              var button = E('button', { type: 'button', class: 'btn cbi-button-neutral', click: function() {
+                  Object.keys(schedPanels).forEach(function(k) {
+                      schedPanels[k].style.display = k === key ? 'block' : 'none';
+                      schedButtons[k].classList.toggle('cbi-button-positive', k === key);
+                      schedButtons[k].classList.toggle('cbi-button-neutral', k !== key);
+                  });
+              } }, labels[key]);
+              schedPanels[key] = panel;
+              schedButtons[key] = button;
+              typeTabs.appendChild(button);
+          });
+          panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; flex-direction:column; align-items:flex-start; gap:.4rem; margin:.4rem 0;' }, [
+              E('span', {}, _('Постоянная конфигурация')), restartDefSel,
+               E('button', { 'class': 'btn cbi-button-neutral', click: function() {
+                   var selected = restartDefSel.value;
+                   callScheduleDefault(selected).then(function(res) { if (self.showRoutingError(res)) self.refreshSchedule(); }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
+               }}, _('Сохранить')),
+              E('span', {}, _('Название расписания')), schedName,
+              typeTabs
+          ]));
+          Object.keys(schedPanels).forEach(function(key) { panel.appendChild(schedPanels[key]); });
+          schedPanels.restart.style.display = 'block';
+          schedButtons.restart.classList.add('cbi-button-positive');
+          schedButtons.restart.classList.remove('cbi-button-neutral');
+          schedPanels.restart.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; flex-direction:column; align-items:flex-start; gap:.4rem; margin:.4rem 0;' }, [
+               E('span', {}, _('Интервал перезапуска Mihomo')), restartInterval.element,
+              E('button', { 'class': 'btn cbi-button-positive', click: function() {
+                  var nm = schedName.value.trim();
+                  if (!nm) { ui.addNotification(null, E('p', _('Введите название')), 'error'); return; }
+                  var interval = restartInterval.value();
+                  if (interval === null) return;
+                   callScheduleSave('time', nm, true, restartDefSel.value || '', '00:00', '00:00', 'all', '', '', '', interval).then(function(res) {
+                      if (!res || !res.ok) { self.showRoutingError(res || { ok: false }); return; }
+                      self.refreshSchedule();
+                  }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
+              }}, _('Сохранить'))
+          ]));
+          var tName = schedName;
+
          var tProf = this.mkProfileSelect('');
          var tStart = E('input', { type: 'time', style: 'min-width:7rem;' });
          var tEnd = E('input', { type: 'time', style: 'min-width:7rem;' });
          var tDays = makeDayBox();
          var dayBox = tDays.box;
           var getDays = tDays.getDays;
-          panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; flex-direction:column; align-items:flex-start; gap:.4rem; margin:.4rem 0;' }, [
-              E('span', {}, _('Название расписания')), tName,
-              E('span', {}, _('Профиль во время расписания')), tProf,
+          schedPanels.time.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; flex-direction:column; align-items:flex-start; gap:.4rem; margin:.4rem 0;' }, [
+              E('span', {}, _('Конфигурация во время расписания')), tProf,
               E('span', {}, _('Время начала')), tStart,
               E('span', {}, _('Время окончания')), tEnd,
               E('span', {}, _('Дни недели')), dayBox,
@@ -3863,7 +4169,8 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
                 var nm = tName.value.trim();
                 if (!nm) { ui.addNotification(null, E('p', _('Введите название')), 'error'); return; }
                 if (!tProf.value) { ui.addNotification(null, E('p', _('Выберите профиль')), 'error'); return; }
-                callScheduleSave('time', nm, true, tProf.value, tStart.value, tEnd.value, getDays()).then(function(res) { if (self.showRoutingError(res)) self.refreshSchedule(); }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
+                 callScheduleSave('time', nm, true, tProf.value, tStart.value, tEnd.value, getDays()).then(function(res) { if (self.showRoutingError(res)) { ui.addNotification(null, E('p', _('Расписание создано. Для просмотра нажмите «Все расписание».')), 'info'); self.refreshSchedule(); } }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
+
              }}, _('Сохранить'))
          ]));
 
@@ -3877,8 +4184,9 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
             if (ib === -1) ib = self.schedTimeOrderArr.length;
             return ia - ib;
         });
-        if (times.length) {
-            var t1 = E('table', { class: 'table mihomo-routing-table', style: 'width:100%; margin-top:.4rem;' }, [E('thead', {}, E('tr', {}, [E('th', { class: 'mihomo-grip' }, ''), E('th', {}, _('Название')), E('th', {}, _('Профиль')), E('th', {}, _('Время')), E('th', {}, _('Дни')), E('th', {}, _('Статус')), E('th', {}, _('Действие'))]))]);
+         if (times.length && this.activeThird === 'list') {
+             var t1 = E('table', { class: 'table mihomo-routing-table', style: 'width:100%; margin-top:.4rem;' }, [E('thead', {}, E('tr', {}, [E('th', { class: 'mihomo-grip' }, ''), E('th', {}, _('Название')), E('th', {}, _('Профиль')), E('th', {}, _('Время')), E('th', {}, _('Дни')), E('th', {}, _('Статус')), E('th', {}, _('Действие'))]))]);
+
             var tb = E('tbody');
             times.forEach(function(t, idx) {
                 var enCb = E('input', { type: 'checkbox', click: function() { callScheduleSetEnabled('time', t.name, enCb.checked).then(function(res) { if (self.showRoutingError(res)) self.refreshSchedule(); }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); }); } });
@@ -3888,7 +4196,8 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
                     firstTd,
                     E('td', {}, t.name),
                     E('td', {}, t.profile),
-                    E('td', {}, (t.start || '—') + ' — ' + (t.end || '—')),
+                     E('td', {}, t.start === '00:00' && t.end === '00:00' && (t.days === 'all' || !t.days) ? _('Перезапуск') + ' ' + self.hoursPrefixLabel(t.interval || data.defaultInterval || '1') : (t.start || '—') + ' — ' + (t.end || '—')),
+
                     E('td', {}, t.days === 'all' ? _('Все дни') : t.days),
                     E('td', {}, enCb),
                     E('td', {}, E('div', { class: 'mihomo-route-actions' }, [
@@ -3904,25 +4213,24 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
                 }));
                 tb.appendChild(tr);
             });
-            t1.appendChild(tb);
-            panel.appendChild(t1);
-        } else {
-            panel.appendChild(E('p', { style: 'opacity:.75;' }, _('Правил пока нет.')));
-        }
+             t1.appendChild(tb);
+             panel.appendChild(t1);
+         }
 
-        panel.appendChild(E('h4', { style: 'margin-top:1rem;' }, _('По триггеру')));
-          var gName = E('input', { type: 'text', placeholder: '', style: 'min-width:8rem;' });
+           var gName = schedName;
+
+
           var gUrls = E('input', { type: 'text', placeholder: '', style: 'min-width:14rem;' });
           var gInt = E('input', { type: 'number', min: '1', value: '3', placeholder: '3' });
            var gThr = E('input', { type: 'number', min: '1', value: '1', placeholder: '1' });
            var gMode = makeScheduleCheckMode('direct');
-         var gPrim = this.mkProfileSelect('');
-        var gFall = this.mkProfileSelect('');
-panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; flex-direction:column; align-items:flex-start; gap:.4rem; margin:.4rem 0;' }, [
-              E('span', {}, _('Название расписания')), gName,
+          var gPrim = this.mkProfileSelect('');
+         var gFall = this.mkProfileSelect('');
+schedPanels.trigger.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; flex-direction:column; align-items:flex-start; gap:.4rem; margin:.4rem 0;' }, [
               E('span', {}, _('Ссылки для проверки (можно указать несколько через пробел)')), gUrls,
-              E('span', {}, _('Активный профиль при успешной загрузке ссылок')), gPrim,
-              E('span', {}, _('Активный профиль при отсутствии загрузки ссылок')), gFall,
+
+              E('span', {}, _('Активная конфигурация при успешной загрузке ссылок')), gPrim,
+              E('span', {}, _('Активная конфигурация при отсутствии загрузки ссылок')), gFall,
               E('span', {}, _('Частота проверки в минутах')), gInt,
               E('span', {}, _('Частота проверки во время сбоев в минутах')), gThr,
               E('span', {}, _('Тип подключения')), gMode,
@@ -3930,7 +4238,8 @@ panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; fl
                 var nm = gName.value.trim();
                 if (!nm) { ui.addNotification(null, E('p', _('Введите название')), 'error'); return; }
                 if (!gUrls.value.trim()) { ui.addNotification(null, E('p', _('Укажите хотя бы один URL')), 'error'); return; }
-                callScheduleSave('trigger', nm, true, '', '', '', '', '', '', gUrls.value.trim(), gInt.value, gFall.value, gPrim.value, gThr.value, '', gMode.value).then(function(res) { if (self.showRoutingError(res)) { ui.addNotification(null, E('p', _('Расписание создано')), 'info'); self.refreshSchedule(); } }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
+                 callScheduleSave('trigger', nm, true, '', '', '', '', '', '', gUrls.value.trim(), gInt.value, gFall.value, gPrim.value, gThr.value, '', gMode.value).then(function(res) { if (self.showRoutingError(res)) { ui.addNotification(null, E('p', _('Расписание создано. Для просмотра нажмите «Все расписание».')), 'info'); self.refreshSchedule(); } }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
+
              }}, _('Сохранить'))
          ]));
 
@@ -3944,8 +4253,9 @@ panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; fl
             if (ib === -1) ib = self.schedTriggerOrderArr.length;
             return ia - ib;
         });
-        if (triggers.length) {
-            var t2 = E('table', { class: 'table mihomo-routing-table', style: 'width:100%; margin-top:.4rem;' }, [E('thead', {}, E('tr', {}, [E('th', { class: 'mihomo-grip' }, ''), E('th', {}, _('Название')), E('th', {}, _('Проверка')), E('th', {}, _('Интервал, мин')), E('th', {}, _('Фолбэк')), E('th', {}, _('Статус')), E('th', {}, _('Действие'))]))]);
+         if (triggers.length && this.activeThird === 'list') {
+             var t2 = E('table', { class: 'table mihomo-routing-table', style: 'width:100%; margin-top:.4rem;' }, [E('thead', {}, E('tr', {}, [E('th', { class: 'mihomo-grip' }, ''), E('th', {}, _('Название')), E('th', {}, _('Проверка')), E('th', {}, _('Интервал, мин')), E('th', {}, _('Фолбэк')), E('th', {}, _('Статус')), E('th', {}, _('Действие'))]))]);
+
             var tb2 = E('tbody');
             triggers.forEach(function(t, idx) {
                 var enCb = E('input', { type: 'checkbox', click: function() { callScheduleSetEnabled('trigger', t.name, enCb.checked).then(function(res) { if (self.showRoutingError(res)) self.refreshSchedule(); }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); }); } });
@@ -3971,28 +4281,28 @@ panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; fl
                 }));
                 tb2.appendChild(tr);
             });
-            t2.appendChild(tb2);
-            panel.appendChild(t2);
-         } else {
-             panel.appendChild(E('p', { style: 'opacity:.75;' }, _('Правил пока нет.')));
-         }
+             t2.appendChild(tb2);
+             panel.appendChild(t2);
+          }
 
-         panel.appendChild(E('h4', { style: 'margin-top:1rem;' }, _('По времени и триггеру')));
-         var cName = E('input', { type: 'text', placeholder: '', style: 'min-width:8rem;' });
-         var cUrls = E('input', { type: 'text', placeholder: '', style: 'min-width:14rem;' });
-         var cInt = E('input', { type: 'number', min: '1', value: '3', placeholder: '3' });
-          var cThr = E('input', { type: 'number', min: '1', value: '1', placeholder: '1' });
-          var cMode = makeScheduleCheckMode('direct');
-          var cPrim = this.mkProfileSelect('');
-         var cFall = this.mkProfileSelect('');
-         var cStart = E('input', { type: 'time', style: 'min-width:7rem;' });
-         var cEnd = E('input', { type: 'time', style: 'min-width:7rem;' });
-         var cDays = makeDayBox();
-         panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; flex-direction:column; align-items:flex-start; gap:.4rem; margin:.4rem 0;' }, [
-             E('span', {}, _('Название расписания')), cName,
-             E('span', {}, _('Ссылки для проверки (можно указать несколько через пробел)')), cUrls,
-             E('span', {}, _('Активный профиль при успешной загрузке ссылок')), cPrim,
-             E('span', {}, _('Активный профиль при отсутствии загрузки ссылок')), cFall,
+           var cName = schedName;
+
+
+          var cUrls = E('input', { type: 'text', placeholder: '', style: 'min-width:14rem;' });
+          var cInt = E('input', { type: 'number', min: '1', value: '3', placeholder: '3' });
+           var cThr = E('input', { type: 'number', min: '1', value: '1', placeholder: '1' });
+           var cMode = makeScheduleCheckMode('direct');
+           var cPrim = this.mkProfileSelect('');
+          var cFall = this.mkProfileSelect('');
+          var cStart = E('input', { type: 'time', style: 'min-width:7rem;' });
+          var cEnd = E('input', { type: 'time', style: 'min-width:7rem;' });
+          var cDays = makeDayBox();
+          schedPanels.combined.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; flex-direction:column; align-items:flex-start; gap:.4rem; margin:.4rem 0;' }, [
+              E('span', {}, _('Ссылки для проверки (можно указать несколько через пробел)')), cUrls,
+
+              E('span', {}, _('Активная конфигурация при успешной загрузке ссылок')), cPrim,
+              E('span', {}, _('Активная конфигурация при отсутствии загрузки ссылок')), cFall,
+
              E('span', {}, _('Частота проверки в минутах')), cInt,
               E('span', {}, _('Частота проверки во время сбоев в минутах')), cThr,
               E('span', {}, _('Тип подключения')), cMode,
@@ -4007,67 +4317,57 @@ panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; fl
                  var days = cDays.getDays();
                  callScheduleSave('trigger', nm, true, '', '', '', '', '', '', cUrls.value.trim(), cInt.value, cFall.value, cPrim.value, cThr.value, '', cMode.value).then(function(res) {
                      if (!res || res.ok !== true) { self.showRoutingError(res || { ok: false }); return; }
-                     callScheduleSave('time', nm, true, cPrim.value, cStart.value, cEnd.value, days).then(function(res2) { if (self.showRoutingError(res2)) { ui.addNotification(null, E('p', _('Расписание создано')), 'info'); self.refreshSchedule(); } }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
+                      callScheduleSave('time', nm, true, cPrim.value, cStart.value, cEnd.value, days).then(function(res2) { if (self.showRoutingError(res2)) { ui.addNotification(null, E('p', _('Расписание создано. Для просмотра нажмите «Все расписание».')), 'info'); self.refreshSchedule(); } }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
+
                  }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
              }}, _('Сохранить'))
          ]));
-         var scheduleNodes = [];
-         while (panel.firstChild) scheduleNodes.push(panel.removeChild(panel.firstChild));
-         var scheduleSections = [];
-         var scheduleTitles = [];
-         var schedulePrefix = [];
-         var scheduleSection = null;
-         scheduleNodes.forEach(function(node) {
-             if (node.tagName === 'H4') {
-                 scheduleSection = E('div', { style: 'margin-top:1rem;' });
-                 scheduleSections.push(scheduleSection);
-                 scheduleTitles.push(node.textContent);
-             } else if (scheduleSection) {
-                 scheduleSection.appendChild(node);
-             } else {
-                 schedulePrefix.push(node);
-             }
-         });
-         schedulePrefix.forEach(function(node) { panel.appendChild(node); });
-         var makeDefaultBlock = function() {
-             var defSel = self.mkProfileSelect(defaultValue);
-             return E('div', { class: 'mihomo-route-add', style: 'display:flex; flex-direction:column; align-items:flex-start; gap:.4rem; margin:.5rem 0;' }, [
-                 E('span', {}, _('Профиль по умолчанию')), defSel,
-                 E('button', { 'class': 'btn cbi-button-neutral', click: function() {
-                     callScheduleDefault(defSel.value).then(function(res) { if (self.showRoutingError(res)) self.refreshSchedule(); }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
-                 }}, _('Сохранить'))
-             ]);
-         };
-         var scheduleButtons = E('div', { class: 'mihomo-seg', style: 'margin:.5rem 0 1rem;' });
-         scheduleTitles.forEach(function(title, idx) {
-             scheduleButtons.appendChild(E('button', { class: 'btn cbi-button-neutral' + (idx === 0 ? ' active' : ''), click: function() {
-                 scheduleSections.forEach(function(section, sectionIdx) { section.style.display = sectionIdx === idx ? 'block' : 'none'; });
-                 Array.prototype.forEach.call(scheduleButtons.children, function(button, buttonIdx) { button.classList.toggle('active', buttonIdx === idx); });
-             } }, _(title)));
-         });
-          panel.appendChild(scheduleButtons);
-          scheduleSections.forEach(function(section, idx) { section.insertBefore(makeDefaultBlock(), section.firstChild); section.style.display = idx === 0 ? 'block' : 'none'; panel.appendChild(section); });
-          scheduleButtons.style.display = 'none';
-           if (this.activeThird === 'list') {
-               scheduleSections.forEach(function(section) { section.style.display = 'none'; });
-               if (!(data.time || []).length && !(data.trigger || []).length) panel.appendChild(E('p', { style: 'opacity:.75;' }, _('Расписания пока нет.')));
-               else panel.appendChild(this.renderScheduleCards(data));
-           } else {
-               var selectedSection = this.activeFourth === 'time' ? 0 : (this.activeFourth === 'trigger' ? 1 : (this.activeFourth === 'combined' ? 2 : null));
-               scheduleSections.forEach(function(section, idx) {
-                   section.style.display = idx === selectedSection ? 'block' : 'none';
-                   if (idx === selectedSection) {
-                       var tables = section.querySelectorAll('table');
-                       for (var i = 0; i < tables.length; i++) tables[i].style.display = 'none';
-                   }
-               });
-          }
+           var restartName = schedName;
+           var restartInterval = this.mkIntervalEditor();
+              if (this.activeThird === 'list') {
+                  var keepNodes = [];
+                  while (panel.firstChild) keepNodes.push(panel.removeChild(panel.firstChild));
+                  if (!(data.time || []).length && !(data.trigger || []).length) {
+                      panel.appendChild(E('p', { style: 'opacity:.75;' }, _('Расписания пока нет.')));
+                      return;
+                  }
+                  var viewMode = 'cards';
+                  try { viewMode = localStorage.getItem('mihomo_schedule_view') || 'cards'; } catch (e) {}
+                  if (viewMode !== 'table') viewMode = 'cards';
+                  var viewSelect = E('select', { class: 'cbi-input-select', style: 'width:9rem; margin:.5rem 0 1rem;' }, [
+                      E('option', { value: 'cards' }, _('Карточки')),
+                      E('option', { value: 'table' }, _('Таблица'))
+                  ]);
+                  viewSelect.value = viewMode;
+                  panel.appendChild(viewSelect);
+                  var cardsWrap = E('div');
+                  cardsWrap.appendChild(this.renderScheduleCards(data));
+                  var tableWrap = E('div', { style: 'display:none;' });
+                  tableWrap.appendChild(this.renderScheduleTables(data));
+                  panel.appendChild(cardsWrap); panel.appendChild(tableWrap);
+                  var setView = function(mode) {
+                      viewMode = mode;
+                      try { localStorage.setItem('mihomo_schedule_view', mode); } catch (e) {}
+                      viewSelect.value = mode;
+                      cardsWrap.style.display = mode === 'cards' ? 'block' : 'none';
+                      tableWrap.style.display = mode === 'table' ? 'block' : 'none';
+                  };
+                  viewSelect.addEventListener('change', function() { setView(viewSelect.value === 'table' ? 'table' : 'cards'); });
+                  setView(viewMode);
+                  return;
+              }
+
+
+
       },
 
      editTimeSchedule: function(t) {
-        var self = this;
-        var name = E('input', { type: 'text', value: t.name, style: 'width:100%;' });
-        var prof = this.mkProfileSelect(t.profile);
+         var self = this;
+         var isRestart = t && t.start === '00:00' && t.end === '00:00' && (t.days === 'all' || !t.days);
+         if (isRestart) return this.editRestartSchedule(t);
+         var name = E('input', { type: 'text', value: t.name, style: 'width:100%;' });
+         var prof = this.mkProfileSelect(t.profile);
+
         var start = E('input', { type: 'time', value: t.start || '', style: 'width:100%;' });
         var end = E('input', { type: 'time', value: t.end || '', style: 'width:100%;' });
         var days = E('select', { style: 'width:100%;' }, [E('option', { value: 'all' }, _('Все дни'))].concat([0, 1, 2, 3, 4, 5, 6].map(function(d) {
@@ -4094,7 +4394,37 @@ panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; fl
         ]);
     },
 
-    editTriggerSchedule: function(t) {
+      editRestartSchedule: function(t) {
+          var self = this;
+          var name = E('input', { type: 'text', value: t.name, style: 'width:100%;' });
+          var prof = this.mkProfileSelect(t.profile);
+          var interval = this.mkIntervalEditor(t.interval || '1');
+          interval.element.style.width = '100%';
+          interval.element.style.boxSizing = 'border-box';
+          interval.element.querySelector('select').style.width = '100%';
+          interval.element.querySelector('select').style.boxSizing = 'border-box';
+          ui.showModal(_('Редактировать расписание'), [
+              E('div', {}, [
+                  E('div', { style: 'display:flex; align-items:center; margin-bottom:.6rem;' }, [E('label', { style: 'min-width:8rem;' }, _('Название')), name]),
+                  E('div', { style: 'display:flex; align-items:center; margin-bottom:.6rem;' }, [E('label', { style: 'min-width:8rem;' }, _('Конфигурация')), prof]),
+                  E('div', { style: 'display:flex; align-items:center; margin-bottom:.6rem;' }, [E('label', { style: 'min-width:8rem;' }, _('Интервал перезапуска Mihomo')), interval.element])
+              ]),
+              E('div', { class: 'right', style: 'margin-top:1rem;' }, [
+                  E('button', { class: 'btn cbi-button-neutral', click: ui.hideModal }, _('Отмена')), ' ',
+                  E('button', { class: 'btn cbi-button-positive', click: function() {
+                      var nm = name.value.trim();
+                      if (!nm) { ui.addNotification(null, E('p', _('Введите название')), 'error'); return; }
+                      if (!prof.value) { ui.addNotification(null, E('p', _('Выберите профиль')), 'error'); return; }
+                      var iv = interval.value();
+                      if (iv === null) return;
+                      callScheduleSave('time', nm, !!t.enabled, prof.value, '00:00', '00:00', 'all', '', '', '', iv, '', '', '', t.name).then(function(res) { if (self.showRoutingError(res)) { ui.hideModal(); self.refreshSchedule(); } }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
+                  }}, _('Сохранить'))
+              ])
+          ]);
+      },
+
+     editTriggerSchedule: function(t) {
+
         var self = this;
         var name = E('input', { type: 'text', value: t.name, style: 'width:100%;' });
         var urls = E('input', { type: 'text', value: t.urls || '', style: 'width:100%;' });
@@ -4184,10 +4514,32 @@ panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; fl
         var details = cardEl.querySelectorAll('.mihomo-overview-card-detail');
         if (head) head.style.display = 'none';
         for (var di = 0; di < details.length; di++) details[di].style.display = 'none';
-        var field = function(label, input) { return E('div', { style: 'margin:.35rem 0;' }, [E('label', { style: 'display:block; opacity:.8; margin-bottom:.15rem;' }, label), input]); };
+        var field = function(label, input) { return E('div', { style: 'margin:.35rem 0; text-align:center;' }, [E('label', { style: 'display:block; opacity:.8; margin-bottom:.15rem;' }, label), input]); };
         var rows = [];
         var onSave = null;
-        if (type === 'time') {
+        if (type === 'restart') {
+            var rName = E('input', { type: 'text', value: t.name, style: 'width:100%; box-sizing:border-box;' });
+            var rProf = this.mkProfileSelect(t.profile);
+            rProf.style.width = '100%';
+            rProf.style.boxSizing = 'border-box';
+             var rInterval = this.mkIntervalEditor(t.interval || data.defaultInterval || '1');
+             rInterval.element.style.width = '100%';
+             rInterval.element.style.boxSizing = 'border-box';
+             rInterval.element.querySelector('select').style.width = '100%';
+             rInterval.element.querySelector('select').style.boxSizing = 'border-box';
+             rows.push(field(_('Название расписания'), rName));
+             rows.push(field(_('Конфигурация во время расписания'), rProf));
+             rows.push(field(_('Интервал перезапуска Mihomo'), rInterval.element));
+
+            onSave = function() {
+                var nm = rName.value.trim();
+                if (!nm) { ui.addNotification(null, E('p', _('Введите название')), 'error'); return; }
+                 if (!rProf.value) { ui.addNotification(null, E('p', _('Выберите профиль')), 'error'); return; }
+                 var iv = rInterval.value();
+                 if (iv === null) return;
+                 callScheduleSave('time', nm, !!t.enabled, rProf.value, '00:00', '00:00', 'all', '', '', '', iv, '', '', '', t.name).then(function(res) { if (self.showRoutingError(res)) self.refreshSchedule(); }).catch(function(err) { self.showRoutingError({ ok: false, error: (err && err.message) || _('Ошибка RPC') }); });
+            };
+        } else if (type === 'time') {
             var nameInput = E('input', { type: 'text', value: t.name, style: 'width:100%; box-sizing:border-box;' });
             var prof = this.mkProfileSelect(t.profile);
             prof.style.width = '100%';
@@ -4355,12 +4707,21 @@ panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; fl
         var self = this;
         var content = editor.getValue();
         var configPath = currentFile;
-        var profilePrefix = '/etc/mihomo/profiles/';
-        var activeProfile = self.profilesData && (self.profilesData.active || self.profilesData.activeProfile);
-        var activeProfilePath = activeProfile ? profilePrefix + activeProfile + '.yaml' : null;
-        var isMihomoConfig = configPath === MAIN_CONFIG || configPath.indexOf(profilePrefix) === 0;
-        var targetPaths = isMihomoConfig ? [MAIN_CONFIG] : [configPath];
-        if (isMihomoConfig && activeProfilePath && targetPaths.indexOf(activeProfilePath) < 0) targetPaths.push(activeProfilePath);
+         var profilePrefix = '/etc/mihomo/profiles/';
+         var isProfileConfig = configPath.indexOf(profilePrefix) === 0;
+         var activeProfile = self.profilesData && (self.profilesData.active || self.profilesData.activeProfile);
+         var activeProfilePath = activeProfile ? profilePrefix + activeProfile + '.yaml' : null;
+         var isMihomoConfig = configPath === MAIN_CONFIG || isProfileConfig;
+         var targetPaths = isMihomoConfig ? (isProfileConfig ? [configPath] : [MAIN_CONFIG]) : [configPath];
+         var profileToApply = null;
+         if (isProfileConfig) {
+             var currentProfileName = configPath.slice(profilePrefix.length).replace(/\.ya?ml$/, '');
+             if (activeProfilePath === configPath) profileToApply = currentProfileName;
+         } else if (activeProfilePath) {
+             targetPaths.push(activeProfilePath);
+             profileToApply = activeProfile;
+         }
+
         var prepared = {};
         var prepare = function(path) {
             if (path === configPath) return Promise.resolve(content);
@@ -4381,9 +4742,8 @@ panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; fl
                 return promise.then(function() { return fs.write(path, prepared[path]); }).then(function() { return normalizeEditorConfig(path); });
             }, Promise.resolve());
         }).then(function() {
-            if (isMihomoConfig && activeProfilePath) {
-                var profileName = activeProfilePath.slice(profilePrefix.length).replace(/\.ya?ml$/, '');
-                return callProfilesApply(profileName).then(function(res) {
+            if (profileToApply) {
+                return callProfilesApply(profileToApply, self.dashboardPanel || '').then(function(res) {
                     if (!res || !res.ok) throw new Error((res && res.error) || _('Не удалось применить профиль'));
                 });
             }
@@ -4415,7 +4775,7 @@ panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; fl
         var configPath = currentFile;
         fs.write(configPath, editor.getValue())
             .then(function() { return normalizeEditorConfig(configPath); })
-            .then(function() { return fs.exec('/usr/bin/mihomo', ['-d', '/etc/mihomo', '-t', configPath]); })
+            .then(function() { return fs.exec('/usr/bin/mihomo', ['-d', '/etc/mihomo', '-f', configPath, '-t']); })
             .then(function(res) { self.showOutput((res.stdout || '') + (res.stderr || ''), res.code !== 0); done(); })
             .catch(function(e) { self.showOutput(e.message, true); done(); });
     },
@@ -4453,8 +4813,10 @@ panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; fl
             "command -v service >/dev/null 2>&1 && service magitrickle " + action + " >/dev/null 2>&1; true";
     },
 
-    magitrickleRemoveCommand: function() {
-        return "[ -f /etc/magitrickle/state/config.yaml ] && cp -f /etc/magitrickle/state/config.yaml /tmp/magitrickle_config_backup.yaml 2>/dev/null; " +
+    magitrickleRemoveCommand: function(variant) {
+        return "marker=$(cat /etc/mixomo/templates/magitrickle-template.active 2>/dev/null | tr -d ' \\r\\n'); old_variant=$(sed -n '1p' /etc/mixomo/versions/magitrickle 2>/dev/null | tr -d ' \\r\\n'); old_version=$(sed -n '2p' /etc/mixomo/versions/magitrickle 2>/dev/null | tr -d ' \\r\\n'); case \"$old_variant\" in original|mod) ;; *) old_variant='" + variant + "' ;; esac; mkdir -p /etc/mixomo/templates; " +
+            "if [ \"$marker\" != from-mixomo ] && [ -f /etc/magitrickle/state/config.yaml ]; then cp -f /etc/magitrickle/state/config.yaml /etc/mixomo/templates/magitrickle-own-$old_variant.yaml; [ -n \"$old_version\" ] && printf '%s\\n' \"$old_version\" > /etc/mixomo/templates/magitrickle-own-$old_variant.yaml.version; fi; " +
+            "[ -f /etc/magitrickle/state/config.yaml ] && cp -f /etc/magitrickle/state/config.yaml /tmp/magitrickle_config_backup.yaml 2>/dev/null || true; " +
             "if command -v apk >/dev/null 2>&1; then " +
                 "apk del magitrickle_mod magitrickle >/dev/null 2>&1 || true; " +
                 "if apk list -I 2>/dev/null | grep -q '^magitrickle[.-]'; then apk del --force-broken-world magitrickle >/dev/null 2>&1 || true; fi; " +
@@ -4464,16 +4826,50 @@ panel.appendChild(E('div', { class: 'mihomo-route-add', style: 'display:flex; fl
                 "opkg remove magitrickle --force-depends >/dev/null 2>&1 || true; " +
                 "opkg list-installed 2>/dev/null | grep -q '^magitrickle ' && { echo '[magitrickle] не удалось удалить пакет'; exit 1; }; " +
             "fi; " +
-            "rm -f /etc/init.d/magitrickle /opt/etc/init.d/S99magitrickle; true";
+            "rm -f /etc/init.d/magitrickle /opt/etc/init.d/S99magitrickle; rm -f /etc/magitrickle/state/config.yaml /etc/magitrickle/state/config.yaml-opkg; true";
+    },
+
+    magitricklePrepareBaseConfigCommand: function() {
+        return "cfg=/etc/magitrickle/state/config.yaml; alt=/etc/magitrickle/state/config.yaml-opkg; if [ ! -f \"$cfg\" ] && [ -f \"$alt\" ]; then cp -f \"$alt\" \"$cfg\" || exit 1; fi; [ -f \"$cfg\" ] || { echo '[magitrickle] отсутствует новая базовая конфигурация'; exit 1; }";
     },
 
     magitrickleRestoreCommand: function() {
         return "[ -f /tmp/magitrickle_config_backup.yaml ] && { [ -f /etc/magitrickle/state/config.yaml ] || { mkdir -p /etc/magitrickle/state; cp -f /tmp/magitrickle_config_backup.yaml /etc/magitrickle/state/config.yaml; }; }; true";
     },
 
+    magitrickleApplyActiveTemplateCommand: function(variant) {
+        var frag = variant === 'mod' ? 'magitrickle-groups-mod.yaml' : 'magitrickle-groups-original.yaml';
+        var variantConfig = variant === 'mod'
+            ? "modprobe xt_socket 2>/dev/null || true; modprobe xt_TPROXY 2>/dev/null || true; port=$(cat /etc/mixomo/routing/redir-port 2>/dev/null | tr -d ' \\r\\n'); if [ -z \"$port\" ]; then port=$(grep -E '^[[:space:]]*redir-port:' /etc/mihomo/config.yaml 2>/dev/null | awk '{print $2}' | head -1 | tr -d ' \\r\\n'); fi; [ -n \"$port\" ] || exit 1; sed -i -e '/^[[:space:]]*tproxyPort:[[:space:]]*/d' \"$cfg\"; awk -v port=\"$port\" '/^[[:space:]]*startMarkTableIndex:[[:space:]]*[0-9]+/ { match($0, /^[[:space:]]*/); indent=substr($0,RSTART,RLENGTH); print; print indent \"tproxyPort: \" port; next } { print }' \"$cfg\" > \"$cfg.new\" && mv \"$cfg.new\" \"$cfg\" || exit 1; "
+            : "sed -i -e '/^[[:space:]]*tproxyPort:[[:space:]]*/d' \"$cfg\"; ";
+        return "cfg=/etc/magitrickle/state/config.yaml; marker=$(cat /etc/mixomo/templates/magitrickle-template.active 2>/dev/null | tr -d ' \\r\\n'); version=$(sed -n '2p' /etc/mixomo/versions/magitrickle 2>/dev/null | tr -d ' \\r\\n'); frag=/etc/mixomo/templates/" + frag + "; backup=/etc/mixomo/templates/magitrickle-own-" + variant + ".yaml; backup_version=$(cat \"$backup.version\" 2>/dev/null | tr -d ' \\r\\n'); " +
+            "mkdir -p /etc/magitrickle/state /etc/mixomo/templates; " +
+            "if [ \"$marker\" = from-mixomo ]; then " +
+                "[ -f \"$frag\" ] || { echo '[magitrickle] отсутствует шаблон Mixomo'; exit 1; }; " +
+                "grep -q '^groups:[[:space:]]*' \"$frag\" || exit 1; " +
+                "if grep -q '^groups:[[:space:]]*' \"$cfg\" 2>/dev/null; then awk '/^groups:[[:space:]]*/{exit} {print}' \"$cfg\" > \"$cfg.new\"; else cat \"$cfg\" > \"$cfg.new\" 2>/dev/null || printf '' > \"$cfg.new\"; fi; " +
+                "{ cat \"$frag\"; printf '\\n'; } >> \"$cfg.new\" && mv \"$cfg.new\" \"$cfg\" || exit 1; " +
+             "else " +
+                 "if [ -f \"$backup\" ] && { [ ! -f /etc/mixomo/templates/magitrickle-package-default.yaml ] || ! cmp -s \"$backup\" /etc/mixomo/templates/magitrickle-package-default.yaml; } && grep -q '^groups:[[:space:]]*' \"$backup\" 2>/dev/null; then " +
+                     "awk '/^groups:[[:space:]]*/{found=1} found && /^[^[:space:]#][^:]*:/ && !/^groups:[[:space:]]*/{exit} found{print}' \"$backup\" > \"$cfg.own-groups\"; grep -q '^groups:[[:space:]]*' \"$cfg.own-groups\" || exit 1; " +
+                     "if grep -q '^groups:[[:space:]]*' \"$cfg\" 2>/dev/null; then awk '/^groups:[[:space:]]*/{exit} {print}' \"$cfg\" > \"$cfg.new\"; else cat \"$cfg\" > \"$cfg.new\" 2>/dev/null || printf '' > \"$cfg.new\"; fi; " +
+                     "{ cat \"$cfg.own-groups\"; printf '\\n'; } >> \"$cfg.new\" && mv \"$cfg.new\" \"$cfg\" && rm -f \"$cfg.own-groups\" || exit 1; printf '%s\\n' own > /etc/mixomo/templates/magitrickle-template.active; " +
+                 "else " +
+                     "[ -f \"$frag\" ] || { echo '[magitrickle] отсутствует шаблон Mixomo'; exit 1; }; " +
+                     "if grep -q '^groups:[[:space:]]*' \"$cfg\" 2>/dev/null; then awk '/^groups:[[:space:]]*/{exit} {print}' \"$cfg\" > \"$cfg.new\"; else cat \"$cfg\" > \"$cfg.new\" 2>/dev/null || printf '' > \"$cfg.new\"; fi; " +
+                     "{ cat \"$frag\"; printf '\\n'; } >> \"$cfg.new\" && mv \"$cfg.new\" \"$cfg\" || exit 1; printf '%s\\n' from-mixomo > /etc/mixomo/templates/magitrickle-template.active; " +
+                 "fi; " +
+             "fi; " +
+
+            variantConfig +
+            "service magitrickle restart || exit 1; i=0; while [ \"$i\" -lt 15 ] && ! pidof magitrickled >/dev/null 2>&1; do sleep 1; i=$((i + 1)); done; pidof magitrickled >/dev/null 2>&1 || exit 1";
+    },
+
     magitrickleInstallCommand: function(variant) {
         if (variant === 'mod') {
-            return "tmp=/tmp/magitrickle-mod.sh; if command -v curl >/dev/null 2>&1; then curl -fsSL --connect-timeout 10 --max-time 300 https://raw.githubusercontent.com/badigit/MagiTrickle_mod_badigit/mod_badigit/scripts/install.sh -o $tmp; else wget -qO $tmp -T 300 https://raw.githubusercontent.com/badigit/MagiTrickle_mod_badigit/mod_badigit/scripts/install.sh; fi || { echo '[magitrickle] не удалось скачать установщик Mod'; exit 1; }; sh $tmp || exit 1";
+            var deps = "if command -v apk >/dev/null 2>&1; then apk update >/dev/null 2>&1 && apk add kmod-nft-tproxy kmod-nft-socket iptables-mod-tproxy iptables-mod-socket iptables-mod-conntrack-extra kmod-ipt-nat kmod-ipt-ipset ip6tables-nft || exit 1; else opkg update >/dev/null 2>&1 && opkg install kmod-ipt-tproxy kmod-ipt-socket iptables-mod-socket iptables-mod-tproxy iptables-mod-conntrack-extra kmod-ipt-nat kmod-ipt-ipset ip6tables-nft || exit 1; fi; modprobe xt_socket 2>/dev/null || true; modprobe xt_TPROXY 2>/dev/null || true; command -v apk >/dev/null 2>&1 || iptables -m socket -h >/dev/null 2>&1 || exit 1; ";
+            return deps +
+                "tmp=/tmp/magitrickle-mod.sh; if command -v curl >/dev/null 2>&1; then curl -fsSL --connect-timeout 10 --max-time 300 https://raw.githubusercontent.com/badigit/MagiTrickle_mod_badigit/mod_badigit/scripts/install.sh -o $tmp; else wget -qO $tmp -T 300 https://raw.githubusercontent.com/badigit/MagiTrickle_mod_badigit/mod_badigit/scripts/install.sh; fi || { echo '[magitrickle] не удалось скачать установщик Mod'; exit 1; }; sh $tmp || exit 1";
         }
         return "tmp=/tmp/magitrickle-add-repo.sh; if command -v curl >/dev/null 2>&1; then curl -fsSL --connect-timeout 10 --max-time 60 http://bin.magitrickle.dev/packages/add_repo.sh -o $tmp; else wget -qO $tmp -T 60 http://bin.magitrickle.dev/packages/add_repo.sh; fi || { echo '[magitrickle] не удалось скачать add_repo.sh'; exit 1; }; sh $tmp >/dev/null 2>&1 || { echo '[magitrickle] add_repo.sh завершился с ошибкой'; exit 1; }; " +
             "if command -v apk >/dev/null 2>&1; then apk update >/dev/null 2>&1; apk add magitrickle || exit 1; else opkg update >/dev/null 2>&1; opkg install magitrickle || exit 1; fi";
@@ -4496,15 +4892,15 @@ return "mkdir -p /etc/mixomo/versions; prev_variant=$(sed -n '1p' /etc/mixomo/ve
     magitrickleInstallSteps: function(variant) {
         return [
             this.magitrickleService('stop'),
-            this.magitrickleRemoveCommand(),
+            this.magitrickleRemoveCommand(variant),
             this.magitrickleKillStale(),
             this.magitrickleInstallCommand(variant),
             this.magitrickleVerifyInstall(),
-            this.magitrickleRestoreCommand(),
+            this.magitricklePrepareBaseConfigCommand(),
             this.magitrickleKillStale(),
             this.magitrickleService('enable'),
-            this.magitrickleService('restart'),
-            this.magitrickleVersionFinalize(variant)
+            this.magitrickleVersionFinalize(variant),
+            this.magitrickleApplyActiveTemplateCommand(variant)
         ];
     },
 
@@ -4570,7 +4966,7 @@ return "mkdir -p /etc/mixomo/versions; prev_variant=$(sed -n '1p' /etc/mixomo/ve
     mixomoManifestUrl: function() {
         return this.mixomoChannel === 'test'
             ? 'https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/main/manifest.test'
-            : 'https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/v0.3.3/manifest.stable';
+            : 'https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/main/manifest.stable';
     },
 
     mixomoInstallerUrl: function() {
@@ -4712,8 +5108,9 @@ return "mkdir -p /etc/mixomo/versions; prev_variant=$(sed -n '1p' /etc/mixomo/ve
             var title = self.overviewPanel ? self.overviewPanel.querySelector('[data-mihomo-card="magitrickle"] .mihomo-overview-card-title') : null;
             if (title) title.textContent = _('MagiTrickle') + ' ' + self.magitrickleVersion;
             self.setMagitrickleButtonIdle();
-            return fs.exec('/bin/sh', ['-c', 'service magitrickle status 2>&1; pidof magitrickled 2>/dev/null; true']).catch(function() { return { code: 1 }; }).then(function(st) {
+            return fs.exec('/bin/sh', ['-c', 'service magitrickle status 2>&1; pidof magitrickled 2>/dev/null']).catch(function() { return { code: 1 }; }).then(function(st) {
                 self.magitrickleRunning = isMagiRunningOutput(st);
+                if (!self.magitrickleRunning) throw new Error(_('MagiTrickle установлен, но не запущен'));
                 if (self.overviewPanel && self.activeView === 'overview') return self.refreshOverview();
             });
         });
@@ -4834,6 +5231,159 @@ return "mkdir -p /etc/mixomo/versions; prev_variant=$(sed -n '1p' /etc/mixomo/ve
             ui.addNotification(null, E('p', err.message || _('Не удалось переключить вариант MagiTrickle')), 'error');
             self.refreshMagitrickle();
         });
+    },
+
+    magitrickleTemplateCommand: function() {
+        var frag = this.magitrickleVariant === 'mod' ? 'groups-mod.yaml' : 'groups-original.yaml';
+        var ownVariant = this.magitrickleVariant === 'mod' ? 'mod' : 'original';
+        return "cfg=/etc/magitrickle/state/config.yaml; own=/etc/mixomo/templates/magitrickle-own-" + ownVariant + ".yaml; own_version=/etc/mixomo/templates/magitrickle-own-" + ownVariant + ".yaml.version; frag=" + frag + ";" +
+            " tpl=/etc/mixomo/templates/magitrickle-$frag;" +
+            " url=https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/main/src/assets/magitrickle/$frag; dl=/tmp/magitrickle-$frag;" +
+            " mkdir -p /etc/magitrickle/state; mkdir -p /etc/mixomo/templates;" +
+            " prev=$(cat /etc/mixomo/templates/magitrickle-template.active 2>/dev/null | tr -d ' \\r\\n');" +
+             " if [ \"$prev\" != from-mixomo ] && [ -f \"$cfg\" ]; then cp -f \"$cfg\" \"$own\" && old_version=$(sed -n '2p' /etc/mixomo/versions/magitrickle 2>/dev/null | tr -d ' \\r\\n') && [ -n \"$old_version\" ] && printf '%s\\n' \"$old_version\" > \"$own_version\" || { echo '[magitrickle] не удалось сохранить бэкап'; exit 1; }; fi;" +
+
+            " if command -v curl >/dev/null 2>&1; then curl -fsSL --connect-timeout 15 --max-time 180 \"$url\" -o \"$dl\"; else wget -qO \"$dl\" -T 180 \"$url\"; fi;" +
+            " if [ -s \"$dl\" ]; then frag=\"$dl\"; elif [ -f \"$tpl\" ]; then frag=\"$tpl\"; else echo '[magitrickle] шаблон недоступен'; exit 1; fi;" +
+            " grep -q '^groups:[[:space:]]*' \"$frag\" || { echo '[magitrickle] во фрагменте нет groups:'; exit 1; };" +
+            " if grep -q '^groups:[[:space:]]*' \"$cfg\" 2>/dev/null; then awk '/^groups:[[:space:]]*/{exit} {print}' \"$cfg\" > \"$cfg.new\" || { echo '[magitrickle] не удалось обрезать конфиг'; exit 1; };" +
+            " else cat \"$cfg\" > \"$cfg.new\" 2>/dev/null || printf '' > \"$cfg.new\" || { echo '[magitrickle] нет доступа к конфигу'; exit 1; }; fi;" +
+            " { cat \"$frag\"; printf '\\n'; } >> \"$cfg.new\" || { echo '[magitrickle] не удалось дописать фрагмент'; exit 1; };" +
+            " mv \"$cfg.new\" \"$cfg\" || { echo '[magitrickle] не удалось сохранить конфиг'; exit 1; };" +
+            " printf '%s\\n' from-mixomo > /etc/mixomo/templates/magitrickle-template.active || exit 1;" +
+            " service magitrickle restart || exit 2";
+    },
+
+    switchMagitrickleTemplate: function(template, select) {
+        var self = this;
+        var previous = this.magitrickleTemplate;
+        if (template !== 'own' && template !== 'from-mixomo') return;
+        if (template === previous) return;
+        if (template === 'own') {
+            select.value = previous;
+            var showTemplateModal = function(hasBackup) {
+                var rows = [];
+                if (hasBackup) rows.push(E('div', { style: 'margin:.35rem 0; text-align:center;' }, E('button', { class: 'btn cbi-button-positive', click: function() { ui.hideModal(); self.restoreOwnTemplate(select, previous); } }, _('Вернуть прошлую копию'))));
+                rows.push(E('div', { style: 'margin:.35rem 0; text-align:center;' }, E('button', { class: 'btn cbi-button-neutral', click: function() { ui.hideModal(); self.createOwnTemplate(select, 'standard', previous); } }, _('Использовать Default'))));
+                rows.push(E('div', { style: 'margin:.35rem 0; text-align:center;' }, E('button', { class: 'btn cbi-button-neutral', click: function() { ui.hideModal(); self.createOwnTemplate(select, 'empty', previous); } }, _('Использовать чистый шаблон'))));
+                rows.push(E('div', { style: 'margin:.35rem 0; text-align:center;' }, E('button', { class: 'btn cbi-button-neutral', click: function() { ui.hideModal(); select.value = previous; } }, _('Отмена'))));
+                ui.showModal(null, [E('div', { style: 'width:18rem; max-width:100%; margin:0 auto; text-align:center;' }, [E('div', { style: 'font-weight:600; margin-bottom:.7rem;' }, _('Выберите шаблон для «Личная»'))].concat(rows))]);
+            };
+            var ownVariant = this.magitrickleVariant === 'mod' ? 'mod' : 'original';
+            var backupCheck = '[ -f /etc/mixomo/templates/magitrickle-own-' + ownVariant + '.yaml ] && [ -n "$(sed -n \'2p\' /etc/mixomo/versions/magitrickle 2>/dev/null | tr -d \' \\r\\n\')" ] && [ "$(cat /etc/mixomo/templates/magitrickle-own-' + ownVariant + '.yaml.version 2>/dev/null | tr -d \' \\r\\n\')" = "$(sed -n \'2p\' /etc/mixomo/versions/magitrickle 2>/dev/null | tr -d \' \\r\\n\')" ] && { [ ! -f /etc/mixomo/templates/magitrickle-package-default.yaml ] || ! cmp -s /etc/mixomo/templates/magitrickle-own-' + ownVariant + '.yaml /etc/mixomo/templates/magitrickle-package-default.yaml; }';
+            fs.exec('/bin/sh', ['-c', backupCheck]).then(function(res) {
+                showTemplateModal(!!(res && res.code === 0));
+            }).catch(function() { showTemplateModal(false); });
+            return;
+        }
+        select.disabled = true;
+        fs.exec('/bin/sh', ['-c', self.magitrickleTemplateCommand()]).then(function(res) {
+            select.disabled = false;
+            if (res && res.code === 2) {
+                ui.addNotification(null, E('p', _('Шаблон применён, но сервис не перезапустился')), 'error');
+                self.refreshMagitrickle();
+                self.magitricklePanelDirty = true;
+                self.reloadMagitricklePanel(1000);
+                return;
+            }
+            if (res && res.code !== 0) throw new Error((res.stderr || '') + (res.stdout || ''));
+            self.magitrickleTemplate = 'from-mixomo';
+            try { localStorage.setItem('magitrickle_template', 'from-mixomo'); } catch (e) {}
+            select.value = 'from-mixomo';
+            ui.addNotification(null, E('p', _('Шаблон MagiTrickle применён')), 'info');
+            self.refreshMagitrickle();
+            self.magitricklePanelDirty = true;
+            self.reloadMagitricklePanel(1000);
+        }).catch(function(err) {
+            select.disabled = false;
+            self.magitrickleTemplate = previous;
+            try { localStorage.setItem('magitrickle_template', previous); } catch (e) {}
+            select.value = previous;
+            ui.addNotification(null, E('p', err.message || _('Не удалось применить шаблон MagiTrickle')), 'error');
+        });
+    },
+
+    restoreOwnTemplate: function(select, previous) {
+        var self = this;
+        var ownVariant = this.magitrickleVariant === 'mod' ? 'mod' : 'original';
+        select.disabled = true;
+        var cmd = 'cfg=/etc/magitrickle/state/config.yaml; own=/etc/mixomo/templates/magitrickle-own-' + ownVariant + '.yaml; version=$(sed -n \'2p\' /etc/mixomo/versions/magitrickle 2>/dev/null | tr -d \' \\r\\n\'); backup_version=$(cat "$own.version" 2>/dev/null | tr -d \' \\r\\n\'); active=/etc/mixomo/templates/magitrickle-template.active;' +
+            ' [ -f "$own" ] && [ -n "$version" ] && [ "$backup_version" = "$version" ] || { echo "Нет совместимой сохранённой копии"; exit 1; };' +
+            ' cp -f "$own" "$cfg" && printf \'%s\\n\' own > "$active" && service magitrickle restart';
+        fs.exec('/bin/sh', ['-c', cmd]).then(function(res) {
+            select.disabled = false;
+            if (res && res.code !== 0) throw new Error((res.stderr || '') + (res.stdout || ''));
+            self.magitrickleTemplate = 'own';
+            try { localStorage.setItem('magitrickle_template', 'own'); } catch (e) {}
+            select.value = 'own';
+            ui.addNotification(null, E('p', _('Предыдущая копия восстановлена')), 'info');
+            self.refreshMagitrickle();
+            self.magitricklePanelDirty = true;
+            self.reloadMagitricklePanel(1000);
+        }).catch(function(err) {
+            select.disabled = false;
+            self.magitrickleTemplate = previous;
+            try { localStorage.setItem('magitrickle_template', previous); } catch (e) {}
+            select.value = previous;
+            ui.addNotification(null, E('p', err.message || _('Не удалось восстановить копию')), 'error');
+        });
+    },
+
+    createOwnTemplate: function(select, source, previous) {
+        var self = this;
+        var ownVariant = this.magitrickleVariant === 'mod' ? 'mod' : 'original';
+        select.disabled = true;
+        var cmd;
+        if (source === 'empty') {
+            cmd = 'cfg=/etc/magitrickle/state/config.yaml; own=/etc/mixomo/templates/magitrickle-own-' + ownVariant + '.yaml; own_version=/etc/mixomo/templates/magitrickle-own-' + ownVariant + '.yaml.version; active=/etc/mixomo/templates/magitrickle-template.active;' +
+                ' mkdir -p /etc/magitrickle/state; mkdir -p /etc/mixomo/templates;' +
+                ' if grep -q \'^groups:[[:space:]]*\' "$cfg" 2>/dev/null; then awk \'/^groups:[[:space:]]*/{exit} {print}\' "$cfg" > "$cfg.new";' +
+                ' else cat "$cfg" > "$cfg.new" 2>/dev/null || printf \'\' > "$cfg.new"; fi && printf \'groups: []\\n\' >> "$cfg.new" && mv "$cfg.new" "$cfg" && cp -f "$cfg" "$own" && version=$(sed -n \'2p\' /etc/mixomo/versions/magitrickle 2>/dev/null | tr -d \' \\r\\n\') && [ -n "$version" ] && printf \'%s\\n\' "$version" > "$own_version" && printf \'%s\\n\' own > "$active";' +
+                ' service magitrickle restart';
+        } else {
+            var frag = this.magitrickleVariant === 'mod' ? 'magitrickle-groups-mod.yaml' : 'magitrickle-groups-original.yaml';
+            cmd = 'cfg=/etc/magitrickle/state/config.yaml; own=/etc/mixomo/templates/magitrickle-own-' + ownVariant + '.yaml; own_version=/etc/mixomo/templates/magitrickle-own-' + ownVariant + '.yaml.version; frag=/etc/mixomo/templates/' + frag + '; active=/etc/mixomo/templates/magitrickle-template.active;' +
+                ' mkdir -p /etc/magitrickle/state; mkdir -p /etc/mixomo/templates;' +
+                ' [ -f "$frag" ] || { echo "Шаблон Mixomo недоступен"; exit 1; };' +
+                ' if grep -q \'^groups:[[:space:]]*\' "$cfg" 2>/dev/null; then awk \'/^groups:[[:space:]]*/{exit} {print}\' "$cfg" > "$cfg.new";' +
+                ' else cat "$cfg" > "$cfg.new" 2>/dev/null || printf \'\' > "$cfg.new"; fi;' +
+                ' { cat "$frag"; printf \'\\n\'; } >> "$cfg.new" && mv "$cfg.new" "$cfg" && cp -f "$cfg" "$own" && version=$(sed -n \'2p\' /etc/mixomo/versions/magitrickle 2>/dev/null | tr -d \' \\r\\n\') && [ -n "$version" ] && printf \'%s\\n\' "$version" > "$own_version" && printf \'%s\\n\' own > "$active";' +
+                ' service magitrickle restart';
+        }
+        fs.exec('/bin/sh', ['-c', cmd]).then(function(res) {
+            select.disabled = false;
+            if (res && res.code !== 0) throw new Error((res.stderr || '') + (res.stdout || ''));
+            self.magitrickleTemplate = 'own';
+            try { localStorage.setItem('magitrickle_template', 'own'); } catch (e) {}
+            select.value = 'own';
+            ui.addNotification(null, E('p', _('Шаблон MagiTrickle применён')), 'info');
+            self.refreshMagitrickle();
+            self.magitricklePanelDirty = true;
+            self.reloadMagitricklePanel(1000);
+        }).catch(function(err) {
+            select.disabled = false;
+            self.magitrickleTemplate = previous;
+            try { localStorage.setItem('magitrickle_template', previous); } catch (e) {}
+            select.value = previous;
+            ui.addNotification(null, E('p', err.message || _('Не удалось применить шаблон MagiTrickle')), 'error');
+        });
+    },
+
+    reloadMagitricklePanel: function(delay) {
+        var self = this;
+        setTimeout(function() {
+            if (!self.magitricklePanel) return;
+            var frame = self.magitricklePanel.querySelector('iframe');
+            if (!frame) return;
+            var src = frame.getAttribute('src') || frame.src;
+            if (!src) return;
+            var base = String(src).split('?')[0];
+            try {
+                frame.setAttribute('src', base + '?t=' + Date.now());
+            } catch (e) {
+                try { frame.contentWindow.location.reload(); } catch (e2) {}
+            }
+        }, delay || 0);
     },
 
     handleMagiTrickleAction: function(act) {

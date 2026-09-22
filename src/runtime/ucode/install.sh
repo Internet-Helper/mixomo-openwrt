@@ -22,10 +22,16 @@ runtime_ucode_install() {
     source=$(runtime_ucode_source daemon)
     ensure_dir /etc/mihomo/profiles || return 1
     ensure_dir /etc/mihomo/rule-files || return 1
+    ensure_dir /etc/mihomo/proxy-providers || return 1
     ensure_dir /etc/mixomo/profiles || return 1
     ensure_dir /etc/mixomo/order || return 1
     ensure_dir /etc/mixomo/schedule || return 1
     ensure_dir /etc/mixomo/dns || return 1
+    ensure_dir /etc/mixomo/subscriptions/providers || return 1
+    ensure_dir /etc/mixomo/templates || return 1
+    ensure_dir /etc/mixomo/secrets || return 1
+    install_text_atomic "$(asset_path config/subscription-template.yaml)" /etc/mixomo/templates/subscription-template.yaml 644 || return 1
+    chmod 700 /etc/mixomo/secrets /etc/mixomo/subscriptions /etc/mixomo/subscriptions/providers 2>/dev/null || true
     if [ ! -e /etc/mixomo/dns/custom ]; then
         printf '%b\n' \
             'Mihomo\t127.0.0.1#7880' \

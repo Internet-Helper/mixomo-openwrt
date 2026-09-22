@@ -3,11 +3,11 @@ download_to() {
     local target="$2"
     local secs="${3:-300}"
     if command -v curl >/dev/null 2>&1; then
-        curl -fsSL --connect-timeout 10 --max-time "$secs" -o "$target" "$url"
+        curl -fsSL --connect-timeout 10 --max-time "$secs" -o "$target" "$url" >/dev/null 2>&1
         return $?
     fi
     if command -v wget >/dev/null 2>&1; then
-        wget -q -T "$secs" -O "$target" "$url"
+        wget -q -T "$secs" -O "$target" "$url" >/dev/null 2>&1
         return $?
     fi
     return 1

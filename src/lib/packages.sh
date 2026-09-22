@@ -233,6 +233,22 @@ ensure_package() {
     }
 }
 
+ensure_magitrickle_tproxy_modules() {
+    local packages=""
+    if [ "$USE_APK" -eq 1 ]; then
+        packages="kmod-nft-tproxy kmod-nft-socket iptables-mod-tproxy iptables-mod-socket iptables-mod-conntrack-extra kmod-ipt-nat kmod-ipt-ipset ip6tables-nft"
+    else
+        packages="kmod-ipt-tproxy kmod-ipt-socket iptables-mod-socket iptables-mod-tproxy iptables-mod-conntrack-extra kmod-ipt-nat kmod-ipt-ipset ip6tables-nft"
+    fi
+    local package
+    for package in $packages; do
+        ensure_package "$package" || return 1
+    done
+    modprobe xt_socket 2>/dev/null || true
+    modprobe xt_TPROXY 2>/dev/null || true
+    [ "$USE_APK" -eq 1 ] || iptables -m socket -h >/dev/null 2>&1 || return 1
+}
+
 ensure_nftables() {
     command -v nft >/dev/null 2>&1 && return 0
     local candidate

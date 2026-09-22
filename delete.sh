@@ -1,6 +1,6 @@
 #!/bin/sh
 
-SCRIPT_VERSION="v0.3.3"
+SCRIPT_VERSION="v0.3.4"
 
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -46,8 +46,11 @@ mihomo_artifacts_present() {
     [ -e "/usr/share/rpcd/ucode/mihomo-routing.uc" ] || [ -e "/usr/share/rpcd/ucode/mihomo-dns.uc" ] || \
     [ -e "/usr/share/rpcd/ucode/mihomo-profiles.uc" ] || [ -e "/usr/share/rpcd/ucode/mihomo-schedule.uc" ] || \
     [ -e "/usr/share/luci/menu.d/luci-app-mihomo.json" ] || \
+    [ -e "/usr/share/luci/menu.d/luci-app-mixomo.json" ] || \
     [ -e "/usr/share/rpcd/acl.d/luci-app-mihomo.json" ] || \
     [ -e "/usr/share/rpcd/acl.d/luci-app-mixomo.json" ] || \
+    [ -e "/usr/share/rpcd/ucode/mixomo-backup" ] || \
+    [ -e "/usr/share/ucode/mixomo-profiles.uc" ] || \
     [ -e "/usr/libexec/rpcd/mihomo-routing" ] || [ -e "/usr/libexec/rpcd/mihomo-dns" ] || \
     [ -e "/usr/libexec/rpcd/mihomo-profiles" ] || [ -e "/usr/libexec/rpcd/mihomo-schedule" ]
 }
@@ -77,11 +80,16 @@ remove_mihomo() {
     fi
     rm -rf /etc/mihomo
     rm -f /usr/share/ucode/mixomo.uc
+    rm -f /usr/share/ucode/mixomo-files.uc /usr/share/ucode/mixomo-state.uc
+    rm -f /usr/share/ucode/mixomo-config.uc /usr/share/ucode/mixomo-profiles.uc
+    rm -f /usr/share/ucode/mixomo-rules.uc /usr/share/ucode/mixomo-schedules.uc
+    rm -f /usr/share/ucode/mixomo-validation.uc
     rm -f /usr/share/rpcd/ucode/mihomo-routing /usr/share/rpcd/ucode/mihomo-dns
     rm -f /usr/share/rpcd/ucode/mihomo-profiles /usr/share/rpcd/ucode/mihomo-schedule
+    rm -f /usr/share/rpcd/ucode/mixomo-backup
     rm -f /usr/share/rpcd/ucode/mihomo-routing.uc /usr/share/rpcd/ucode/mihomo-dns.uc
     rm -f /usr/share/rpcd/ucode/mihomo-profiles.uc /usr/share/rpcd/ucode/mihomo-schedule.uc
-    rm -f /usr/share/luci/menu.d/luci-app-mihomo.json
+    rm -f /usr/share/luci/menu.d/luci-app-mihomo.json /usr/share/luci/menu.d/luci-app-mixomo.json
     rm -f /usr/share/rpcd/acl.d/luci-app-mihomo.json /usr/share/rpcd/acl.d/luci-app-mixomo.json
     rm -f /usr/libexec/rpcd/mihomo-routing /usr/libexec/rpcd/mihomo-dns
     rm -f /usr/libexec/rpcd/mihomo-profiles /usr/libexec/rpcd/mihomo-schedule
@@ -269,7 +277,7 @@ remove_magitrickle() {
 
     rm -rf /www/luci-static/resources/view/magitrickle
     rm -f /usr/share/luci/menu.d/luci-app-magitrickle.json
-    rm -f /etc/init.d/magitrickle
+    rm -f /etc/init.d/magitrickle /opt/etc/init.d/S99magitrickle
     rm -rf /etc/magitrickle
     rm -f /etc/config/magitrickle
     uci -q delete magitrickle

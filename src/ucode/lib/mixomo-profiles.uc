@@ -11,14 +11,26 @@ import {
 	prefix_before_proxies, from_proxies, strip_trailing_blanks, append_block, has_section,
 	build_full_config, build_selected_config, build_refresh_full_config,
 	build_refresh_selected_config, normalize_config, test_config,
-	current_active, apply_profile
+	current_active, apply_profile, read_dashboard_panel, set_dashboard_panel
 } from 'mixomo';
 
 const VALID_SECTIONS = [ 'proxies', 'proxy-groups', 'proxy-providers', 'rule-providers', 'rules' ];
 const ORDER_DIR = '/etc/mixomo/order';
+const SUBSCRIPTIONS_DIR = '/etc/mixomo/subscriptions';
+const SUBSCRIPTION_PROVIDERS_DIR = SUBSCRIPTIONS_DIR + '/providers';
+const HAPPY_KEY_FILE = '/etc/mixomo/secrets/happy-decoder.key';
+const SUBSCRIPTION_TEMPLATE = '/etc/mixomo/templates/subscription-template.yaml';
 
 function shlex(s) {
 	return "'" + replace(s, "'", "'\\''") + "'";
+}
+
+function secure_temp(prefix) {
+	let p = popen('/bin/mktemp ' + shlex('/tmp/' + prefix + '.XXXXXX'), 'r');
+	if (p == null) return '';
+	let path = trim(p.read('all') || '');
+	p.close();
+	return path;
 }
 
 function has_suffix(s, suf) {
@@ -27,6 +39,15 @@ function has_suffix(s, suf) {
 
 function fail(msg) { return { ok: false, error: msg }; }
 function ok(obj) { if (obj == null) obj = {}; obj.ok = true; return obj; }
+
+function with_defaults(args, names) {
+	if (args == null) return args;
+	for (let di = 0; di < length(names); di++) {
+		let key = names[di];
+		if (args[key] == null) args[key] = '';
+	}
+	return args;
+}
 
 function is_digit(s) {
 	return (s != null && s != '' && match(s, /^[0-9]+$/));
@@ -114,6 +135,7 @@ function emit_list() {
 			interval: (row != null && row[2] != null) ? row[2] : '',
 			updated: (row != null && row[3] != null) ? row[3] : '',
 			sections: (row != null && row[4] != null) ? row[4] : '',
+			source: (row != null && row[5] != null) ? row[5] : '',
 			active: (active == name) ? 1 : 0
 		});
 	}
@@ -673,9 +695,336 @@ function find_time_conflict(self_name, start, end, days, dom, months) {
 	return '';
 }
 
+function subscription_value(content, key) {
+	let lines = split(content || '', '\n');
+	for (let i = 0; i < length(lines); i++) {
+		let p = index(lines[i], '=');
+		if (p > 0 && substr(lines[i], 0, p) == key) return substr(lines[i], p + 1);
+	}
+	return '';
+}
+
+function subscription_id(value) {
+	let id = clean_name(value || '');
+	return (id == '') ? '' : id;
+}
+
+function subscription_defaults() {
+	let version = read_file('/etc/mixomo/versions/mihomo') || '';
+	let release = read_file('/etc/openwrt_release') || '';
+	let model = read_file('/tmp/sysinfo/model') || '';
+	let m = match(release, /DISTRIB_RELEASE='([^']+)'/);
+	return {
+		mihomo_version: trim(version),
+		hwid: 'Router',
+		device_os: 'OpenWrt',
+		openwrt_version: m == null ? '' : m[1],
+		router_model: trim(model)
+	};
+}
+
+function subscription_headers(req) {
+	let d = subscription_defaults();
+	if (!req.args.manual) return [ d.mihomo_version, d.hwid, d.device_os, d.openwrt_version, d.router_model ];
+	return [
+		req.args.mihomo_version || d.mihomo_version,
+		req.args.hwid || d.hwid,
+		req.args.device_os || d.device_os,
+		req.args.openwrt_version || d.openwrt_version,
+		req.args.router_model || d.router_model
+	];
+}
+
+function save_subscription(req) {
+	with_defaults(req.args, [ 'id', 'name', 'url', 'interval', 'mihomo_version', 'hwid', 'device_os', 'openwrt_version', 'router_model' ]);
+	if (req.args.manual == null) req.args.manual = false;
+	let id = subscription_id(req.args.id || req.args.name || '');
+	let url = req.args.url || '';
+	let interval = req.args.interval || '';
+	if (interval == '') return fail('Недопустимый интервал provider ' + id + ': пустое значение');
+	if (!valid_name(id) || id == '') return fail('Недопустимое имя provider ' + id);
+	if (url == '' || (index(url, 'http://') != 0 && index(url, 'https://') != 0 && index(url, 'happ://') != 0) || match(url, /[\r\n]/) != null) return fail('Недопустимая ссылка provider ' + id);
+	if (!valid_interval(interval)) return fail('Недопустимый интервал provider ' + id + ': ' + interval);
+	mkdir_p(SUBSCRIPTION_PROVIDERS_DIR);
+	let h = subscription_headers(req);
+	for (let hi = 0; hi < length(h); hi++) if (match(h[hi] || '', /[\r\n]/) != null) return fail('Недопустимый header');
+	let data = 'id=' + id + '\nurl=' + url + '\ninterval=' + interval + '\nmanual=' + (req.args.manual ? '1' : '0') + '\nmihomo_version=' + h[0] + '\nhwid=' + h[1] + '\ndevice_os=' + h[2] + '\nopenwrt_version=' + h[3] + '\nrouter_model=' + h[4] + '\n';
+	if (!write_file(SUBSCRIPTION_PROVIDERS_DIR + '/' + id, data)) return fail('Не удалось записать provider-файл ' + id);
+	if (!write_file(SUBSCRIPTIONS_DIR + '/' + id + '.url', url + '\n')) return fail('Не удалось записать metadata provider ' + id);
+	return ok({ id: id });
+}
+
+function list_subscriptions() {
+	let out = [];
+	let defaults = subscription_defaults();
+	let files = list_dir(SUBSCRIPTION_PROVIDERS_DIR + '/');
+	for (let i = 0; i < length(files); i++) {
+		let content = read_file(SUBSCRIPTION_PROVIDERS_DIR + '/' + files[i]);
+		if (content == null) continue;
+		push(out, {
+			id: subscription_value(content, 'id'), url: subscription_value(content, 'url'),
+			interval: subscription_value(content, 'interval'), manual: subscription_value(content, 'manual') == '1',
+			mihomo_version: subscription_value(content, 'mihomo_version') || defaults.mihomo_version,
+			hwid: subscription_value(content, 'hwid') || defaults.hwid,
+			device_os: subscription_value(content, 'device_os') || defaults.device_os,
+			openwrt_version: subscription_value(content, 'openwrt_version') || defaults.openwrt_version,
+			router_model: subscription_value(content, 'router_model') || defaults.router_model,
+		});
+	}
+	return ok({ providers: out, defaults: defaults });
+}
+
+function delete_subscription(req) {
+	with_defaults(req.args, [ 'id' ]);
+	let id = subscription_id(req.args.id || '');
+	if (id == '') return fail('Недопустимый provider');
+	unlink(SUBSCRIPTION_PROVIDERS_DIR + '/' + id);
+	unlink(SUBSCRIPTIONS_DIR + '/' + id + '.url');
+	unlink('/etc/mihomo/proxy-providers/' + id + '.txt');
+	unlink('/etc/mihomo/proxy-providers/' + id + '.yaml');
+	return ok();
+}
+
+function json_escape(value) {
+	value = value || '';
+	value = replace(value, '\\', '\\\\');
+	value = replace(value, '"', '\\"');
+	value = replace(value, '\r', '\\r');
+	value = replace(value, '\n', '\\n');
+	return value;
+}
+
+function happy_unescape(value) {
+	value = replace(value || '', '\\\\u0026', '&');
+	value = replace(value, '\\\\/', '/');
+	value = replace(value, '\\\\"', '"');
+	value = replace(value, '\\\\n', '\n');
+	value = replace(value, '\\\\r', '\r');
+	value = replace(value, '\\\\t', '\t');
+	value = replace(value, '\\\\', '\\');
+	return value;
+}
+
+function happy_response_value(content, key) {
+	content = content || '';
+	let needle = '"' + key + '"';
+	let pos = index(content, needle);
+	while (pos >= 0) {
+		let rest = substr(content, pos + length(needle));
+		let colon = index(rest, ':');
+		if (colon < 0) return '';
+		rest = substr(rest, colon + 1);
+		let start = index(rest, '"');
+		if (start < 0) return '';
+		rest = substr(rest, start + 1);
+		let out = '';
+		let i = 0;
+		while (i < length(rest)) {
+			let ch = substr(rest, i, 1);
+			if (ch == '\\' && i + 1 < length(rest)) {
+				out += substr(rest, i, 2);
+				i += 2;
+				continue;
+			}
+			if (ch == '"') return happy_unescape(out);
+			out += ch;
+			i++;
+		}
+		return '';
+	}
+	return '';
+}
+
+function happy_key_status() { return ok({ configured: file_exists(HAPPY_KEY_FILE) && trim(read_file(HAPPY_KEY_FILE) || '') != '' }); }
+
+function happy_key_generate() {
+	mkdir_p('/etc/mixomo/secrets');
+	let out = secure_temp('mixomo-happy-key');
+	if (out == '') return fail('Не удалось создать временный файл');
+	if (system([ '/usr/bin/curl', '-fsS', '--connect-timeout', '10', '--max-time', '30', '-X', 'POST', 'https://happy-decoder.cc/api/v1/keys', '-o', out ]) != 0) { unlink(out); return fail('Не удалось сгенерировать API key'); }
+	let key_response = read_file(out);
+	let key = happy_response_value(key_response, 'key');
+	if (key == '') key = happy_response_value(key_response, 'api_key');
+	unlink(out);
+	if (key == '') return fail('Сервис не вернул API key');
+	if (!write_file(HAPPY_KEY_FILE, key + '\n')) return fail('Не удалось сохранить API key');
+	system([ '/bin/chmod', '600', HAPPY_KEY_FILE ]);
+	return ok({ configured: true });
+}
+
+function happy_decrypt(req) {
+	with_defaults(req.args, [ 'url' ]);
+	let url = req.args.url || '';
+	if (index(url, 'happ://crypt') != 0) return ok({ url: url });
+	let key = trim(read_file(HAPPY_KEY_FILE) || '');
+	if (key == '') return fail('API key не настроен');
+	let body = secure_temp('mixomo-happy-body');
+	let out = secure_temp('mixomo-happy-response');
+	let cfg = secure_temp('mixomo-happy-curl');
+	if (body == '' || out == '' || cfg == '') { if (body != '') unlink(body); if (out != '') unlink(out); if (cfg != '') unlink(cfg); return fail('Не удалось создать временные файлы'); }
+	let payload = '{"url":"' + json_escape(url) + '"}';
+	write_file(body, payload);
+	write_file(cfg, 'silent\nshow-error\nfail\nconnect-timeout = 10\nmax-time = 30\nrequest = POST\nurl = "https://happy-decoder.cc/api/v1/decrypt"\nheader = "Authorization: Bearer ' + key + '"\nheader = "Content-Type: application/json"\ndata = @' + body + '\noutput = ' + out + '\n');
+	system([ '/bin/chmod', '600', body, cfg, out ]);
+	let rc = system([ '/usr/bin/curl', '-K', cfg ]);
+	let response = read_file(out);
+	unlink(body); unlink(cfg); unlink(out);
+	if (rc != 0) return fail('Не удалось расшифровать ссылку');
+	let decoded = happy_response_value(response, 'decryptedUrl');
+	if (decoded == '') decoded = happy_response_value(response, 'url');
+	if (decoded == '') decoded = happy_response_value(response, 'subscription_url');
+	if (decoded == '') decoded = happy_response_value(response, 'decoded_url');
+	if (decoded == '') return fail('Сервис не вернул ссылку');
+	return ok({ url: decoded });
+}
+
+function yaml_quote(value) {
+	value = value || '';
+	value = replace(value, '\r', ' ');
+	value = replace(value, '\n', ' ');
+	value = replace(value, "'", "''");
+	return "'" + value + "'";
+}
+
+const SUBSCRIPTION_COMPACT_KEYS = [ 'external-controller', 'external-ui', 'external-ui-url', 'mixed-port', 'redir-port', 'allow-lan', 'mode', 'ipv6', 'log-level', 'unified-delay', 'tcp-concurrent', 'find-process-mode', 'routing-mark', 'profile', 'sniffer' ];
+
+function subscription_top_key(line) {
+	let m = match(line || '', /^([A-Za-z_][A-Za-z0-9_-]*):/);
+	return (m == null) ? '' : m[1];
+}
+
+function subscription_format(content) {
+	let lines = split(content || '', '\n');
+	let out = [];
+	for (let i = 0; i < length(lines); i++) {
+		let line = lines[i];
+		let key = subscription_top_key(line);
+		if (key == '') { push(out, line); continue; }
+		while (length(out) > 0 && out[length(out) - 1] == '') out = slice(out, 0, length(out) - 1);
+		if (index(SUBSCRIPTION_COMPACT_KEYS, key) < 0 && length(out) > 0) push(out, '');
+		push(out, line);
+		let j = i + 1;
+		while (j < length(lines) && lines[j] == '') j++;
+		i = j - 1;
+	}
+	return join('\n', out);
+}
+
+function subscription_format_profile(path) {
+	let content = read_file(path);
+	if (content == null) return false;
+	let formatted = subscription_format(content);
+	if (formatted == content) return true;
+	return write_file(path, formatted);
+}
+
+function subscription_content(providers) {
+	if (!providers || !length(providers)) return fail('Добавьте хотя бы один provider');
+	let needs_happy_key = false;
+	for (let pi = 0; pi < length(providers); pi++) if (index(providers[pi].url || '', 'happ://crypt') == 0) needs_happy_key = true;
+	if (needs_happy_key && trim(read_file(HAPPY_KEY_FILE) || '') == '') {
+		let key_result = happy_key_generate();
+		if (!key_result.ok) return fail('Этап API key: ' + (key_result.error || 'неизвестная ошибка'));
+	}
+	let provider_yaml = '', uses = '';
+	for (let i = 0; i < length(providers); i++) {
+		let p = providers[i];
+		let id = subscription_id(p.id || '');
+		let url = p.url || '';
+		let interval = p.interval || '';
+		if (!valid_name(id) || id == '') return fail('Недопустимое имя provider ' + id);
+		if (url == '' || (index(url, 'http://') != 0 && index(url, 'https://') != 0 && index(url, 'happ://') != 0) || match(url, /[\r\n]/) != null) return fail('Недопустимая ссылка provider ' + id);
+		if (!valid_interval(interval)) return fail('Недопустимый интервал provider ' + id + ': ' + interval);
+		for (let hi = 0; hi < 5; hi++) if (match(p[[ 'mihomo_version', 'hwid', 'device_os', 'openwrt_version', 'router_model' ][hi]] || '', /[\r\n]/) != null) return fail('Недопустимый header');
+		let resolved = happy_decrypt({ args: { url: url } });
+		if (!resolved.ok) return fail('Не удалось расшифровать provider ' + id + ': ' + resolved.error);
+		let interval_seconds = (interval == '0') ? 0 : int(interval || '0') * 3600;
+		if (interval_seconds == null || interval_seconds < 0) return fail('Недопустимый интервал provider ' + id);
+		if (provider_yaml != '') provider_yaml += '\n';
+		provider_yaml += '  ' + id + ':\n    type: http\n    proxy: DIRECT\n    path: ./proxy-providers/' + id + '.txt\n    header:\n      User-Agent: [' + yaml_quote('mihomo/' + p.mihomo_version) + ']\n      x-hwid: [' + yaml_quote(p.hwid) + ']\n      x-device-os: [' + yaml_quote(p.device_os) + ']\n      x-ver-os: [' + yaml_quote(p.openwrt_version) + ']\n      x-device-model: [' + yaml_quote(p.router_model) + ']\n    url: ' + yaml_quote(resolved.url) + '\n    interval: ' + interval_seconds + '\n    override:\n      udp: true\n    health-check:\n      enable: true\n      url: https://www.google.com/generate_204\n      interval: 300\n      timeout: 500\n      lazy: true\n';
+		uses += '      - ' + id + '\n';
+	}
+	let groups = '  - name: "YouTube"\n    type: fallback\n    url: http://gstatic.com/generate_204\n    expected-status: 204\n    interval: 300\n    lazy: true\n    proxies:\n      - Домашний интернет\n      - Прокси\n    use:\n' + uses +
+		'\n  - name: "Интернет"\n    type: fallback\n    url: http://gstatic.com/generate_204\n    expected-status: 204\n    interval: 300\n    lazy: true\n    proxies:\n      - Прокси без России\n      - Прокси\n    use:\n' + uses +
+		'\n  - name: "Прокси без России"\n    type: url-test\n    url: https://google.com/generate_204\n    expected-status: 204\n    interval: 300\n    timeout: 500\n    lazy: true\n    use:\n' + uses +
+		'    exclude-filter: "Russia|Russian|Россия|РФ|Российский|🇷🇺"\n' +
+		'\n  - name: "Прокси"\n    type: url-test\n    url: https://google.com/generate_204\n    expected-status: 204\n    interval: 300\n    timeout: 500\n    lazy: true\n    use:\n' + uses;
+	let template = read_file(SUBSCRIPTION_TEMPLATE);
+	if (template == null) return fail('Шаблон профиля не найден');
+	return ok({ content: replace(replace(template, '__PROXY_PROVIDERS__', provider_yaml), '__PROXY_GROUPS__', groups) });
+}
+
+function subscription_state_rename(old_name, name) {
+	if (old_name == name) { state_update(STATE_FILE, name, '', '', '', 'subscription'); return; }
+	let rows = [], table = read_table(STATE_FILE);
+	for (let i = 0; i < length(table); i++) {
+		let row = table[i];
+		if (row[0] == old_name) row[0] = name;
+		push(rows, row);
+	}
+	write_table(STATE_FILE, rows);
+	state_update(STATE_FILE, name, '', '', '', 'subscription');
+}
+
+function subscription_replace(req) {
+	let old_name = clean_name(req.args.old || '');
+	let name = clean_name(req.args.name || '');
+	if (!valid_name(name) || (old_name != '' && !valid_name(old_name))) return fail('Недопустимое имя профиля');
+	let old_profile = PROFILES_DIR + '/' + old_name + '.yaml';
+	let profile = PROFILES_DIR + '/' + name + '.yaml';
+	if (old_name != '' && !file_exists(old_profile)) return fail('Профиль не найден');
+	if (old_name != name && file_exists(profile)) return fail('Профиль с таким именем уже существует');
+	let listed = list_subscriptions();
+	if (!listed.ok) return fail('Не удалось прочитать providers: ' + (listed.error || 'неизвестная ошибка'));
+	let built = subscription_content(listed.providers || []);
+	if (!built.ok) return built;
+	let tmp = secure_temp('mixomo-subscription');
+	if (tmp == '') return fail('Не удалось создать временный файл');
+	if (!write_file(tmp, built.content)) { unlink(tmp); return fail('Не удалось сохранить временную конфигурацию'); }
+	normalize_config(tmp);
+	let checked = test_config(tmp);
+	if (!checked.ok) { unlink(tmp); return fail('Конфигурация не прошла проверку Mihomo: ' + trim(checked.output)); }
+	if (system([ '/bin/mv', tmp, profile ]) != 0) { unlink(tmp); return fail('Не удалось заменить профиль'); }
+	let current_ids = [];
+	for (let ci = 0; ci < length(listed.providers || []); ci++) push(current_ids, subscription_id((listed.providers || [])[ci].id || ''));
+	let cached = list_dir('/etc/mihomo/proxy-providers/');
+	for (let cfi = 0; cfi < length(cached); cfi++) {
+		let cache_name = cached[cfi];
+		let cache_id = cache_name;
+		if (has_suffix(cache_id, '.txt')) cache_id = substr(cache_id, 0, length(cache_id) - 4);
+		else if (has_suffix(cache_id, '.yaml')) cache_id = substr(cache_id, 0, length(cache_id) - 5);
+		else continue;
+		if (index(current_ids, cache_id) < 0) unlink('/etc/mihomo/proxy-providers/' + cache_name);
+	}
+	if (old_name != '' && old_name != name) {
+		unlink(old_profile);
+		subscription_state_rename(old_name, name);
+		if (current_active() == old_name) write_file(ACTIVE_FILE, name + '\n');
+	} else {
+		state_update(STATE_FILE, name, '', '', '', 'subscription');
+	}
+	subscription_format_profile(profile);
+	return ok();
+}
+
+function generate_subscription_profile(req) {
+	let listed = list_subscriptions();
+	if (!listed.ok) return fail('Не удалось прочитать providers: ' + (listed.error || 'неизвестная ошибка'));
+	let built = subscription_content(listed.providers || []);
+	if (!built.ok) return built;
+	let name = clean_name(req.args.name || '');
+	if (!valid_name(name)) return fail('Недопустимое имя профиля');
+	let created = do_import_full({ args: { name: name, url: '', content: built.content } });
+	if (!created.ok) return created;
+	state_update(STATE_FILE, name, '', '', '', 'subscription');
+	subscription_format_profile(PROFILES_DIR + '/' + name + '.yaml');
+	return ok();
+}
+
 const methods = {
 	list: { call: emit_list },
-	apply: { args: { name: 'string' }, call: function(req) { return apply_profile(req.args.name || ''); } },
+	apply: { args: { name: 'string', panel: 'string' }, call: function(req) { return apply_profile(req.args.name || '', req.args.panel || ''); } },
+	set_dashboard: { args: { panel: 'string' }, call: function(req) { return set_dashboard_panel(req.args.panel || ''); } },
 	normalize: { args: { path: 'string' }, call: do_normalize },
 	'import': {
 		args: { name: 'string', url: 'string', content: 'string', sections: 'string', interval: 'string' },
@@ -709,7 +1058,16 @@ const methods = {
 		call: do_schedule_save
 	},
 	schedule_delete: { args: { type: 'string', name: 'string' }, call: do_schedule_delete },
-	schedule_set_enabled: { args: { type: 'string', name: 'string', enabled: true }, call: do_schedule_set_enabled }
+	schedule_set_enabled: { args: { type: 'string', name: 'string', enabled: true }, call: do_schedule_set_enabled },
+	subscription_list: { call: list_subscriptions },
+		subscription_add: { args: { id: 'string', url: 'string', interval: 'string', manual: true, mihomo_version: 'string', hwid: 'string', device_os: 'string', openwrt_version: 'string', router_model: 'string' }, call: save_subscription },
+	subscription_update: { args: { id: 'string', url: 'string', interval: 'string', manual: true, mihomo_version: 'string', hwid: 'string', device_os: 'string', openwrt_version: 'string', router_model: 'string' }, call: save_subscription },
+	subscription_delete: { args: { id: 'string' }, call: delete_subscription },
+	subscription_generate: { args: { name: 'string' }, call: generate_subscription_profile },
+	subscription_replace: { args: { old: 'string', name: 'string' }, call: subscription_replace },
+	happy_key_status: { call: happy_key_status },
+	happy_key_generate: { call: happy_key_generate },
+	happy_decrypt: { args: { url: 'string' }, call: happy_decrypt }
 };
 
 export { methods };

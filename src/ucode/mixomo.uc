@@ -98,7 +98,7 @@ function lookup_row(path, name) {
 	return null;
 }
 
-function state_update(path, name, url, interval, secs) {
+function state_update(path, name, url, interval, secs, source) {
 	let rows = [];
 	let found = false;
 	let table = read_table(path);
@@ -109,6 +109,7 @@ function state_update(path, name, url, interval, secs) {
 			if (interval != null) r[2] = interval;
 			r[3] = ('' + time());
 			if (secs != null) r[4] = secs;
+			if (source != null) r[5] = source;
 			found = true;
 		}
 		push(rows, r);
@@ -119,7 +120,8 @@ function state_update(path, name, url, interval, secs) {
 			(url == null) ? '' : url,
 			(interval == null) ? '' : interval,
 			('' + time()),
-			(secs == null) ? '' : secs
+			(secs == null) ? '' : secs,
+			(source == null) ? '' : source
 		]);
 	}
 	write_table(path, rows);
@@ -250,11 +252,20 @@ function strip_trailing_blanks(s) {
 	return join('\n', slice(lines, 0, end));
 }
 
+function strip_leading_blanks(s) {
+	let lines = (s == null) ? [] : split(s, '\n');
+	let start = 0;
+	while (start < length(lines) && lines[start] == '')
+		start++;
+	return join('\n', slice(lines, start, length(lines)));
+}
+
 function append_block(current, content) {
 	if (content == null || content == '') return current;
 	if (current == null) current = '';
 	current = strip_trailing_blanks(current);
-	if (current != '') current += '\n';
+	content = strip_leading_blanks(content);
+	if (current != '') current += '\n\n';
 	return current + content + '\n';
 }
 
@@ -413,19 +424,69 @@ function reload_mihomo() {
 		'-X', 'PUT', url, '-d', body ]) == 0;
 }
 
-function apply_profile(name) {
+const DASHBOARD_FILE = '/etc/mixomo/dashboard_panel';
+
+function dashboard_settings(panel) {
+	if (panel == 'zashboard') return [ 'external-controller: 0.0.0.0:9090', 'external-ui: ./UI/zashboard/', 'external-ui-url: "https://github.com/Zephyruso/zashboard/releases/latest/download/dist-cdn-fonts.zip"' ];
+	if (panel == 'metacubex') return [ 'external-controller: 0.0.0.0:9090', 'external-ui: ./UI/metacubex/', 'external-ui-url: "https://github.com/MetaCubeX/metacubexd/releases/latest/download/compressed-dist.tgz"' ];
+	return null;
+}
+
+function read_dashboard_panel() {
+	let p = trim(read_file(DASHBOARD_FILE) || '');
+	return (p == 'zashboard' || p == 'metacubex') ? p : '';
+}
+
+function set_dashboard_panel(panel) {
+	if (panel != '' && panel != 'zashboard' && panel != 'metacubex')
+		return { ok: false, error: 'Недопустимая панель' };
+	mkdir_p('/etc/mixomo');
+	if (!write_file(DASHBOARD_FILE, panel + '\n')) return { ok: false, error: 'Не удалось сохранить панель' };
+	return { ok: true };
+}
+
+function ensure_dashboard(path, panel) {
+	let settings = dashboard_settings(panel);
+	if (settings == null) return true;
+	let s = read_file(path);
+	if (s == null) return false;
+	let lines = split(s, '\n');
+	let has_controller = false, has_ui = false;
+	for (let i = 0; i < length(lines); i++) {
+		if (match(lines[i], /^external-controller:/) != null) has_controller = true;
+		if (match(lines[i], /^external-ui:/) != null) has_ui = true;
+	}
+	if (has_controller && has_ui) return true;
+	let out = [];
+	for (let i = 0; i < length(lines); i++) {
+		let line = lines[i];
+		if (match(line, /^external-controller:/) != null) continue;
+		if (match(line, /^external-ui:/) != null) continue;
+		if (match(line, /^external-ui-url:/) != null) continue;
+		push(out, line);
+	}
+	return write_file(path, join('\n', settings) + '\n' + join('\n', out));
+}
+
+function apply_profile(name, panel) {
 	if (name == null || name == '' || name == '-') return { ok: false, error: 'Недопустимый профиль' };
 	let prof = PROFILES_DIR + '/' + name + '.yaml';
 	if (read_file(prof) == null) return { ok: false, error: 'Профиль не найден' };
 	normalize_config(prof);
 	let t = test_config(prof);
-	if (!t.ok) return { ok: false, error: 'Профиль не проходит проверку Mihomo' };
+	if (!t.ok) return { ok: false, error: 'Профиль не проходит проверку Mihomo: ' + trim(t.output) };
 
+	let active_panel = (panel == 'zashboard' || panel == 'metacubex') ? panel : read_dashboard_panel();
 	let prev = read_file(MAIN_CONFIG);
 	if (prev != null) write_file(MAIN_CONFIG + '.previous', prev);
 	let tmp = '/tmp/mixomo-config.new';
 	write_file(tmp, read_file(prof));
 	system([ '/bin/mv', tmp, MAIN_CONFIG ]);
+	if (active_panel != '') {
+		ensure_dashboard(MAIN_CONFIG, active_panel);
+		mkdir_p('/etc/mixomo');
+		write_file(DASHBOARD_FILE, active_panel + '\n');
+	}
 
 	if (!reload_mihomo()) {
 		system([ '/etc/init.d/mihomo', 'restart' ]);
@@ -451,5 +512,6 @@ export {
 	extract_anchor_sections, extract_external_anchor_sections, prefix_before_proxies,
 	from_proxies, strip_trailing_blanks, append_block, has_section, build_full_config,
 	build_selected_config, build_refresh_full_config, build_refresh_selected_config,
-	normalize_config, test_config, current_active, apply_profile
+	normalize_config, test_config, current_active, apply_profile,
+	read_dashboard_panel, set_dashboard_panel
 };

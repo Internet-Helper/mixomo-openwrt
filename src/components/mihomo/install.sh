@@ -4,6 +4,7 @@
 [ "${MIXOMO_DEBUG:-0}" = 1 ] && set -x
 
 mihomo_asset() { asset_path "config/mihomo.yaml"; }
+mihomo_subscription_template_asset() { asset_path "config/subscription-template.yaml"; }
 mihomo_init_asset() { asset_path "init/mihomo"; }
 MIHOMO_PROXY_ENABLED=0
 MIHOMO_PUBLIC_PROXIES="https://ghproxy.net/ https://gh-proxy.com/"
@@ -16,9 +17,9 @@ mihomo_proxy_download() {
     local proxy="$1" url="$2" output="$3"
     url=$(mihomo_proxy_url "$proxy" "$url")
     if command -v curl >/dev/null 2>&1; then
-        curl -fsSL --connect-timeout 15 --max-time 300 -o "$output" "$url"
+        curl -fsSL --connect-timeout 15 --max-time 300 -o "$output" "$url" >/dev/null 2>&1
     else
-        wget -q -T 300 -O "$output" "$url"
+        wget -q -T 300 -O "$output" "$url" >/dev/null 2>&1
     fi
 }
 
@@ -75,10 +76,11 @@ mihomo_install_config() {
     [ -x /etc/init.d/mihomo ] && /etc/init.d/mihomo running >/dev/null 2>&1 && was_running=1
     install_text_atomic "$(mihomo_asset)" "$MIHOMO_TEMPLATE" 644 || return 1
     if [ -f "$MIHOMO_CONFIG" ] && grep -qE '^[[:space:]]*mixed-port:[[:space:]]*7890([[:space:]]|$)' "$MIHOMO_CONFIG"; then
+        sed -i -e '/^[[:space:]]*allow-lan:[[:space:]]*/d' -e '1i allow-lan: true' "$MIHOMO_CONFIG" || return 1
         step_done "$(T "Конфигурация Mihomo сохранена" "Mihomo configuration preserved")"
     else
         if [ -f "$MIHOMO_CONFIG" ]; then
-             cp -p "$MIHOMO_CONFIG" "${MIHOMO_CONFIG}.pre-v0.3.3.bak" 2>/dev/null || true
+             cp -p "$MIHOMO_CONFIG" "${MIHOMO_CONFIG}.pre-v0.3.4.bak" 2>/dev/null || true
         fi
         install_text_atomic "$(mihomo_asset)" "$MIHOMO_CONFIG" 644 || return 1
             step_done "$(T "Создана новая конфигурация Mihomo" "Created a new Mihomo configuration")"
@@ -154,6 +156,8 @@ mihomo_check() {
 
 mihomo_install() {
     ensure_dir "$MIHOMO_INSTALL_DIR" || return 1
+    ensure_dir /etc/mixomo/templates || return 1
+    install_text_atomic "$(mihomo_subscription_template_asset)" /etc/mixomo/templates/subscription-template.yaml 644 || return 1
     ensure_dir "$MIHOMO_RULE_DIR" || return 1
     ensure_dir /etc/mihomo/proxy-providers || return 1
     ensure_dir /etc/mihomo/rule-providers || return 1

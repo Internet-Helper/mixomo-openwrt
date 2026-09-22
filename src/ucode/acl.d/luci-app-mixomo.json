@@ -7,13 +7,17 @@
                 "/etc/mihomo/profiles/": ["list"],
                 "/etc/mihomo/profiles/*": ["read", "stat"],
                 "/etc/mihomo/rule-files/": ["list"],
-                "/etc/mihomo/rule-files/*": ["read", "stat"]
+                "/etc/mihomo/rule-files/*": ["read", "stat"],
+                "/etc/mixomo/subscriptions/": ["list"],
+                "/etc/mixomo/subscriptions/*": ["read", "stat"],
+                "/etc/mixomo/subscriptions/*/*": ["read", "stat"],
+                "/etc/mixomo/templates/subscription-template.yaml": ["read", "stat"]
             },
             "ubus": {
                 "service": ["list"],
                 "mihomo-routing": ["status", "clients"],
                 "mihomo-dns": ["status"],
-                "mihomo-profiles": ["list"],
+                "mihomo-profiles": ["list", "subscription_list", "happy_key_status"],
                 "mihomo-schedule": ["list"]
             }
         },
@@ -27,9 +31,9 @@
                 "/sbin/logread": ["exec"]
             },
             "ubus": {
-                "mihomo-routing": ["add", "update", "delete", "set_enabled", "set_router", "set_udp443", "exclude_add", "exclude_delete", "exclude_update", "exclude_set_enabled", "reorder", "reload"],
+                "mihomo-routing": ["add", "update", "delete", "set_enabled", "set_router", "set_udp443", "exclude_add", "exclude_delete", "exclude_update", "exclude_set_enabled", "reorder"],
                 "mihomo-dns": ["apply", "clear", "add_preset", "remove_preset", "rename_preset", "set_order"],
-                "mihomo-profiles": ["apply", "normalize", "import", "import_full", "create", "rename_profile", "delete", "rule_import", "rule_rename", "rule_delete", "refresh", "set_interval", "set_url", "set_order"],
+                "mihomo-profiles": ["apply", "normalize", "import", "import_full", "create", "rename_profile", "delete", "rule_import", "rule_rename", "rule_delete", "refresh", "set_interval", "set_url", "set_order", "set_dashboard", "subscription_list", "subscription_add", "subscription_update", "subscription_delete", "subscription_generate", "subscription_replace", "happy_key_status", "happy_key_generate", "happy_decrypt"],
                 "mihomo-schedule": ["default", "save", "delete", "set_enabled"]
             }
         }

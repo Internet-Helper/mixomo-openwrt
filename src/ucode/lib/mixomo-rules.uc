@@ -467,12 +467,6 @@ function set_udp443(enabled) {
 	system([ '/etc/init.d/firewall', 'reload' ]);
 }
 
-function finalize() {
-	if (access('/etc/init.d/magitrickle', 'x'))
-		system([ '/etc/init.d/magitrickle', 'restart' ]);
-	return emit_status();
-}
-
 const methods = {
 	status: { call: emit_status },
 	clients: { call: emit_clients },
@@ -703,12 +697,9 @@ call: function(req) {
 	set_enabled: {
 		args: { id: 'string', enabled: true },
 		call: function(req) {
-			let sec = PREFIX + 'client_' + req.args.id;
-			if (!section_exists(sec)) return { ok: false, error: 'Правило не найдено' };
-			let backend = get_opt(sec, 'backend');
-			if (backend == '') backend = get_backend_default();
-			let prio = get_opt(sec, 'priority');
-			if (req.args.enabled) {
+		let sec = PREFIX + 'client_' + req.args.id;
+		if (!section_exists(sec)) return { ok: false, error: 'Правило не найдено' };
+		if (req.args.enabled) {
 				if (uci.get('network', sec, 'disabled') != null)
 					uci.delete('network', sec, 'disabled');
 			} else {

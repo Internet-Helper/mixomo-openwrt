@@ -8,8 +8,24 @@
         "/etc/mihomo/profiles/*": ["read", "stat"],
         "/etc/mihomo/rule-files/": ["list"],
         "/etc/mihomo/rule-files/*": ["read", "stat"],
-        "/etc/mixomo/versions/magitrickle": ["read", "stat"],
-        "/etc/mixomo/versions/mixomo": ["read", "stat"],
+        "/etc/mihomo/proxy-providers/": ["list"],
+        "/etc/mihomo/proxy-providers/*": ["read", "stat"],
+         "/etc/mixomo/versions/magitrickle": ["read", "stat"],
+         "/etc/mixomo/templates/magitrickle-template.active": ["read", "stat"],
+         "/etc/mixomo/templates/magitrickle-own-original.yaml": ["read", "stat"],
+         "/etc/mixomo/templates/magitrickle-own-original.yaml.version": ["read", "stat"],
+         "/etc/mixomo/templates/magitrickle-own-mod.yaml": ["read", "stat"],
+         "/etc/mixomo/templates/magitrickle-own-mod.yaml.version": ["read", "stat"],
+         "/etc/mixomo/templates/magitrickle-own-backup.yaml": ["read", "stat"],
+         "/etc/mixomo/templates/magitrickle-groups-original.yaml": ["read", "stat"],
+         "/etc/mixomo/templates/magitrickle-groups-mod.yaml": ["read", "stat"],
+          "/etc/mixomo/templates/magitrickle-package-default.yaml": ["read", "stat"],
+          "/etc/mixomo/templates/subscription-template.yaml": ["read", "stat"],
+          "/etc/mixomo/subscriptions/": ["list"],
+          "/etc/mixomo/subscriptions/*": ["read", "stat"],
+          "/etc/mixomo/subscriptions/*/*": ["read", "stat"],
+          "/etc/mixomo/versions/mixomo": ["read", "stat"],
+
         "/etc/mixomo/backup.conf": ["read", "stat"],
         "/etc/mixomo/backups/": ["list"],
         "/etc/mixomo/backups/*": ["read", "stat"]
@@ -19,7 +35,7 @@
         "service": ["list"],
         "mihomo-routing": ["status", "clients"],
         "mihomo-dns": ["status"],
-        "mihomo-profiles": ["list"],
+        "mihomo-profiles": ["list", "subscription_list", "happy_key_status"],
         "mihomo-schedule": ["list"],
         "mixomo-backup": ["status"]
       }
@@ -29,18 +45,21 @@
         "/etc/mihomo/config.yaml": ["write"],
         "/etc/mihomo/profiles/*": ["write"],
         "/etc/mihomo/rule-files/*": ["write"],
+        "/etc/mihomo/proxy-providers/*": ["write"],
         "/bin/sh": ["exec"],
         "/usr/bin/mihomo": ["exec"],
         "/etc/init.d/mihomo": ["exec"],
         "/etc/init.d/magitrickle": ["exec"],
         "/sbin/logread": ["exec"],
         "/etc/mixomo/backup.conf": ["write"],
-        "/etc/mixomo/backups/*": ["write"]
+        "/etc/mixomo/backups/*": ["write"],
+        "/etc/mixomo/subscriptions/*": ["write"],
+        "/etc/mixomo/subscriptions/*/*": ["write"]
       },
       "ubus": {
         "mihomo-routing": ["add", "update", "delete", "set_enabled", "set_router", "set_udp443", "exclude_add", "exclude_delete", "exclude_update", "exclude_set_enabled", "reorder"],
         "mihomo-dns": ["apply", "apply_full", "clear", "add_preset", "remove_preset", "rename_preset", "set_order"],
-        "mihomo-profiles": ["apply", "normalize", "import", "import_full", "create", "rename_profile", "delete", "rule_import", "rule_rename", "rule_delete", "refresh", "set_interval", "set_url", "set_order"],
+        "mihomo-profiles": ["apply", "normalize", "import", "import_full", "create", "rename_profile", "delete", "rule_import", "rule_rename", "rule_delete", "refresh", "set_interval", "set_url", "set_order", "set_dashboard", "subscription_list", "subscription_add", "subscription_update", "subscription_delete", "subscription_generate", "subscription_replace", "happy_key_status", "happy_key_generate", "happy_decrypt"],
         "mihomo-schedule": ["default", "save", "delete", "set_enabled"],
         "mixomo-backup": ["create", "delete", "restore", "settings"]
       }

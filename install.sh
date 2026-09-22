@@ -80,6 +80,12 @@ if [ -z "$MIXOMO_MANIFEST_PATH" ]; then
     MIXOMO_MANIFEST_PATH=$MIXOMO_SOURCE_URL/$latest_tag/manifest.stable
 fi
 
+case "$MIXOMO_MANIFEST_PATH" in
+    */v[0-9A-Za-z._-]*/manifest.stable)
+        [ "${MIXOMO_UPDATE_ONLY:-0}" = 1 ] && MIXOMO_MANIFEST_PATH=$MIXOMO_SOURCE_URL/main/manifest.stable
+        ;;
+esac
+
 if [ -f "$MIXOMO_MANIFEST_PATH" ]; then
     MANIFEST=$MIXOMO_MANIFEST_PATH
 elif case "$MIXOMO_MANIFEST_PATH" in file://*) true;; *) false;; esac; then

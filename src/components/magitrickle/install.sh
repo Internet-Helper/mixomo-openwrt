@@ -91,7 +91,7 @@ magitrickle_select() {
     if [ -n "$installed" ]; then
         label=$(magitrickle_label "$installed")
         magitrickle_line "$(T "Установленная версия: $label" "Installed version: $label")"
-        magitrickle_line "1) $(T "Обновить $label (нажмите Enter для выбора)" "Update $label (press Enter to select)")"
+        magitrickle_line "1) $(T "Обновить $label (можно нажать Enter для выбора)" "Update $label (you can press Enter to select)")"
         if [ "$installed" = mod ]; then other=original; else other=mod; fi
         other_label=$(magitrickle_label "$other")
         magitrickle_line "2) $(T "Изменить версию на $other_label" "Switch version to $other_label")"
@@ -104,7 +104,7 @@ magitrickle_select() {
         esac
     else
         magitrickle_line "$(T "Какую версию установить?" "Which version to install?")"
-        magitrickle_line "1. Original $(T "(нажмите Enter для выбора)" "(press Enter to select)")"
+        magitrickle_line "1. Original $(T "(можно нажать Enter для выбора)" "(you can press Enter to select)")"
         magitrickle_line "2. Mod"
         magitrickle_prompt "$(T "Ваш выбор: " "Your choice: ")"
         choice=$(read_user_input) || return 1
@@ -202,12 +202,108 @@ magitrickle_restore_config() {
     rm -f "$backup"
 }
 
+magitrickle_install_template() {
+    ensure_dir /etc/mixomo/templates || return 1
+    install_text_atomic "$(asset_path "magitrickle/groups-original.yaml")" /etc/mixomo/templates/magitrickle-groups-original.yaml 644 || return 1
+    install_text_atomic "$(asset_path "magitrickle/groups-mod.yaml")" /etc/mixomo/templates/magitrickle-groups-mod.yaml 644 || return 1
+}
+
+magitrickle_save_own_backup() {
+    local variant="$1" config=/etc/magitrickle/state/config.yaml backup version
+    case "$variant" in original|mod) ;; *) return 1 ;; esac
+    [ -f "$config" ] || return 0
+    ensure_dir /etc/mixomo/templates || return 1
+    backup=/etc/mixomo/templates/magitrickle-own-$variant.yaml
+    cp -f "$config" "$backup"
+    version=$(magitrickle_read_version)
+    if [ -n "$version" ]; then printf '%s\n' "$version" > "$backup.version"; else rm -f "$backup.version"; fi
+}
+
+magitrickle_apply_own_groups() {
+    local variant="$1" config=/etc/magitrickle/state/config.yaml backup temp_dir
+    backup=/etc/mixomo/templates/magitrickle-own-$variant.yaml
+    [ -f "$backup" ] || return 1
+    if [ -f /etc/mixomo/templates/magitrickle-package-default.yaml ] && cmp -s "$backup" /etc/mixomo/templates/magitrickle-package-default.yaml; then
+        return 1
+    fi
+    grep -q '^groups:[[:space:]]*' "$backup" || return 1
+    temp_dir=$(mktemp -d /tmp/mixomo.XXXXXX) || return 1
+    awk '/^groups:[[:space:]]*/{found=1} found && /^[^[:space:]#][^:]*:/ && !/^groups:[[:space:]]*/{exit} found{print}' "$backup" > "$temp_dir/groups.yaml" || { rm -rf "$temp_dir"; return 1; }
+    grep -q '^groups:[[:space:]]*' "$temp_dir/groups.yaml" || { rm -rf "$temp_dir"; return 1; }
+    if grep -q '^groups:[[:space:]]*' "$config"; then
+        awk '/^groups:[[:space:]]*/{exit} {print}' "$config" > "$temp_dir/config.yaml" || { rm -rf "$temp_dir"; return 1; }
+    else
+        cat "$config" > "$temp_dir/config.yaml" || { rm -rf "$temp_dir"; return 1; }
+    fi
+    { cat "$temp_dir/groups.yaml"; printf '\n'; } >> "$temp_dir/config.yaml" || { rm -rf "$temp_dir"; return 1; }
+    mv "$temp_dir/config.yaml" "$config" || { rm -rf "$temp_dir"; return 1; }
+    rm -rf "$temp_dir"
+    printf '%s\n' own > /etc/mixomo/templates/magitrickle-template.active
+}
+
+magitrickle_apply_active_template() {
+    local variant="$1" config=/etc/magitrickle/state/config.yaml marker frag backup temp_dir
+    case "$variant" in original|mod) ;; *) return 1 ;; esac
+    marker=$(cat /etc/mixomo/templates/magitrickle-template.active 2>/dev/null | tr -d ' \r\n')
+    if [ "$marker" = from-mixomo ]; then
+        frag=/etc/mixomo/templates/magitrickle-groups-$variant.yaml
+        [ -f "$frag" ] || return 1
+        grep -q '^groups:[[:space:]]*' "$frag" || return 1
+        temp_dir=$(mktemp -d /tmp/mixomo.XXXXXX) || return 1
+        if grep -q '^groups:[[:space:]]*' "$config"; then
+            awk '/^groups:[[:space:]]*/{exit} {print}' "$config" > "$temp_dir/config.yaml" || { rm -rf "$temp_dir"; return 1; }
+        else
+            cat "$config" > "$temp_dir/config.yaml" || { rm -rf "$temp_dir"; return 1; }
+        fi
+        { cat "$frag"; printf '\n'; } >> "$temp_dir/config.yaml" || { rm -rf "$temp_dir"; return 1; }
+        mv "$temp_dir/config.yaml" "$config" || { rm -rf "$temp_dir"; return 1; }
+        rm -rf "$temp_dir"
+        return 0
+    fi
+    if magitrickle_apply_own_groups "$variant"; then
+        return 0
+    fi
+    magitrickle_apply_standard_groups "$variant" || return 1
+}
+
+magitrickle_apply_standard_groups() {
+    local variant="$1" config=/etc/magitrickle/state/config.yaml
+    local frag=/etc/mixomo/templates/magitrickle-groups-$variant.yaml
+    local temp_dir
+    [ "$variant" = original ] || [ "$variant" = mod ] || return 1
+    [ -f "$frag" ] || return 1
+    [ -f "$config" ] || return 1
+    grep -q '^groups:[[:space:]]*' "$frag" || return 1
+    temp_dir=$(mktemp -d /tmp/mixomo.XXXXXX) || return 1
+    if grep -q '^groups:[[:space:]]*' "$config"; then
+        awk '/^groups:[[:space:]]*/{exit} {print}' "$config" > "$temp_dir/config.yaml" || { rm -rf "$temp_dir"; return 1; }
+    else
+        cat "$config" > "$temp_dir/config.yaml" || { rm -rf "$temp_dir"; return 1; }
+    fi
+    { cat "$frag"; printf '\n'; } >> "$temp_dir/config.yaml" || { rm -rf "$temp_dir"; return 1; }
+    mv "$temp_dir/config.yaml" "$config" || { rm -rf "$temp_dir"; return 1; }
+    rm -rf "$temp_dir"
+    printf '%s\n' from-mixomo > /etc/mixomo/templates/magitrickle-template.active
+}
+
 magitrickle_install() {
-    local installed latest now_version config=/etc/magitrickle/state/config.yaml
+    local installed latest now_version marker config=/etc/magitrickle/state/config.yaml
     local temp_dir
     magitrickle_select || return 1
+    if [ "$MAGITRICKLE_VARIANT" = mod ]; then
+        ensure_magitrickle_tproxy_modules || return 1
+    fi
+    magitrickle_install_template || return 1
     step_start "${MIXOMO_STEP:+$MIXOMO_STEP }[ONLINE] $(T "Загрузка MagiTrickle" "Downloading MagiTrickle")"
     installed=$(magitrickle_read_variant)
+    magitrickle_fresh=0
+    [ -f "$config" ] || magitrickle_fresh=1
+    if [ "$magitrickle_fresh" = 0 ]; then
+        marker=$(cat /etc/mixomo/templates/magitrickle-template.active 2>/dev/null | tr -d ' \r\n')
+        [ "$marker" = from-mixomo ] || { marker=own; printf '%s\n' own > /etc/mixomo/templates/magitrickle-template.active; }
+        [ "$installed" = original ] || [ "$installed" = mod ] || installed="$MAGITRICKLE_VARIANT"
+        [ "$marker" = own ] && magitrickle_save_own_backup "$installed" || true
+    fi
     [ "$installed" = "$MAGITRICKLE_VARIANT" ] && [ -x /etc/init.d/magitrickle ] && {
         now_version=$(magitrickle_read_version)
         if [ -n "$now_version" ]; then
@@ -221,7 +317,7 @@ magitrickle_install() {
         [ -f "$config" ] && cp "$config" /tmp/magitrickle_config_backup.yaml 2>/dev/null || true
         service magitrickle stop >/dev/null 2>&1 || true
         service magitrickle disable >/dev/null 2>&1 || true
-        [ -f "$config" ] && rm -f "$config" || true
+        rm -f "$config" "${config}-opkg" || true
         if [ "$USE_APK" -eq 1 ]; then
             mixomo_timeout 30 apk del magitrickle_mod magitrickle >/dev/null 2>&1 || true
         else
@@ -230,6 +326,10 @@ magitrickle_install() {
         fi
         rm -f /etc/init.d/magitrickle
         magitrickle_install_package || { [ -f /tmp/magitrickle_config_backup.yaml ] && cp /tmp/magitrickle_config_backup.yaml "$config" 2>/dev/null || true; return 1; }
+        if [ ! -f "$config" ] && [ -f "${config}-opkg" ]; then
+            cp -f "${config}-opkg" "$config" || return 1
+        fi
+        [ -f "$config" ] || return 1
         if [ "$MAGITRICKLE_VARIANT" = mod ]; then
             if ! uci -q get magitrickle.main.enabled >/dev/null 2>&1; then
                 uci -q set magitrickle.main=main || true
@@ -250,7 +350,12 @@ magitrickle_install() {
         fi
         magitrickle_save_variant "$MAGITRICKLE_VARIANT" "$latest"
     fi
-    magitrickle_restore_config
+    cp -f "$config" /etc/mixomo/templates/magitrickle-package-default.yaml 2>/dev/null || return 1
+    if [ "$magitrickle_fresh" = 1 ]; then
+        magitrickle_apply_standard_groups "$MAGITRICKLE_VARIANT" || return 1
+    else
+        magitrickle_apply_active_template "$MAGITRICKLE_VARIANT" || return 1
+    fi
     if [ "$MAGITRICKLE_VARIANT" = mod ]; then
         port=$(cat /etc/mixomo/routing/redir-port 2>/dev/null | tr -d ' \r\n')
         if [ -z "$port" ]; then
@@ -273,6 +378,15 @@ magitrickle_install() {
             rm -rf "$temp_dir"
         fi
     fi
+    if [ "$magitrickle_fresh" = 1 ]; then
+        printf '%s\n' from-mixomo > /etc/mixomo/templates/magitrickle-template.active
+    fi
+    if [ "$MAGITRICKLE_VARIANT" = mod ]; then
+        modprobe xt_socket 2>/dev/null || true
+        modprobe xt_TPROXY 2>/dev/null || true
+    fi
+    service magitrickle restart >/dev/null 2>&1 || return 1
+    magitrickle_wait_running || return 1
     label=$(magitrickle_label "$MAGITRICKLE_VARIANT")
     step_done "$(T "MagiTrickle $label установлен" "MagiTrickle $label installed")"
 }
