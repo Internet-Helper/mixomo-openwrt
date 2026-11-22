@@ -65,4 +65,8 @@ test -f src/assets/init/magitrickle-local
 test -f src/assets/config/magitrickle-local
 test "$(grep -c 'magitrickle_local_install' src/main.sh)" -ge 2
 test "$(grep -c 'set_magitrickle_local' src/assets/acl/luci-app-mixomo.json)" -ge 1
+test -f manifest.local
+test -f dist/mixomo-v0.3.4-magitrickle-local.tar.gz
+test "$(grep -c 'MIXOMO_SOURCE_URL=${MIXOMO_SOURCE_URL:-' install.sh)" -eq 1
+test "$(grep -c 'MIXOMO_SOURCE_URL=${MIXOMO_SOURCE_URL:-' test-install.sh)" -eq 1
 printf 'contracts-ok\n'
