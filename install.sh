@@ -2,9 +2,9 @@
 set -eu
 
 SCRIPT_DIR=$(CDPATH= cd "$(dirname "$0")" && pwd)
-MIXOMO_RELEASES_API=${MIXOMO_RELEASES_API:-https://api.github.com/repos/Internet-Helper/mixomo-openwrt/releases/latest}
-MIXOMO_SOURCE_URL=${MIXOMO_SOURCE_URL:-https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt}
-MIXOMO_MANIFEST_PATH=${MIXOMO_MANIFEST_PATH:-}
+MIXOMO_RELEASES_API=${MIXOMO_RELEASES_API:-https://api.github.com/repos/ewgen198409/mixomo-openwrt/releases/latest}
+MIXOMO_SOURCE_URL=${MIXOMO_SOURCE_URL:-https://raw.githubusercontent.com/ewgen198409/mixomo-openwrt}
+MIXOMO_MANIFEST_PATH=${MIXOMO_MANIFEST_PATH:-https://raw.githubusercontent.com/ewgen198409/mixomo-openwrt/main/manifest.local}
 MIXOMO_SOURCE_ROOT=${MIXOMO_SOURCE_ROOT:-$SCRIPT_DIR}
 MIXOMO_LOCAL_ROOT=${MIXOMO_LOCAL_ROOT:-}
 MIXOMO_LAUNCH_DIR=$(pwd)

@@ -47,13 +47,24 @@ wget -qO- https://github.com/Internet-Helper/mixomo-openwrt/raw/main/install.sh 
 
 # Installing from the fork (with router-local traffic via MagiTrickle)
 
-The fork `ewgen198409/mixomo-openwrt` adds the option "Route this router's local traffic through MagiTrickle (by domain)". The default `install.sh` downloads code from upstream, so point it at the fork source and manifest explicitly:
+The fork `ewgen198409/mixomo-openwrt` adds the option "Route this router's local traffic through MagiTrickle (by domain)". Its `install.sh` points at the fork's own source and manifest by default, so the usual command is enough:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/ewgen198409/mixomo-openwrt/main/install.sh \
-| MIXOMO_SOURCE_URL=https://raw.githubusercontent.com/ewgen198409/mixomo-openwrt \
-  MIXOMO_MANIFEST_PATH=https://raw.githubusercontent.com/ewgen198409/mixomo-openwrt/main/manifest.local \
-  sh
+curl -fsSL https://raw.githubusercontent.com/ewgen198409/mixomo-openwrt/main/install.sh | sh
+```
+
+or with wget:
+
+```sh
+wget -qO- https://raw.githubusercontent.com/ewgen198409/mixomo-openwrt/main/install.sh | sh
+```
+
+To install the original upstream version instead, override the source via environment variables:
+
+```sh
+MIXOMO_SOURCE_URL=https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt \
+MIXOMO_MANIFEST_PATH=https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/main/manifest.stable \
+sh install.sh
 ```
 
 Do not use `MIXOMO_UPDATE_ONLY=1` with the upstream manifest until the change is merged upstream (PR #6) — the upstream bundle will overwrite the patched files.

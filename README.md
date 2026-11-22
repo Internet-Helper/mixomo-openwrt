@@ -45,13 +45,24 @@ wget -qO- https://github.com/Internet-Helper/mixomo-openwrt/raw/main/install.sh 
 
 # Установка из форка (с опцией локального трафика через MagiTrickle)
 
-В форке `ewgen198409/mixomo-openwrt` добавлена опция «Локальный трафик роутера через MagiTrickle (по доменам)». Обычный `install.sh` скачивает код из апстрима, поэтому для установки этой версии нужно явно указать источник и manifest форка:
+В форке `ewgen198409/mixomo-openwrt` добавлена опция «Локальный трафик роутера через MagiTrickle (по доменам)». `install.sh` этого форка по умолчанию берёт код и manifest из форка, поэтому достаточно обычной команды:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/ewgen198409/mixomo-openwrt/main/install.sh \
-| MIXOMO_SOURCE_URL=https://raw.githubusercontent.com/ewgen198409/mixomo-openwrt \
-  MIXOMO_MANIFEST_PATH=https://raw.githubusercontent.com/ewgen198409/mixomo-openwrt/main/manifest.local \
-  sh
+curl -fsSL https://raw.githubusercontent.com/ewgen198409/mixomo-openwrt/main/install.sh | sh
+```
+
+или через wget:
+
+```sh
+wget -qO- https://raw.githubusercontent.com/ewgen198409/mixomo-openwrt/main/install.sh | sh
+```
+
+Чтобы принудительно поставить оригинальную версию, переопределите источник через переменные окружения:
+
+```sh
+MIXOMO_SOURCE_URL=https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt \
+MIXOMO_MANIFEST_PATH=https://raw.githubusercontent.com/Internet-Helper/mixomo-openwrt/main/manifest.stable \
+sh install.sh
 ```
 
 Не используйте `MIXOMO_UPDATE_ONLY=1` с апстримовым manifest, пока правка не принята в основной репозиторий (PR #6): апстримовский bundle перезапишет пропатченные файлы.

@@ -69,4 +69,6 @@ test -f manifest.local
 test -f dist/mixomo-v0.3.4-magitrickle-local.tar.gz
 test "$(grep -c 'MIXOMO_SOURCE_URL=${MIXOMO_SOURCE_URL:-' install.sh)" -eq 1
 test "$(grep -c 'MIXOMO_SOURCE_URL=${MIXOMO_SOURCE_URL:-' test-install.sh)" -eq 1
+test "$(grep -c 'ewgen198409/mixomo-openwrt' install.sh)" -ge 3
+test "$(grep -c 'ewgen198409/mixomo-openwrt' test-install.sh)" -ge 2
 printf 'contracts-ok\n'
