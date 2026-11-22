@@ -59,4 +59,16 @@ test "$(grep -c 'Ссылка на подписку' src/ui/mihomo/config.js)" -
 test "$(grep -c 'happy_key_generate' src/ucode/lib/mixomo-profiles.uc)" -ge 2
 test "$(grep -c 'happy-decoder.cc/api/v1/decrypt' src/ucode/lib/mixomo-profiles.uc)" -ge 1
 test "$(grep -c '/etc/mixomo/secrets/happy-decoder.key' src/assets/acl/luci-app-mixomo.json)" -eq 0
+test -f src/runtime/magitrickle-local/install.sh
+test -f src/runtime/magitrickle-local/magitrickle-local.sh
+test -f src/assets/init/magitrickle-local
+test -f src/assets/config/magitrickle-local
+test "$(grep -c 'magitrickle_local_install' src/main.sh)" -ge 2
+test "$(grep -c 'set_magitrickle_local' src/assets/acl/luci-app-mixomo.json)" -ge 1
+test -f manifest.local
+test -f dist/mixomo-v0.3.4-magitrickle-local.tar.gz
+test "$(grep -c 'MIXOMO_SOURCE_URL=${MIXOMO_SOURCE_URL:-' install.sh)" -eq 1
+test "$(grep -c 'MIXOMO_SOURCE_URL=${MIXOMO_SOURCE_URL:-' test-install.sh)" -eq 1
+test "$(grep -c 'ewgen198409/mixomo-openwrt' install.sh)" -ge 3
+test "$(grep -c 'ewgen198409/mixomo-openwrt' test-install.sh)" -ge 2
 printf 'contracts-ok\n'

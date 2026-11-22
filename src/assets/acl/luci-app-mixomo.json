@@ -50,6 +50,7 @@
         "/usr/bin/mihomo": ["exec"],
         "/etc/init.d/mihomo": ["exec"],
         "/etc/init.d/magitrickle": ["exec"],
+        "/usr/local/sbin/magitrickle-local.sh": ["exec"],
         "/sbin/logread": ["exec"],
         "/etc/mixomo/backup.conf": ["write"],
         "/etc/mixomo/backups/*": ["write"],
@@ -57,7 +58,7 @@
         "/etc/mixomo/subscriptions/*/*": ["write"]
       },
       "ubus": {
-        "mihomo-routing": ["add", "update", "delete", "set_enabled", "set_router", "set_udp443", "exclude_add", "exclude_delete", "exclude_update", "exclude_set_enabled", "reorder"],
+        "mihomo-routing": ["add", "update", "delete", "set_enabled", "set_router", "set_udp443", "set_magitrickle_local", "exclude_add", "exclude_delete", "exclude_update", "exclude_set_enabled", "reorder"],
         "mihomo-dns": ["apply", "apply_full", "clear", "add_preset", "remove_preset", "rename_preset", "set_order"],
         "mihomo-profiles": ["apply", "normalize", "import", "import_full", "create", "rename_profile", "delete", "rule_import", "rule_rename", "rule_delete", "refresh", "set_interval", "set_url", "set_order", "set_dashboard", "subscription_list", "subscription_add", "subscription_update", "subscription_delete", "subscription_generate", "subscription_replace", "happy_key_status", "happy_key_generate", "happy_decrypt"],
         "mihomo-schedule": ["default", "save", "delete", "set_enabled"],

@@ -1,0 +1,2 @@
+config magitrickle_local 'main'
+	option enabled '0'

@@ -18,6 +18,7 @@ MIXOMO_ASSET_ROOT="${MIXOMO_ASSET_ROOT:-$MIXOMO_DEFAULT_ASSET_ROOT}"
 . "$MIXOMO_COMPONENT_ROOT/components/magitrickle/install.sh"
 . "$MIXOMO_COMPONENT_ROOT/runtime/ucode/install.sh"
 . "$MIXOMO_COMPONENT_ROOT/runtime/routing/install.sh"
+. "$MIXOMO_COMPONENT_ROOT/runtime/magitrickle-local/install.sh"
 . "$MIXOMO_COMPONENT_ROOT/ui/install.sh"
 
 mixomo_write_version() {
@@ -40,6 +41,7 @@ mixomo_main() {
         ui_install || return 1
         step_start "[2/2] $(T "Обновление маршрутизации" "Updating routing")"
         routing_install || return 1
+        magitrickle_local_install || return 1
         magitrickle_install_template || return 1
         hev_dedup_forwardings || return 1
         /etc/init.d/mixomo-routing restart >/dev/null 2>&1 || true
@@ -63,6 +65,7 @@ mixomo_main() {
     step_start "[5/5] $(T "Завершение" "Finalizing")"
     runtime_ucode_install || return 1
     routing_install || return 1
+    magitrickle_local_install || return 1
     ui_install || return 1
     finalize_install || return 1
     mixomo_write_version || return 1
