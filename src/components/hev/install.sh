@@ -88,6 +88,8 @@ hev_configure_firewall() {
         uci set "firewall.${zone}.mtu_fix=1"
         uci add_list "firewall.${zone}.network=Mihomo"
     fi
+    # Router-originated traffic can be routed to Mihomo by MagiTrickle marks.
+    uci -q set "firewall.${zone}.output=ACCEPT"
     forward=$(uci show firewall 2>/dev/null | sed -n "s/^firewall\.\([^.]*\)\.src='lan'$/\1/p" | while read -r sec; do [ "$(uci -q get "firewall.$sec.dest" 2>/dev/null)" = "Mihomo" ] && { echo "$sec"; break; }; done)
     if [ -z "$forward" ]; then
         forward=$(uci add firewall forwarding)

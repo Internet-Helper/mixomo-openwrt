@@ -1,0 +1,16 @@
+#!/bin/sh /etc/rc.common
+# Apply the saved MagiTrickle "local traffic" toggle after magitrickled started.
+
+START=99
+STOP=10
+
+SCRIPT=/usr/local/sbin/magitrickle-local.sh
+
+start() {
+	[ -x "$SCRIPT" ] || return 0
+	[ "$(uci -q get magitrickle-local.main.enabled)" = "1" ] && "$SCRIPT" start
+}
+
+stop() {
+	[ -x "$SCRIPT" ] && "$SCRIPT" stop
+}

@@ -6,6 +6,7 @@ import { cursor } from 'uci';
 const uci = cursor();
 uci.load('network');
 uci.load('firewall');
+uci.load('magitrickle-local');
 
 const PREFIX = 'mihomo_route_';
 const TABLE_SECTION = 'mihomo_routing_table';
@@ -341,6 +342,27 @@ function udp443_enabled() {
 	return (t != null && t == 'rule' && uci.get('firewall', 'Block_443_UDP', 'disabled') != '1');
 }
 
+function mt_local_enabled() {
+	return uci.get('magitrickle-local', 'main', 'enabled') == '1';
+}
+
+function set_mt_local(enabled) {
+	uci.set('magitrickle-local', 'main', 'magitrickle_local');
+	uci.set('magitrickle-local', 'main', 'enabled', enabled ? '1' : '0');
+	uci.commit('magitrickle-local');
+	system([ '/usr/local/sbin/magitrickle-local.sh', enabled ? 'start' : 'stop' ]);
+}
+
+function disable_router_mode() {
+	if (uci.get('network', PREFIX + 'router') != null)
+		uci.delete('network', PREFIX + 'router');
+	uci.commit('network');
+	disable_router_mark();
+	cleanup_if_unused();
+	system([ '/etc/init.d/network', 'reload' ]);
+	system([ 'ip', 'rule', 'del', 'priority', '19000', 'fwmark', ROUTER_MARK ]);
+}
+
 function emit_status() {
 	let table = uci.get('network', TABLE_SECTION, 'table');
 	let router = 0;
@@ -379,6 +401,7 @@ function emit_status() {
 		ok: true,
 		table: (table == null) ? 0 : int(table),
 		router: !!router,
+		magitrickleLocal: mt_local_enabled() ? 1 : 0,
 		variant: variant,
 		redirAvailable: (variant == 'redir-tproxy') ? 1 : 0,
 		udp443: udp443_enabled() ? 1 : 0,
@@ -479,10 +502,22 @@ const methods = {
 		}
 	},
 
+	set_magitrickle_local: {
+		args: { enabled: true },
+		call: function(req) {
+			let enabled = !!req.args.enabled;
+			if (enabled && get_opt(PREFIX + 'router', 'mark') == ROUTER_MARK)
+				disable_router_mode();
+			set_mt_local(enabled);
+			return emit_status();
+		}
+	},
+
 	set_router: {
 		args: { enabled: true },
 		call: function(req) {
 			let enabled = !!req.args.enabled;
+			if (enabled && mt_local_enabled()) set_mt_local(false);
 			let table = ensure_base();
 			if (table == null) return { ok: false, error: 'Не удалось подобрать свободную таблицу маршрутизации' };
 			if (enabled) {
@@ -497,13 +532,7 @@ const methods = {
 				apply_network();
 				ensure_router_policy(table);
 			} else {
-				if (uci.get('network', PREFIX + 'router') != null)
-					uci.delete('network', PREFIX + 'router');
-				uci.commit('network');
-				disable_router_mark();
-				cleanup_if_unused();
-				system([ '/etc/init.d/network', 'reload' ]);
-				system([ 'ip', 'rule', 'del', 'priority', '19000', 'fwmark', ROUTER_MARK ]);
+				disable_router_mode();
 			}
 			return emit_status();
 		}

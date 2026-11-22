@@ -102,6 +102,10 @@ var MIXOMO_EN = {
      'Установка ядра...': 'Installing the core...',
     'Название (необязательно)': 'Name (optional)',
     'Направлять исходящий трафик этого устройства через Mihomo': "Route this device's outgoing traffic through Mihomo",
+    'Локальный трафик роутера через MagiTrickle (по доменам)': 'Router local traffic via MagiTrickle (by domain)',
+    'Только домены из списков MagiTrickle. Остальной трафик идёт напрямую.': 'Only domains from MagiTrickle lists. Other traffic goes direct.',
+    'Включить локальный трафик через MagiTrickle?': 'Enable local traffic via MagiTrickle?',
+    'Отключить локальный трафик через MagiTrickle?': 'Disable local traffic via MagiTrickle?',
     'Не удалось получить состояние DNS': 'Could not get DNS status',
     'Не удалось применить правило': 'Could not apply the rule',
      'Не удалось применить профиль': 'Could not apply the profile',
@@ -412,6 +416,7 @@ var callRoutingDelete = rpc.declare({ object: 'mihomo-routing', method: 'delete'
 var callRoutingEnabled = rpc.declare({ object: 'mihomo-routing', method: 'set_enabled', params: ['id', 'enabled'], expect: { '': {} } });
 var callRoutingRouter = rpc.declare({ object: 'mihomo-routing', method: 'set_router', params: ['enabled'], expect: { '': {} } });
 var callRoutingUdp443 = rpc.declare({ object: 'mihomo-routing', method: 'set_udp443', params: ['enabled'], expect: { '': {} } });
+var callRoutingMagitrickleLocal = rpc.declare({ object: 'mihomo-routing', method: 'set_magitrickle_local', params: ['enabled'], expect: { '': {} } });
 var callRoutingExcludeAdd = rpc.declare({ object: 'mihomo-routing', method: 'exclude_add', params: ['dest', 'label'], expect: { '': {} } });
 var callRoutingExcludeDelete = rpc.declare({ object: 'mihomo-routing', method: 'exclude_delete', params: ['id'], expect: { '': {} } });
 var callRoutingExcludeUpdate = rpc.declare({ object: 'mihomo-routing', method: 'exclude_update', params: ['id', 'dest', 'label'], expect: { '': {} } });
@@ -746,6 +751,24 @@ return view.extend({
                     ui.hideModal();
                     callRoutingRouter(enable).then(function(res) { if (self.showRoutingError(res)) self.refreshRouting(); });
                 }}, _('Продолжить'))
+            ])
+        ]);
+    },
+
+    confirmMagitrickleLocalRouting: function(enable) {
+        var self = this;
+        var text = enable
+            ? _('Включить локальный трафик через MagiTrickle?')
+            : _('Отключить локальный трафик через MagiTrickle?');
+        ui.showModal(_('Дополнительное подтверждение'), [
+            E('p', {}, text),
+            E('div', { class: 'right', style: 'margin-top:1rem;' }, [
+                E('button', { class: 'btn cbi-button-neutral', click: ui.hideModal }, _('Отменить')),
+                ' ',
+                E('button', { class: 'btn cbi-button-positive', click: function() {
+                    ui.hideModal();
+                    callRoutingMagitrickleLocal(enable).then(function(res) { if (self.showRoutingError(res)) self.refreshRouting(); });
+                } }, _('Продолжить'))
             ])
         ]);
     },
@@ -1848,7 +1871,7 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
     },
 
     getSpecialOrder: function() {
-        var def = ['udp443', 'router'];
+        var def = ['udp443', 'router', 'magitrickleLocal'];
         try {
             var saved = JSON.parse(localStorage.getItem('mihomo_special_order') || 'null');
             if (Array.isArray(saved) && saved.length === def.length && def.every(function(id) { return saved.indexOf(id) >= 0; })) return saved;
@@ -1871,7 +1894,9 @@ var exLabel = E('input', { type: 'text', placeholder: '', style: 'min-width:12re
         while (panel.firstChild) panel.removeChild(panel.firstChild);
         var routerEnabled = (status.router === true || status.router === 1 || status.router === '1');
         var udp443Enabled = (status.udp443 === true || status.udp443 === 1 || status.udp443 === '1');
+        var mtLocalEnabled = (status.magitrickleLocal === true || status.magitrickleLocal === 1 || status.magitrickleLocal === '1');
         var defs = {
+            magitrickleLocal: { title: _('Локальный трафик роутера через MagiTrickle (по доменам)'), detail: _('Только домены из списков MagiTrickle. Остальной трафик идёт напрямую.'), enabled: mtLocalEnabled, toggle: function() { self.confirmMagitrickleLocalRouting(!mtLocalEnabled); } },
             router: { title: _('Направлять исходящий трафик этого устройства через Mihomo'), detail: _('Применяется только к исходящим соединениям этого устройства — apk update, opkg update, wget, curl и тому подобное.'), enabled: routerEnabled, toggle: function() { self.confirmRouterRouting(!routerEnabled); } },
             udp443: { title: _('Блокировать QUIC (UDP/443)'), detail: _('Все устройства переходят на TCP вместо UDP (QUIC) на 443 порту, что упрощает маршрутизацию в Mihomo.'), enabled: udp443Enabled, toggle: function() { self.setUdp443(!udp443Enabled); } }
         };
